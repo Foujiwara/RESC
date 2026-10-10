@@ -1,6 +1,6 @@
 # 12. Premier essai au banc — Ubox SINGLE 85_200
 
-> **À lire avant de brancher.** Ce firmware a été compilé et validé **en simulation** (45 vérifications : identification, démarrage, observateur, Hall, codeur, frein, vitesse, timeout, défauts) et par des tests PC de configuration (28 vérifications). **Il n'a jamais tourné sur la vraie carte.** Les drivers matériels (TIM1, ADC, USB, CAN, flash) sont écrits d'après le manuel RM0090 et n'ont pas encore été vérifiés en réel. L'essai se fait donc **par paliers**, avec une alimentation de labo **limitée en courant**.
+> **À lire avant de brancher.** Ce firmware a été compilé et validé **en simulation** (51 vérifications : identification, démarrage, observateur, Hall, codeur, frein, vitesse, boucle ouverte, timeout, défauts) et par des tests PC de configuration (30 vérifications). **Il n'a jamais tourné sur la vraie carte.** Les drivers matériels (TIM1, ADC, USB, CAN, flash) sont écrits d'après le manuel RM0090 et n'ont pas encore été vérifiés en réel. L'essai se fait donc **par paliers**, avec une alimentation de labo **limitée en courant**.
 
 ## 0. Matériel
 
@@ -43,7 +43,7 @@ Pour revenir au firmware d'origine :
 ## 3. Premier démarrage (pont toujours coupé)
 
 1. Allumer la carte. RESC maintient l'alimentation (PA15) dès les premières instructions. La carte doit **rester allumée** quand on relâche le bouton.
-2. Environ 0,4 s plus tard (calibration des offsets) : **LED verte fixe** = prêt. LED rouge clignotante = défaut.
+2. Environ 0,4 s plus tard (calibration des offsets) : **LED verte à ~30 %** = attente (prêt). **Vert 100 %** = pont actif (marche, démarrage, détection). **Rouge clignotant** = défaut.
 3. Ouvrir la console :
 
 ```bash
@@ -71,12 +71,18 @@ Arrêt de la carte : appui long (> 2 s) sur le bouton, moteur à l'arrêt.
 offsets_cal
 ```
 
-La commande mesure les offsets pont coupé, puis sous PWM au vecteur nul (le pont commute, aucun courant). Les valeurs sont **sauvegardées** et utilisées aux démarrages suivants.
+La commande mesure les offsets pont coupé, puis sous PWM au vecteur nul (le pont commute, aucun courant). Elle mesure les **courants** et les **tensions de phase** dans les deux cas : `foc_offsets_current_*`, `foc_offsets_voltage_*` (sous PWM) et `foc_offsets_voltage_undriven_*` (pont coupé). Les valeurs sont **sauvegardées** et utilisées aux démarrages suivants.
+Les offsets de tension sont l'écart de chaque phase à la moyenne des trois (les trois phases sont au même potentiel pendant la mesure) : quelques mV sont normaux.
 Échec `-6` (offsets instables sous PWM) : bruit de mesure, à signaler avant d'aller plus loin.
 
 ## 5. Identification du moteur (manuelle : R/L, puis flux, puis Hall)
 
-1. `detect_rl` : le moteur **ne tourne pas** ; on entend un sifflement (créneaux de tension). Résultat attendu pour un moteur de moyeu : R de quelques dizaines de mΩ, L de quelques dizaines à centaines de µH.
+1. `detect_rl` : le moteur **ne tourne pas** (il se cale une fois). Durée environ 6 s :
+   - recherche du courant : paliers ×1,5 de 0,4 s jusqu'à au moins 1,5 V et 8 A (ou 80 % du courant autorisé) ;
+   - trois paliers montants de 0,8 s à ½, ¾ et 1 × ce courant : R = pente ΔV/ΔI ;
+   - sifflement (créneaux de tension) sur l'axe d puis sur l'axe q : Ld, Lq ;
+   - retour du courant à zéro.
+   Le courant est envoyé entre les phases B et C (la phase A ne porte rien). La console affiche les paliers, la chute ohmique et la tension perdue dans le temps mort. Résultat attendu pour un moteur de moyeu : R de quelques dizaines de mΩ, L de quelques dizaines à centaines de µH.
 2. `detect_lambda 5 0.3` : le moteur **va tourner** en boucle ouverte à 5 A jusqu'à un rapport cyclique de 0,3. Il doit être libre.
    - Erreur `-5` : le rotor n'a pas suivi. Recommencer avec plus de courant (`detect_lambda 8 0.3`) ou un moteur moins freiné.
 Après chaque mesure réussie, RESC **calcule et sauvegarde automatiquement** ce qui en dépend :
@@ -108,6 +114,16 @@ Sauvegarder avec `store`, puis vérifier avec `status` : le moteur doit apparaî
 | `rpm 3000` | vitesse régulée |
 | `brake 3` | freinage puis coupure du pont à basse vitesse |
 | `rt` | charge ISR, nombre de reconstructions de courant |
+
+Boucle ouverte (essai, comme sur VESC) :
+
+| Commande | Effet |
+|---|---|
+| `foc_openloop 5 1000` | courant de 5 A imposé, angle tournant à 1000 ERPM (ERPM négatif = sens inverse) |
+| `foc_openloop_duty 0.1 1000` | rapport cyclique 0,1 imposé, **sans régulation de courant** : choisir un rapport proche de la FEM à cette vitesse, sinon le courant n'est limité que par la coupure absolue |
+| `stop` | arrêt |
+
+L'observateur n'est jamais utilisé dans ce mode ; il reste calculé, ce qui permet de comparer son angle à l'angle imposé.
 
 `resc_cli` envoie un maintien toutes les 250 ms : une consigne reste active tant que la console est ouverte. `stop` pour arrêter. Fermer la console, ou perdre la liaison USB, relâche le moteur en 1 s (timeout) : c'est une sécurité « homme mort ».
 

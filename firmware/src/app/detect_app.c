@@ -3,7 +3,8 @@
  *
  * Toutes les sequences sont celles du coeur RESC (foc.c) :
  *  offsets  : pont coupe (courants + tensions de phase), puis vecteur nul sous PWM
- *  R/L      : deux paliers de courant (pente dV/dI), creneaux de tension d/q
+ *             (courants + ecarts de tension entre phases)
+ *  R/L      : recherche du courant, 3 paliers montants (pente dV/dI), creneaux de tension d/q
  *  flux     : rotation I/f jusqu'au rapport cyclique cible, FEM pont actif et pont coupe
  *  Hall     : rotation lente a courant d impose, 3 tours avant / arriere / avant,
  *             centre circulaire de chaque etat
@@ -86,7 +87,7 @@ bool detect_app_start_rl(const comm_iface_t *reply)
     s_reply = reply;
     foc_det_t d = { 0 };
     d.kind = FOC_DET_RL;
-    d.i_test = fm_max(0.5f * i_cap(), 2.0f);      /* courant max de recherche : moitie du courant autorise */
+    d.i_test = fm_max(0.8f * i_cap(), 2.0f);      /* courant max de recherche : 80 % du courant autorise */
     if (!launch(&d)) { send_rl(0, 0, 0); return false; }
     s_st = DA_RL;
     commands_printf("Mesure R/L a %.1f A...", (double)d.i_test);
@@ -215,15 +216,21 @@ void detect_app_poll(uint32_t now_ms)
             g_mcconf.foc_offsets_current_0 = d->off_cs[0];
             g_mcconf.foc_offsets_current_1 = d->off_cs[1];
             g_mcconf.foc_offsets_current_2 = d->off_cs[2];
+            g_mcconf.foc_offsets_voltage_0 = d->off_vph_drv[0];
+            g_mcconf.foc_offsets_voltage_1 = d->off_vph_drv[1];
+            g_mcconf.foc_offsets_voltage_2 = d->off_vph_drv[2];
             g_mcconf.foc_offsets_voltage_undriven_0 = d->off_vph[0];
             g_mcconf.foc_offsets_voltage_undriven_1 = d->off_vph[1];
             g_mcconf.foc_offsets_voltage_undriven_2 = d->off_vph[2];
             g_mcconf.foc_offsets_cal_mode &= (uint8_t)~1u;     /* utiliser ces offsets au demarrage */
             resc_conf_apply();
             resc_conf_store_mc();
-            commands_printf("Offsets courant %.1f %.1f %.1f LSB, tensions %.3f %.3f %.3f V : sauvegardes",
-                            (double)d->off_cs[0], (double)d->off_cs[1], (double)d->off_cs[2],
-                            (double)d->off_vph[0], (double)d->off_vph[1], (double)d->off_vph[2]);
+            commands_printf("Offsets courant : %.1f %.1f %.1f LSB",
+                            (double)d->off_cs[0], (double)d->off_cs[1], (double)d->off_cs[2]);
+            commands_printf("Offsets tension sous PWM : %.4f %.4f %.4f V", (double)d->off_vph_drv[0],
+                            (double)d->off_vph_drv[1], (double)d->off_vph_drv[2]);
+            commands_printf("Offsets tension pont coupe : %.4f %.4f %.4f V (sauvegardes)", (double)d->off_vph[0],
+                            (double)d->off_vph[1], (double)d->off_vph[2]);
         }
         break;
 
@@ -237,10 +244,15 @@ void detect_app_poll(uint32_t now_ms)
             resc_conf_derive_current_gains(&g_mcconf, RESC_CURRENT_BW_DEFAULT);
             resc_conf_apply();
             resc_conf_store_mc();
-            if (d->warn)
-                commands_printf("ATTENTION : courant de mesure insuffisant (%.1f A, chute %.2f V < 1 V) : R peu fiable. "
-                                "Augmenter l_current_max pour la mesure.", (double)d->r_i_high, (double)d->r_v_high);
-            commands_printf("Paliers %.1f A / %.1f A", (double)d->r_i_low, (double)d->r_i_high);
+            commands_printf("Paliers %.1f / %.1f / %.1f A, chute ohmique %.3f V, tension perdue (temps mort) %.3f V",
+                            (double)d->r_i_low, (double)(0.75f * d->r_i_high), (double)d->r_i_high,
+                            (double)d->r_v_high, (double)d->r_v_dt);
+            if (d->warn == 1)
+                commands_printf("ATTENTION : chute ohmique faible (%.2f V) : R peu precise. "
+                                "Augmenter l_current_max pour la mesure.", (double)d->r_v_high);
+            if (d->warn == 2)
+                commands_printf("ATTENTION : temps mort non sature au palier bas : R calculee sur les 2 paliers hauts. "
+                                "Augmenter l_current_max pour la mesure.");
             commands_printf("R=%.2f mOhm  Ld=%.1f uH  Lq=%.1f uH  ->  kp=%.4f ki=%.2f (sauvegarde)",
                             (double)(d->r * 1e3f), (double)(d->ld * 1e6f), (double)(d->lq * 1e6f),
                             (double)g_mcconf.foc_current_kp, (double)g_mcconf.foc_current_ki);

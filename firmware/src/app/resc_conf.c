@@ -117,6 +117,7 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(foc_hall_table_0); FIN(foc_hall_table_1); FIN(foc_hall_table_2); FIN(foc_hall_table_3);
     FIN(foc_hall_table_4); FIN(foc_hall_table_5); FIN(foc_hall_table_6); FIN(foc_hall_table_7);
     FIN(foc_offsets_current_0); FIN(foc_offsets_current_1); FIN(foc_offsets_current_2);
+    FIN(foc_offsets_voltage_0); FIN(foc_offsets_voltage_1); FIN(foc_offsets_voltage_2);
     FIN(foc_offsets_voltage_undriven_0); FIN(foc_offsets_voltage_undriven_1); FIN(foc_offsets_voltage_undriven_2);
     FIN(s_pid_kp); FIN(s_pid_ki); FIN(s_pid_kd); FIN(s_pid_kd_filter); FIN(s_pid_min_erpm); FIN(s_pid_ramp_erpms_s);
     FIN(cc_min_current); FIN(m_ntc_motor_beta);

@@ -15,6 +15,7 @@ typedef struct {
 
     volatile ctrl_mode_t mode;
     volatile float value;            /* A, duty ou ERPM selon le mode */
+    volatile float ol_erpm;          /* vitesse imposee des modes boucle ouverte */
     volatile uint32_t last_cmd_ms;
     volatile bool cmd_flag;          /* nouvelle commande recue */
     volatile float off_delay;        /* s : maintien apres consigne nulle */
@@ -71,6 +72,8 @@ void ctrl_set_handbrake(float a)    { command(CTRL_MODE_HANDBRAKE, fm_abs(a)); }
 void ctrl_set_duty(float d)         { command(CTRL_MODE_DUTY, fm_sat_sym(d, C.l.duty_max)); }
 void ctrl_set_rpm(float erpm)       { command(CTRL_MODE_RPM, erpm); }
 void ctrl_release(void)             { command(CTRL_MODE_NONE, 0.0f); }
+void ctrl_set_openloop(float a, float erpm)      { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP, fm_abs(a)); }
+void ctrl_set_openloop_duty(float d, float erpm) { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP_DUTY, fm_abs(fm_sat_sym(d, C.l.duty_max))); }
 void ctrl_alive(void)               { C.last_cmd_ms = C.now_ms; C.st.timeout = false; }
 void ctrl_set_off_delay(float s)    { C.off_delay = fm_sat(s, 0.0f, 10.0f); }
 void ctrl_estop(void)               { C.estop = true; command(CTRL_MODE_NONE, 0.0f); }
@@ -203,6 +206,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     /* -- application du mode */
     float iq = 0.0f;
     bool run = false, allow_start = false;
+    uint8_t openloop = 0;
     int8_t dir = 1;
     float v = C.value;
 
@@ -277,6 +281,21 @@ void ctrl_update(uint32_t now_ms, float dt)
         break;
     }
 
+    case CTRL_MODE_OPENLOOP:        /* courant impose, angle tournant a ol_erpm (sens = signe de l'ERPM) */
+        if (v > l->cc_min_current) {
+            iq = C.ol_erpm >= 0.0f ? v : -v;
+            run = true;
+            openloop = 1;
+        }
+        break;
+
+    case CTRL_MODE_OPENLOOP_DUTY:   /* rapport cyclique impose, sans regulation de courant */
+        if (v > 0.001f) {
+            run = true;
+            openloop = 2;
+        }
+        break;
+
     case CTRL_MODE_HANDBRAKE:   /* non supporte en sensorless : roue libre */
     case CTRL_MODE_NONE:
     default:
@@ -319,11 +338,15 @@ void ctrl_update(uint32_t now_ms, float dt)
     }
 
     if (!C.power_ok) run = false;
+    if (!run) openloop = 0;
 
     C.iq_out = iq;
     g_foc_cmd.id_ref = 0.0f;
     g_foc_cmd.iq_ref = iq;
     g_foc_cmd.dir = dir;
     g_foc_cmd.allow_start = allow_start ? 1 : 0;
+    g_foc_cmd.ol_omega = C.ol_erpm * (FM_2PI / 60.0f);
+    g_foc_cmd.ol_duty = C.ol_erpm >= 0.0f ? v : -v;
+    g_foc_cmd.openloop = openloop;
     g_foc_cmd.run = run ? 1 : 0;
 }

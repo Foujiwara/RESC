@@ -48,8 +48,11 @@ static void integrate(sim_motor_t *m, double T, const double d[3], bool en)
             double dmx = d[0], dmn = d[0];
             for (int x = 1; x < 3; x++) { if (d[x] > dmx) dmx = d[x]; if (d[x] < dmn) dmn = d[x]; }
             double ripple = m->vbus * (dmx - dmn) / (2.0 * 0.5 * (m->ld + m->lq) * m->f_pwm) + 0.05;
+            /* Les capacites des MOSFET retardent la commutation a faible courant : l'erreur
+             * n'est complete qu'au-dessus de i_soft (zone lineaire elargie) */
+            double isat = 0.5 * ripple > m->i_soft ? 0.5 * ripple : m->i_soft;
             for (int x = 0; x < 3; x++) {
-                double k = i[x] / (0.5 * ripple);
+                double k = i[x] / isat;
                 if (k > 1) k = 1;
                 if (k < -1) k = -1;
                 double dd = d[x] - k * m->t_dead * m->f_pwm;

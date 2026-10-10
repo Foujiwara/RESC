@@ -92,6 +92,9 @@ typedef struct {
     volatile uint8_t run;          /* pont souhaite actif */
     volatile uint8_t allow_start;  /* autorise le demarrage I/f depuis l'arret */
     volatile int8_t  dir;          /* sens du demarrage I/f : +1 / -1 */
+    volatile uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty */
+    volatile float   ol_omega;     /* rad/s el. (signe = sens) */
+    volatile float   ol_duty;      /* -1..1, mode 2 */
 } foc_cmd_t;
 
 /* ------------------------------------------------------------ Etats */
@@ -126,13 +129,15 @@ typedef struct {
     float r_known, l_known;    /* pour le calcul du flux */
     /* resultats */
     float r, ld, lq, lambda;
-    float off_cs[3], off_vph[3];
+    float off_cs[3], off_vph[3];   /* LSB ; V pont coupe (ecart a la moyenne) */
+    float off_vph_drv[3];          /* V sous PWM (ecart a la moyenne des 3 phases) */
     float hall_angle[8];       /* rad ; hall_valid[s] faux = etat invalide */
     bool  hall_valid[8];
     float enc_offset, enc_ratio;
     bool  enc_inverted;
-    float r_i_low, r_i_high, r_v_high;   /* paliers utilises pour R (diagnostic) */
-    int   warn;                /* 1 : courant de mesure insuffisant, R peu fiable */
+    float r_i_low, r_i_high, r_v_high;   /* paliers utilises pour R, chute ohmique entre eux */
+    float r_v_dt;              /* V : tension perdue a courant constant (temps mort, diodes) */
+    int   warn;                /* 1 : chute ohmique faible ; 2 : temps mort non sature au palier bas */
 } foc_det_t;
 
 /* ------------------------------------------------------------ Telemetrie */

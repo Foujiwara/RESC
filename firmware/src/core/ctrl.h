@@ -16,7 +16,9 @@ typedef enum {
     CTRL_MODE_BRAKE,
     CTRL_MODE_DUTY,
     CTRL_MODE_RPM,
-    CTRL_MODE_HANDBRAKE
+    CTRL_MODE_HANDBRAKE,
+    CTRL_MODE_OPENLOOP,         /* courant impose, angle a vitesse imposee */
+    CTRL_MODE_OPENLOOP_DUTY     /* rapport cyclique impose, angle a vitesse imposee */
 } ctrl_mode_t;
 
 typedef struct {
@@ -77,6 +79,9 @@ void ctrl_set_handbrake(float amps);
 void ctrl_set_duty(float duty);
 void ctrl_set_rpm(float erpm);
 void ctrl_release(void);
+/* Boucle ouverte (essai) : courant (A) ou duty (0..1), vitesse en ERPM signee */
+void ctrl_set_openloop(float amps, float erpm);
+void ctrl_set_openloop_duty(float duty, float erpm);
 void ctrl_alive(void);
 void ctrl_set_off_delay(float seconds);
 void ctrl_estop(void);
