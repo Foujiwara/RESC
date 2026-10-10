@@ -16,11 +16,11 @@
 #include "platform.h"
 
 /* ------------------------------------------------------------------ etat */
-typedef enum { ST_ALIGN = 0, ST_RAMP } start_sub_t;
+typedef enum { ST_ALIGN = 0, ST_RAMP, ST_FORCED } start_sub_t;   /* ST_FORCED : boucle ouverte commandee */
 
 typedef enum {
     DS_IDLE = 0,
-    DS_R_SEARCH, DS_R_HOLD1, DS_R_HOLD2,
+    DS_R_SEARCH, DS_R_STEP,
     DS_L_D, DS_L_Q,
     DS_LAM_ALIGN, DS_LAM_RAMP, DS_LAM_HOLD, DS_LAM_COAST,
     DS_OFF_OFF, DS_OFF_ON,
@@ -71,7 +71,8 @@ typedef struct {
     det_step_t ds;
     float dst;
     float acc_v, acc_i, acc_n;
-    float v1, i1, v2, i2;
+    int r_step;
+    float rv[3], ri[3];
     float vd_bias;
     float inj_v;
     int8_t inj_s0, inj_s1, inj_s2;
@@ -80,7 +81,7 @@ typedef struct {
     uint8_t inj_phase;
     float lam_ed, lam_eq, lam_w;
     float lam_driven, lam_vacc;
-    float r_ilev, r_ihi, r_ilo;
+    float r_ilev, r_ihi;
 
     /* capteurs d'angle */
     uint16_t raw_cs[3];
@@ -208,10 +209,10 @@ bool foc_detect_start(const foc_det_t *req)
     d.r = d.ld = d.lq = d.lambda = 0.0f;
     d.enc_offset = d.enc_ratio = 0.0f;
     d.enc_inverted = false;
-    d.r_i_low = d.r_i_high = d.r_v_high = 0.0f;
+    d.r_i_low = d.r_i_high = d.r_v_high = d.r_v_dt = 0.0f;
     d.warn = 0;
     for (int k = 0; k < 8; k++) { d.hall_angle[k] = 0.0f; d.hall_valid[k] = false; }
-    for (int k = 0; k < 3; k++) { d.off_cs[k] = 0.0f; d.off_vph[k] = 0.0f; }
+    for (int k = 0; k < 3; k++) { d.off_cs[k] = 0.0f; d.off_vph[k] = 0.0f; d.off_vph_drv[k] = 0.0f; }
     if ((req->kind == FOC_DET_HALL || req->kind == FOC_DET_ENCODER) && d.omega_test <= 0.0f) d.omega_test = FM_2PI * 2.0f;
     if (req->kind == FOC_DET_ENCODER && S.p.enc.cpr < 4) return false;
     S.det = d;
@@ -368,21 +369,38 @@ RAMFUNC static void enter_start(bool from_run)
     set_state(FOC_ST_START);
 }
 
+/* Boucle ouverte commandee (foc_openloop, foc_openloop_duty) : angle impose,
+ * jamais de relais vers l'observateur. Reprend l'angle courant si le pont tourne. */
+RAMFUNC static void enter_forced(void)
+{
+    if (S.st == FOC_ST_RUN || S.st == FOC_ST_START) {
+        S.ol_theta = S.theta;
+        S.ol_omega = S.omega;
+        S.ol_iq = S.iq_ref;
+    } else {
+        S.ol_theta = S.obs.theta;
+        S.ol_omega = 0.0f;
+        S.ol_iq = 0.0f;
+        S.int_d = S.int_q = 0.0f;
+        S.vd = S.vq = 0.0f;
+    }
+    S.id_ref = 0.0f;
+    S.sub = ST_FORCED;
+    set_state(FOC_ST_START);
+}
+
+/* Relais I/f -> observateur. Le rotor oscille autour de l'angle impose (pendule non
+ * amorti) : tourner les references dans le repere observe pourrait mettre le courant
+ * sur l'axe d (couple nul) et faire decrocher. Le courant de demarrage est donc place
+ * entierement sur l'axe q observe (couple maximal) ; le PI rattrape l'echelon en
+ * quelques periodes. L'integrateur reprend la chute ohmique, l'anticipation porte la FEM. */
 RAMFUNC static void handoff_to_run(void)
 {
-    float d = fm_wrap_pi(S.ol_theta - S.obs.theta);
-    float s, c;
-    fm_sincos(d, &s, &c);
-    float id = c * S.id_ref - s * S.iq_ref;
-    float iq = s * S.id_ref + c * S.iq_ref;
-    float vi_d = c * S.int_d - s * S.int_q;
-    float vi_q = s * S.int_d + c * S.int_q;
-    S.id_ref = id;
-    S.iq_ref = iq;
-    float w = S.obs.omega;
-    /* L'anticipation de marche contient deja la FEM : on la retire de l'integrateur */
-    S.int_d = vi_d - (-w * S.p.lq * iq);
-    S.int_q = vi_q - (w * (S.p.ld * id + S.p.lambda));
+    float imag = fm_sqrt(S.id_ref * S.id_ref + S.iq_ref * S.iq_ref);
+    S.id_ref = 0.0f;
+    S.iq_ref = (float)S.dir * imag;
+    S.int_d = 0.0f;
+    S.int_q = S.p.r * S.iq_ref;
     S.slew = S.p.st_i * 5.0f;      /* rejoint doucement la consigne (200 ms) */
     S.slew_t = 0.3f;
     S.low_t = S.flux_bad_t = 0.0f;
@@ -434,25 +452,27 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             break;
         default:              S.ds = DS_SEN_ALIGN; break;
         }
-        S.ol_theta = 0.0f;
+        /* R/L : vecteur sur l'axe beta -> phase A sans courant, B et C a +-0.87 I.
+         * Une phase a courant nul a une erreur de temps mort nulle et constante. */
+        S.ol_theta = (S.det.kind == FOC_DET_RL) ? 0.5f * FM_PI : 0.0f;
         S.ol_omega = 0.0f;
         break;
 
-    /* --- Resistance : deux paliers de courant, pente dV/dI (annule l'erreur de temps mort) */
-    /* --- Recherche du courant de mesure : paliers x1.5 jusqu'a une chute ohmique
-     *     d'au moins 1 V (le temps mort et le bruit deviennent negligeables),
-     *     dans la limite du courant autorise (det.i_test). */
+    /* --- Resistance, etape 1 : recherche du courant de mesure.
+     *     Paliers x1.5 de 0.4 s jusqu'a |vd| >= 1.5 V avec au moins 8 A, ou jusqu'au
+     *     courant autorise (det.i_test). Le courant doit etre assez grand pour que
+     *     l'erreur de temps mort soit saturee (constante) meme au palier le plus bas. */
     case DS_R_SEARCH:
         S.id_ref += fm_sat_sym(S.r_ilev - S.id_ref, I * dt / 0.1f);
         if (S.dst > 0.25f) { S.acc_v += S.vd; S.acc_n += 1.0f; }
         if (S.dst >= 0.4f) {
             float v = S.acc_v / S.acc_n;
-            if (fm_abs(v) >= 1.0f || S.r_ilev >= I) {
+            if ((fm_abs(v) >= 1.5f && S.r_ilev >= fm_min(8.0f, I)) || S.r_ilev >= I) {
                 S.r_ihi = S.r_ilev;
                 S.det.r_i_high = S.r_ihi;
-                S.det.r_v_high = v;
-                if (fm_abs(v) < 1.0f) S.det.warn = 1;
-                S.ds = DS_R_HOLD2;           /* palier haut d'abord, palier bas apres la mesure de L */
+                S.det.r_i_low = 0.5f * S.r_ihi;
+                S.r_step = 0;
+                S.ds = DS_R_STEP;
             } else {
                 S.r_ilev = fm_min(S.r_ilev * 1.5f, I);
             }
@@ -460,33 +480,43 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             S.acc_v = S.acc_i = S.acc_n = 0.0f;
         }
         break;
-    case DS_R_HOLD1:
-    case DS_R_HOLD2: {
-        float target = (S.ds == DS_R_HOLD1) ? S.r_ilo : S.r_ihi;
+
+    /* --- Resistance, etape 2 : trois paliers montants 0.5, 0.75 et 1 x I.
+     *     R = pente dV/dI : l'erreur de temps mort, constante sur les paliers, s'annule.
+     *     Si la pente du bas est nettement plus forte que celle du haut, le temps mort
+     *     n'etait pas sature au palier bas : on ne garde que les deux paliers hauts. */
+    case DS_R_STEP: {
+        float target = S.r_ihi * (0.5f + 0.25f * (float)S.r_step);
         S.id_ref += fm_sat_sym(target - S.id_ref, I * dt / 0.1f);
-        if (S.dst > 0.6f) { S.acc_v += S.vd; S.acc_i += S.id; S.acc_n += 1.0f; }
-        if (S.dst >= 1.0f) {
-            float v = S.acc_v / S.acc_n, i = S.acc_i / S.acc_n;
-            if (S.ds == DS_R_HOLD1) {
-                /* palier bas : R = pente entre les deux paliers (erreur de temps mort constante) */
-                S.v1 = v; S.i1 = i;
-                float di = S.i2 - S.i1;
-                float r = di > 0.1f * S.r_ihi ? (S.v2 - S.v1) / di : -1.0f;
-                if (!(r > 1e-5f && r < 20.0f)) { det_finish(-2); return; }
-                S.det.r = r;
-                S.ds = DS_END;
-            } else {
-                S.v2 = v; S.i2 = i;
-                S.vd_bias = S.v2;
-                S.inj_v = fm_max(0.02f * S.vbus_f, 0.2f);
-                S.inj_acc = S.inj_n = 0.0f;
-                S.inj_s0 = S.inj_s1 = S.inj_s2 = 0;
-                S.inj_phase = 0;
-                S.i_prev = S.id;
-                S.ds = DS_L_D;
-            }
+        if (S.dst > 0.3f) { S.acc_v += S.vd; S.acc_i += S.id; S.acc_n += 1.0f; }
+        if (S.dst >= 0.8f) {
+            S.rv[S.r_step] = S.acc_v / S.acc_n;
+            S.ri[S.r_step] = S.acc_i / S.acc_n;
             S.dst = 0.0f;
             S.acc_v = S.acc_i = S.acc_n = 0.0f;
+            if (++S.r_step < 3) break;
+
+            float d01 = S.ri[1] - S.ri[0], d12 = S.ri[2] - S.ri[1];
+            if (!(d01 > 0.1f * S.r_ihi && d12 > 0.1f * S.r_ihi)) { det_finish(-2); return; }
+            float r_lo = (S.rv[1] - S.rv[0]) / d01;
+            float r_hi = (S.rv[2] - S.rv[1]) / d12;
+            float r = (S.rv[2] - S.rv[0]) / (S.ri[2] - S.ri[0]);
+            if (r_lo > 1.3f * r_hi && r_hi > 0.0f) { r = r_hi; S.det.warn = 2; }
+            if (!(r > 1e-5f && r < 20.0f)) { det_finish(-2); return; }
+            S.det.r = r;
+            S.det.r_v_high = S.rv[2] - S.rv[0];            /* chute ohmique utile */
+            S.det.r_v_dt = S.rv[2] - r * S.ri[2];          /* tension perdue (temps mort, diodes) */
+            if (S.det.warn == 0 && fm_abs(S.det.r_v_high) < 0.2f) S.det.warn = 1;
+            S.det.r_known = r;
+
+            /* Inductances au courant du palier haut (rotor tenu par le courant d) */
+            S.vd_bias = S.rv[2];
+            S.inj_v = fm_max(0.02f * S.vbus_f, 0.2f);
+            S.inj_acc = S.inj_n = 0.0f;
+            S.inj_s0 = S.inj_s1 = S.inj_s2 = 0;
+            S.inj_phase = 0;
+            S.i_prev = S.id;
+            S.ds = DS_L_D;
         }
         break;
     }
@@ -530,13 +560,9 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
                     S.dst = 0.0f;
                 } else {
                     S.det.lq = l;
-                    /* palier bas a la moitie du palier haut : l'erreur de temps mort, saturee
-                     * aux deux paliers, est la meme et s'annule dans la pente dV/dI */
-                    S.r_ilo = fm_max(0.5f * S.r_ihi, fm_min(2.0f, 0.8f * S.r_ihi));
-                    S.det.r_i_low = S.r_ilo;
-                    S.ds = DS_R_HOLD1;
+                    /* fin : le PI reprend au palier haut et ramene le courant a zero */
+                    S.ds = DS_END;
                     S.dst = 0.0f;
-                    S.acc_v = S.acc_i = S.acc_n = 0.0f;
                     S.int_d = S.vd_bias;
                     S.int_q = 0.0f;
                 }
@@ -619,12 +645,14 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             S.acc_n += 1.0f;
         }
         if (S.dst >= 0.35f) {
+            /* pont coupe, moteur arrete : les phases sont reliees par les enroulements et
+             * sont au meme potentiel ; l'ecart de chaque phase a la moyenne est son offset
+             * (le mode commun n'intervient pas dans alpha/beta) */
             float vm = 0.0f;
             for (int x = 0; x < 3; x++) { S.off_tmp[x] = S.acc3[x] / S.acc_n; vm += S.accv[x] / S.acc_n; }
             vm *= (1.0f / 3.0f);
-            /* moteur arrete : les trois phases doivent etre au meme potentiel */
             for (int x = 0; x < 3; x++) S.det.off_vph[x] = S.accv[x] / S.acc_n - vm;
-            for (int x = 0; x < 3; x++) S.acc3[x] = 0.0f;
+            for (int x = 0; x < 3; x++) S.acc3[x] = S.accv[x] = 0.0f;
             S.acc_n = 0.0f;
             S.ds = DS_OFF_ON;
             S.dst = 0.0f;
@@ -635,10 +663,16 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
         S.vd = S.vq = 0.0f;
         S.int_d = S.int_q = 0.0f;
         if (S.dst > 0.05f) {
-            for (int x = 0; x < 3; x++) S.acc3[x] += (float)S.raw_cs[x];
+            for (int x = 0; x < 3; x++) { S.acc3[x] += (float)S.raw_cs[x]; S.accv[x] += S.vph_raw[x]; }
             S.acc_n += 1.0f;
         }
         if (S.dst >= 0.35f) {
+            /* sous PWM, vecteur nul : les trois phases commutent ensemble et ont la meme
+             * tension moyenne ; l'ecart de chaque phase a la moyenne est son offset */
+            float vm = 0.0f;
+            for (int x = 0; x < 3; x++) vm += S.accv[x] / S.acc_n;
+            vm *= (1.0f / 3.0f);
+            for (int x = 0; x < 3; x++) S.det.off_vph_drv[x] = S.accv[x] / S.acc_n - vm;
             for (int x = 0; x < 3; x++) {
                 float on = S.acc3[x] / S.acc_n;
                 if (!(S.p.cs_two_shunts && x == 2) && fm_abs(on - S.off_tmp[x]) > 80.0f) { det_finish(-6); return; }
@@ -883,7 +917,9 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.ds = DS_IDLE;
             goto output;
         }
-        if (g_foc_cmd.run && motor_params_ok() && S.vbus > S.p.vbus_trip_min) {
+        if (g_foc_cmd.run && g_foc_cmd.openloop && S.vbus > S.p.vbus_trip_min) {
+            enter_forced();
+        } else if (g_foc_cmd.run && motor_params_ok() && S.vbus > S.p.vbus_trip_min) {
             S.dir = g_foc_cmd.dir >= 0 ? 1 : -1;
             bool obs_fast = fm_abs(S.obs.omega) > 0.8f * S.p.st_omega && flux_ratio > 0.7f && flux_ratio < 1.4f;
             if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
@@ -936,6 +972,46 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         set_state(FOC_ST_IDLE);
         goto output;
     }
+    /* Passage en boucle ouverte commandee depuis le demarrage ou la marche */
+    if (g_foc_cmd.openloop && !(S.st == FOC_ST_START && S.sub == ST_FORCED)) enter_forced();
+    /* Fin de la boucle ouverte commandee : pont coupe, la commande suivante redemarre */
+    if (!g_foc_cmd.openloop && S.st == FOC_ST_START && S.sub == ST_FORCED) {
+        bridge_off();
+        set_state(FOC_ST_IDLE);
+        goto output;
+    }
+
+    if (S.st == FOC_ST_START && S.sub == ST_FORCED) {
+        S.br = true;
+        float target = g_foc_cmd.ol_omega;
+        float acc = fm_max(S.p.st_omega / fm_max(S.p.st_t_ramp, 0.05f), 200.0f);
+        S.ol_omega += fm_sat_sym(target - S.ol_omega, acc * dt);
+        S.ol_theta = fm_wrap_pi(S.ol_theta + S.ol_omega * dt);
+        S.theta = S.ol_theta;
+        S.omega = S.ol_omega;
+        float s, c;
+        fm_sincos(S.theta, &s, &c);
+        S.id = c * S.i_a + s * S.i_b;
+        S.iq = -s * S.i_a + c * S.i_b;
+        if (g_foc_cmd.openloop == 2) {
+            /* rapport cyclique impose sur l'axe q, sans regulation de courant
+             * (les protections de courant de l'ISR restent actives) */
+            float v = fm_sat_sym(g_foc_cmd.ol_duty, S.p.m_max) * S.vbus_f * FM_1_SQRT3;
+            S.vd = 0.0f;
+            S.vq += fm_sat_sym(v - S.vq, vmax * dt / 0.3f);
+            S.int_d = S.int_q = 0.0f;
+            S.id_ref = 0.0f;
+            S.iq_ref = 0.0f;
+        } else {
+            S.ol_iq += fm_sat_sym(g_foc_cmd.iq_ref - S.ol_iq, S.p.i_slew * dt);
+            S.id_ref = 0.0f;
+            S.iq_ref = S.ol_iq;
+            current_loop(S.p.kp, S.p.ki, 0.0f, 0.0f, vmax);
+        }
+        theta_out = S.theta + S.omega * S.p.delay_comp * dt;
+        modulate(theta_out);
+        goto output;
+    }
 
     if (S.st == FOC_ST_START) {
         S.br = true;
@@ -961,7 +1037,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.omega = S.ol_omega;
         S.id_ref = 0.0f;
         S.iq_ref = S.ol_iq;
-        if (S.lock_t >= 0.02f) {
+        if (S.lock_t >= 0.05f) {
             /* calcul des courants dans le repere boucle ouverte, puis relais */
             float s, c;
             fm_sincos(S.theta, &s, &c);

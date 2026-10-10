@@ -103,16 +103,19 @@ int main(void)
            g_foc_telem.off_cs[2], M.off[0], M.off[1], M.off[2]);
     check("offsets a +/-2 LSB", fabs(g_foc_telem.off_cs[0] - M.off[0]) < 2 && fabs(g_foc_telem.off_cs[1] - M.off[1]) < 2);
 
-    printf("== 2. Identification R / Ld / Lq (10 A)\n");
+    printf("== 2. Identification R / Ld / Lq (temps mort partiel sous 4 A, comme de gros MOSFET)\n");
+    M.i_soft = 4.0;
     foc_det_t d;
     memset(&d, 0, sizeof(d));
     d.kind = FOC_DET_RL;
-    d.i_test = 15;      /* courant max de recherche (moitie de 30 A) */
+    d.i_test = 24;      /* courant max de recherche (80 % de 30 A) */
     check("detection R/L acceptee", foc_detect_start(&d));
     for (int k = 0; k < 600 && !foc_detect_status()->done; k++) run(0.05);
     const foc_det_t *ds = foc_detect_status();
-    printf("  R = %.4f (vrai %.4f)  Ld = %.1f uH (vrai %.1f)  Lq = %.1f uH (vrai %.1f)  err=%d  paliers %.1f/%.1f A  alerte=%d\n",
-           ds->r, M.r, ds->ld * 1e6, M.ld * 1e6, ds->lq * 1e6, M.lq * 1e6, ds->error, ds->r_i_low, ds->r_i_high, ds->warn);
+    printf("  R = %.4f (vrai %.4f)  Ld = %.1f uH (vrai %.1f)  Lq = %.1f uH (vrai %.1f)  err=%d  paliers %.1f..%.1f A  "
+           "chute %.3f V  temps mort %.3f V  alerte=%d\n",
+           ds->r, M.r, ds->ld * 1e6, M.ld * 1e6, ds->lq * 1e6, M.lq * 1e6, ds->error, ds->r_i_low, ds->r_i_high,
+           ds->r_v_high, ds->r_v_dt, ds->warn);
     check("R a +/-10 %", fabs(ds->r / M.r - 1) < 0.10);
     check("Ld a +/-20 %", fabs(ds->ld / M.ld - 1) < 0.20);
     check("Lq a +/-20 %", fabs(ds->lq / M.lq - 1) < 0.20);
@@ -351,6 +354,31 @@ int main(void)
     RUN_CTRL(1.5);   /* plus aucune commande */
     report("apres timeout");
     check("timeout de commande : pont relache", ctrl_stats()->timeout && foc_state() != FOC_ST_RUN);
+
+    /* ------------------------------------------------------------------ */
+    printf("== 13. Boucle ouverte commandee (foc_openloop, foc_openloop_duty)\n");
+    run(1.0);
+    ctrl_set_openloop(15, 2000);
+    for (int k = 0; k < 30; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+    report("openloop 15 A 2000");
+    check("boucle ouverte courant : vitesse imposee 2000 ERPM (+/-3 %)",
+          foc_state() == FOC_ST_START && fabs(sim_omega_e(&M) * 60 / (2 * M_PI) / 2000 - 1) < 0.03);
+    check("boucle ouverte courant : |i| = 15 A (+/-1.5)", fabs(sqrt(g_foc_telem.id * g_foc_telem.id + g_foc_telem.iq * g_foc_telem.iq) - 15) < 1.5);
+    /* duty proche de la FEM (0.018 Wb x 314 rad/s = 5.7 V -> 0.16 sous 60 V) : sinon courant non borne */
+    ctrl_set_openloop_duty(0.18f, 3000);
+    for (int k = 0; k < 30; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+    report("openloop duty 0.18 3000");
+    check("boucle ouverte duty : 3000 ERPM (+/-3 %)",
+          foc_state() == FOC_ST_START && fabs(sim_omega_e(&M) * 60 / (2 * M_PI) / 3000 - 1) < 0.03);
+    check("boucle ouverte duty : rapport cyclique 0.18", fabs(fabs(g_foc_telem.duty) - 0.18) < 0.01);
+    ctrl_set_openloop(15, -2000);
+    for (int k = 0; k < 50; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+    report("openloop 15 A -2000");
+    check("boucle ouverte courant : inversion vers -2000 ERPM (+/-3 %)",
+          foc_state() == FOC_ST_START && fabs(sim_omega_e(&M) * 60 / (2 * M_PI) / -2000 - 1) < 0.03);
+    ctrl_release();
+    RUN_CTRL(0.05);
+    check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
 
     printf("\nCharge : %s  (%d echec(s))\n", g_fail ? "ECHEC" : "TOUS LES ESSAIS PASSENT", g_fail);
     return g_fail ? 1 : 0;

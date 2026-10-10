@@ -111,10 +111,13 @@ void app_tick_1khz(void)
     power_key_tick();
 #endif
 
-    /* LED : vert = pret, clignotant en marche ; rouge = defaut */
-    bool fault = g_foc_telem.state == FOC_ST_FAULT;
-    bool run = g_foc_telem.state == FOC_ST_RUN || g_foc_telem.state == FOC_ST_START;
-    board_led(run ? ((now >> 7) & 1u) : !fault, fault ? ((now >> 8) & 1u) : false);
+    /* LED : defaut = rouge clignotant (2 Hz), marche = vert 100 %,
+     * attente = vert a 1/3 (PWM logiciel 333 Hz, sans scintillement visible) */
+    foc_state_t st = g_foc_telem.state;
+    bool fault = st == FOC_ST_FAULT;
+    bool run = st == FOC_ST_RUN || st == FOC_ST_START || st == FOC_ST_DETECT;
+    bool dim = (now % 3u) == 0u;
+    board_led(!fault && (run || dim), fault && ((now >> 8) & 1u));
 
     /* Watchdog : rafraichi seulement si la boucle FOC et la boucle principale avancent */
     if (s_main_alive != s_last_alive) { s_last_alive = s_main_alive; s_alive_ms = now; }

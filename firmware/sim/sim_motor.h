@@ -19,6 +19,7 @@ typedef struct {
     /* onduleur et mesure */
     double vbus;
     double t_dead;            /* s, temps mort effectif */
+    double i_soft;            /* A : en dessous, l'erreur de temps mort est partielle (Coss des MOSFET) */
     double f_pwm;
     double i_lsb;             /* A par LSB (signe = polarite de l'ampli) */
     double v_lsb, vph_lsb;    /* V par LSB */

@@ -170,13 +170,15 @@ static void cmd_help(void)
 {
     P("Commandes RESC :");
     P("  status | rt | conf | hw | faults | clear");
-    P("  detect_rl                      : resistance et inductances (moteur a l'arret)");
+    P("  detect_rl                      : resistance (3 paliers) puis inductances (moteur a l'arret)");
     P("  detect_lambda <A> [duty]       : flux (moteur LIBRE, il va tourner)");
     P("  offsets_cal                    : calibration des offsets (moteur a l'arret, sauvegarde)");
     P("  detect_hall [A]                : table des sondes Hall (le moteur tourne, sauvegarde)");
     P("  detect_enc [A]                 : codeur ABI : rapport, sens, offset (sauvegarde)");
     P("  sensor                         : etat des capteurs (Hall, source d'angle)");
     P("  current <A> | brake <A> | duty <d> | rpm <erpm> | stop");
+    P("  foc_openloop <A> <erpm>        : boucle ouverte a courant impose (stop pour arreter)");
+    P("  foc_openloop_duty <d> <erpm>   : boucle ouverte a rapport cyclique impose, sans regulation");
     P("  list | get <nom> | set <nom> <valeur>");
     P("  foc_gains [bande_rad_s]        : recalcule kp, ki, gain observateur (auto apres R/L et flux)");
     P("  store                          : sauvegarde la configuration (moteur + application)");
@@ -227,6 +229,15 @@ void terminal_process(char *line)
     else if (!strcmp(c, "brake") && argc >= 2) ctrl_set_brake((float)atof(argv[1]));
     else if (!strcmp(c, "duty") && argc >= 2) ctrl_set_duty((float)atof(argv[1]));
     else if (!strcmp(c, "rpm") && argc >= 2) ctrl_set_rpm((float)atof(argv[1]));
+    else if ((!strcmp(c, "foc_openloop") || !strcmp(c, "foc_openloop_duty")) && argc >= 3) {
+        bool duty = !strcmp(c, "foc_openloop_duty");
+        float v = (float)atof(argv[1]), erpm = (float)atof(argv[2]);
+        if (!resc_power_allowed()) { P("Refuse : carte non relue (statut IMPORTED)"); return; }
+        if (!resc_motor_configured()) { P("Refuse : moteur non identifie (R, L et flux necessaires)"); return; }
+        if (duty) ctrl_set_openloop_duty(v, erpm); else ctrl_set_openloop(v, erpm);
+        P("Boucle ouverte %s %.3g %s a %.0f ERPM ; 'stop' pour arreter (coupure aussi au timeout de commande)",
+          duty ? "duty" : "courant", (double)v, duty ? "" : "A", (double)erpm);
+    }
     else if (!strcmp(c, "stop")) ctrl_release();
     else if (!strcmp(c, "store")) P(resc_conf_store_mc() && resc_conf_store_app() ? "Configuration sauvegardee" : "Refuse : moteur en marche");
     else if (!strcmp(c, "list") || !strcmp(c, "get") || !strcmp(c, "set")) cmd_get_set(argc, argv);
