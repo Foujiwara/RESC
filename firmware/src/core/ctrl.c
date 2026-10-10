@@ -24,7 +24,6 @@ typedef struct {
 
     uint32_t now_ms;
     float iq_out;                    /* reference envoyee au coeur */
-    float duty_int;                  /* integrateur du mode duty */
     float s_int, s_prev_err, s_d_filt, s_set;   /* PID vitesse */
     float off_t;
     float last_theta;
@@ -207,6 +206,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     float iq = 0.0f;
     bool run = false, allow_start = false;
     uint8_t openloop = 0;
+    bool duty_mode = false;
     int8_t dir = 1;
     float v = C.value;
 
@@ -238,16 +238,12 @@ void ctrl_update(uint32_t now_ms, float dt)
         break;
 
     case CTRL_MODE_DUTY:
+        /* rapport cyclique applique par le coeur ; le courant n'est que borne */
         if (fm_abs(v) >= l->duty_min) {
-            float e = v - t->duty;
-            C.duty_int += l->duty_ki * e * dt;
-            C.duty_int = fm_sat(C.duty_int, lo, hi);
-            iq = l->duty_kp * e + C.duty_int;
+            duty_mode = true;
             run = true;
             allow_start = true;
             dir = v >= 0.0f ? 1 : -1;
-        } else {
-            C.duty_int = 0.0f;
         }
         break;
 
@@ -299,7 +295,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     case CTRL_MODE_HANDBRAKE:   /* non supporte en sensorless : roue libre */
     case CTRL_MODE_NONE:
     default:
-        C.s_int = C.duty_int = 0.0f;
+        C.s_int = 0.0f;
         C.s_set = erpm;
         break;
     }
@@ -347,6 +343,10 @@ void ctrl_update(uint32_t now_ms, float dt)
     g_foc_cmd.allow_start = allow_start ? 1 : 0;
     g_foc_cmd.ol_omega = C.ol_erpm * (FM_2PI / 60.0f);
     g_foc_cmd.ol_duty = C.ol_erpm >= 0.0f ? v : -v;
+    g_foc_cmd.duty = v;
+    g_foc_cmd.i_hi = hi;
+    g_foc_cmd.i_lo = lo;
+    g_foc_cmd.duty_mode = (run && duty_mode) ? 1 : 0;
     g_foc_cmd.openloop = openloop;
     g_foc_cmd.run = run ? 1 : 0;
 }

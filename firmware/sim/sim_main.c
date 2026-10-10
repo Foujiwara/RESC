@@ -108,7 +108,7 @@ int main(void)
     foc_det_t d;
     memset(&d, 0, sizeof(d));
     d.kind = FOC_DET_RL;
-    d.i_test = 24;      /* courant max de recherche (80 % de 30 A) */
+    d.i_test = 15;      /* palier haut : 50 % de l_current_max (30 A) */
     check("detection R/L acceptee", foc_detect_start(&d));
     for (int k = 0; k < 600 && !foc_detect_status()->done; k++) run(0.05);
     const foc_det_t *ds = foc_detect_status();
@@ -332,7 +332,6 @@ int main(void)
     L.erpm_max = 30000; L.erpm_min = -30000; L.erpm_start = 0.8f;
     L.batt_cut_start = 20; L.batt_cut_end = 15; L.regen_cut_start = 80; L.regen_cut_end = 85;
     L.tfet_start = 85; L.tfet_end = 100; L.duty_max = 0.95f; L.duty_min = 0.005f;
-    L.duty_kp = 20; L.duty_ki = 400;
     L.s_kp = 0.004f; L.s_ki = 0.004f; L.s_kd = 0.0001f; L.s_kd_filter = 0.2f; L.s_min_erpm = 900; L.s_ramp_erpms = 25000;
     L.s_allow_braking = true; L.timeout_ms = 1000; L.start_erpm_exit = 700;
     ctrl_init(&L);
@@ -351,6 +350,40 @@ int main(void)
     for (int k = 0; k < 40; k++) { ctrl_alive(); RUN_CTRL(0.1); }
     report("SET_RPM 8000");
     check("regulation de vitesse a +/-5 %", fabs(sim_omega_e(&M) * 60 / (2 * M_PI) / 8000 - 1) < 0.05);
+    /* duty : tension imposee, vitesse stable sans pompage, courant borne a i_max */
+    ctrl_set_duty(0.3f);
+    for (int k = 0; k < 30; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+    report("SET_DUTY 0.3");
+    {
+        double wmin = 1e9, wmax = -1e9, imax_seen = 0;
+        for (int k = 0; k < 100; k++) {
+            ctrl_alive(); RUN_CTRL(0.01);
+            double w = sim_omega_e(&M);
+            if (w < wmin) wmin = w;
+            if (w > wmax) wmax = w;
+        }
+        printf("  vitesse %.0f..%.0f ERPM\n", wmin * 60 / (2 * M_PI), wmax * 60 / (2 * M_PI));
+        check("duty 0.3 : rapport cyclique tenu (+/-0.01)", fabs(g_foc_telem.duty - 0.3) < 0.01);
+        check("duty 0.3 : vitesse stable (ecart < 1 %)", (wmax - wmin) / wmax < 0.01);
+        ctrl_set_duty(0.9f);
+        for (int k = 0; k < 300; k++) {
+            ctrl_alive(); RUN_CTRL(0.001);
+            if (fabs(g_foc_telem.iq) > imax_seen) imax_seen = fabs(g_foc_telem.iq);
+        }
+        printf("  echelon 0.3 -> 0.9 : |iq| max %.1f A (limite %.0f A)\n", imax_seen, L.i_max);
+        check("duty : courant borne a i_max (+10 %)", imax_seen < 1.1 * L.i_max);
+        imax_seen = 0;
+        ctrl_set_duty(0.1f);
+        for (int k = 0; k < 300; k++) {
+            ctrl_alive(); RUN_CTRL(0.001);
+            if (-g_foc_telem.iq > imax_seen) imax_seen = -g_foc_telem.iq;
+        }
+        printf("  baisse 0.9 -> 0.1 : frein |iq| max %.1f A (limite %.0f A)\n", imax_seen, -L.i_min);
+        check("duty : frein borne a i_min (+10 %)", imax_seen < 1.1 * -L.i_min);
+        for (int k = 0; k < 30; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+        report("SET_DUTY 0.1");
+        check("duty 0.1 : rapport cyclique tenu", foc_state() == FOC_ST_RUN && fabs(g_foc_telem.duty - 0.1) < 0.01);
+    }
     RUN_CTRL(1.5);   /* plus aucune commande */
     report("apres timeout");
     check("timeout de commande : pont relache", ctrl_stats()->timeout && foc_state() != FOC_ST_RUN);

@@ -38,6 +38,8 @@ bool resc_conf_store_app(void);
  *  gains de courant  kp = L * bw, ki = R * bw  (bw : bande passante, rad/s)
  *  gain observateur  gamma = 1000 / lambda^2   (convergence radiale ~1000 rad/s) */
 #define RESC_CURRENT_BW_DEFAULT 1000.0f
+/* Mesure de R : palier haut = cette fraction de l_current_max (si aucun courant n'est donne) */
+#define RESC_RL_CURRENT_FRAC    0.5f
 void resc_conf_derive_current_gains(vesc_mcconf_t *c, float bw);
 void resc_conf_derive_observer_gain(vesc_mcconf_t *c);
 

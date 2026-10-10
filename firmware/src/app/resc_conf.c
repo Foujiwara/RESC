@@ -287,8 +287,6 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     cl->tmot_enabled = mc->m_motor_temp_sens_type == TEMP_SENSOR_NTC_10K_25C && BOARD_TMOT_CH != HW_ADC_CH_NONE;
     cl->duty_max = mc->l_max_duty;
     cl->duty_min = mc->l_min_duty;
-    cl->duty_kp = mc->foc_duty_dowmramp_kp;
-    cl->duty_ki = mc->foc_duty_dowmramp_ki;
     cl->s_kp = mc->s_pid_kp;
     cl->s_ki = mc->s_pid_ki;
     cl->s_kd = mc->s_pid_kd;

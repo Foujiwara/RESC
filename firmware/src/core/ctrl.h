@@ -40,7 +40,6 @@ typedef struct {
     bool  tmot_enabled;
     /* duty */
     float duty_max, duty_min;
-    float duty_kp, duty_ki;
     /* vitesse PID (semantique VESC : sortie en fraction de i_max, gains / 20) */
     float s_kp, s_ki, s_kd, s_kd_filter;
     float s_min_erpm, s_ramp_erpms;
