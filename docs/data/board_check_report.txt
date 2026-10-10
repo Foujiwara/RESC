@@ -1,0 +1,91 @@
+boards/ubox/board_ubox_single_100.h  "UBOX_SINGLE_100"  [REVIEWED]  OCP=aucune  CS=3 low-side  I_abs=180 A  Vbus=11-95 V  f_pwm=15000 Hz
+boards/ubox/board_ubox_single_80.h  "UBOX_SINGLE_80"  [REVIEWED]  OCP=aucune  CS=3 low-side  I_abs=210 A  Vbus=11-85 V  f_pwm=15000 Hz
+boards/ubox/board_ubox_single_85_200.h  "UBOX_SINGLE_85_200"  [REVIEWED]  OCP=aucune  CS=3 low-side  I_abs=420 A  Vbus=11-85 V  f_pwm=15000 Hz
+boards/ubox/board_ubox_v2_100.h  "UBOX_V2_100"  [REVIEWED]  OCP=aucune  CS=3 low-side  I_abs=180 A  Vbus=11-95 V  f_pwm=15000 Hz
+boards/vesc/bmesc/board_focstrot_v4.h  "FOCSTrot V4.0"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=0 A  Vbus=18-140 V  f_pwm=13000 Hz
+    ERREUR  hw_check.h:160  "DEF_I_ABS_TRIP_A hors limites"
+boards/vesc/fungineers/board_thor301.h  "Thor301"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=315 A  Vbus=38-97 V  f_pwm=15000 Hz
+    DOUBLON PA4: BOARD_SPI_NSS_PIN, BOARD_TFET3_CH
+boards/vesc/jetfleet/board_jetfleetf6_20s.h  "JetFleetF6_20s"  [IMPORTED]  OCP=BKIN  CS=3 low-side  I_abs=320 A  Vbus=18-90 V  f_pwm=15000 Hz
+    DOUBLON PB12: BOARD_BKIN_PIN, BOARD_I2C_SCL_PIN
+boards/vesc/jetfleet/board_jetfleetf6_24s.h  "JetFleetF6_24s"  [IMPORTED]  OCP=BKIN  CS=3 low-side  I_abs=300 A  Vbus=18-110 V  f_pwm=15000 Hz
+    DOUBLON PB12: BOARD_BKIN_PIN, BOARD_I2C_SCL_PIN
+boards/vesc/jetfleet/board_jetfleetf6_32s.h  "JetFleetF6_32s"  [IMPORTED]  OCP=BKIN  CS=3 low-side  I_abs=270 A  Vbus=18-140 V  f_pwm=15000 Hz
+    DOUBLON PB12: BOARD_BKIN_PIN, BOARD_I2C_SCL_PIN
+boards/vesc/luna/board_luna_bbshd.h  "LUNA_BBSHD"  [IMPORTED]  OCP=BKIN  CS=3 en ligne  I_abs=230 A  Vbus=30-86 V  f_pwm=25000 Hz
+    ERREUR  board_luna_bbshd.h:0  BOARD_SERVO_PIN = PD12 absent du boitier LQFP64
+    DOUBLON PB11: BOARD_I2C_SDA_PIN, BOARD_LED_RED_PIN
+boards/vesc/luna/board_luna_m600.h  "LUNA_M600_V2"  [IMPORTED]  OCP=BKIN  CS=3 en ligne  I_abs=200 A  Vbus=6-86 V  f_pwm=18000 Hz
+    ERREUR  hw_check.h:135  "UART principal : instance et broches incompatibles"
+    ERREUR  board_luna_m600.h:0  BOARD_SERVO_PIN = PD12 absent du boitier LQFP64
+    ERREUR  board_luna_m600.h:0  BOARD_UART_TX_PIN = PD8 absent du boitier LQFP64
+    ERREUR  board_luna_m600.h:0  BOARD_UART_RX_PIN = PD9 absent du boitier LQFP64
+    DOUBLON PB11: BOARD_I2C_SDA_PIN, BOARD_LED_RED_PIN
+boards/vesc/other/board_40.h  "40"  [IMPORTED]  OCP=GPIO  CS=2 low-side  I_abs=150 A  Vbus=6-57 V  f_pwm=12500 Hz
+    DOUBLON PB8: BOARD_CAN_RX_PIN, BOARD_HALL3_PIN
+boards/vesc/other/board_49.h  "49"  [IMPORTED]  OCP=GPIO  CS=2 low-side  I_abs=150 A  Vbus=6-57 V  f_pwm=12500 Hz
+    DOUBLON PC5: BOARD_ADC_EXT1_CH, BOARD_LED_RED_PIN
+boards/vesc/other/board_axiom.h  "AXIOM"  [IMPORTED]  OCP=GPIO  CS=3 en ligne  I_abs=800 A  Vbus=0-525 V  f_pwm=12500 Hz
+    ERREUR  hw_check.h:27  "Carte : mesure de courant incomplete (BOARD_CS_TOPOLOGY/SHUNT_OHM/AMP_GAIN/INVERTED)"
+    ERREUR  hw_check.h:30  "Carte : mesures de tension incompletes (BOARD_VREF_V, diviseurs Vbus et phases)"
+    ERREUR  hw_check.h:135  "UART principal : instance et broches incompatibles"
+    ERREUR  board_axiom.h:0  BOARD_UART_RX_PIN = PD9 absent du boitier LQFP64
+    DOUBLON PB11: BOARD_I2C_SDA_PIN, BOARD_LED_RED_PIN
+boards/vesc/other/board_gesc.h  "GESC"  [IMPORTED]  OCP=aucune  CS=3 en ligne  I_abs=160 A  Vbus=12-60 V  f_pwm=15000 Hz
+    DOUBLON PB8: BOARD_CAN_RX_PIN, BOARD_I2C_SCL_PIN
+    DOUBLON PB9: BOARD_CAN_TX_PIN, BOARD_I2C_SDA_PIN
+boards/vesc/teamtriforceuk/board_a200s_v4.h  "A200S_V4"  [IMPORTED]  OCP=GPIO  CS=3 low-side  I_abs=350 A  Vbus=0-80 V  f_pwm=15000 Hz
+    DOUBLON PC5: BOARD_ADC_EXT3_CH, BOARD_GD_EN_PIN
+boards/vesc/teamtriforceuk/board_a50s_v22_12s.h  "a50s_12s"  [IMPORTED]  OCP=aucune  CS=2 low-side  I_abs=50 A  Vbus=4-56 V  f_pwm=12500 Hz
+    DOUBLON PB0: BOARD_LED_GREEN_PIN, BOARD_TFET2_CH
+    DOUBLON PB1: BOARD_LED_RED_PIN, BOARD_TFET3_CH
+boards/vesc/teamtriforceuk/board_a50s_v22_12s_hg.h  "a50s_12s_hg"  [IMPORTED]  OCP=aucune  CS=2 low-side  I_abs=50 A  Vbus=4-56 V  f_pwm=12500 Hz
+    DOUBLON PB0: BOARD_LED_GREEN_PIN, BOARD_TFET2_CH
+    DOUBLON PB1: BOARD_LED_RED_PIN, BOARD_TFET3_CH
+boards/vesc/teamtriforceuk/board_a50s_v22_6s.h  "a50s_6s"  [IMPORTED]  OCP=aucune  CS=2 low-side  I_abs=50 A  Vbus=4-28 V  f_pwm=12500 Hz
+    DOUBLON PB0: BOARD_LED_GREEN_PIN, BOARD_TFET2_CH
+    DOUBLON PB1: BOARD_LED_RED_PIN, BOARD_TFET3_CH
+boards/vesc/teamtriforceuk/board_a50s_v22_6s_hg.h  "a50s_6s_hg"  [IMPORTED]  OCP=aucune  CS=2 low-side  I_abs=50 A  Vbus=4-28 V  f_pwm=12500 Hz
+    DOUBLON PB0: BOARD_LED_GREEN_PIN, BOARD_TFET2_CH
+    DOUBLON PB1: BOARD_LED_RED_PIN, BOARD_TFET3_CH
+boards/vesc/trampa/board_gp.h  "GP"  [IMPORTED]  OCP=GPIO  CS=3 low-side  I_abs=160 A  Vbus=6-57 V  f_pwm=15000 Hz
+    DOUBLON PB6: BOARD_LED_GREEN_PIN, BOARD_SERVO_PIN
+    DOUBLON PB10: BOARD_I2C_SCL_PIN, BOARD_LED_RED_PIN
+boards/vesc/trampa/board_sparkf.h  "SPARKF"  [IMPORTED]  OCP=GPIO  CS=3 low-side  I_abs=160 A  Vbus=6-57 V  f_pwm=15000 Hz
+    ERREUR  hw_check.h:135  "UART principal : instance et broches incompatibles"
+    ERREUR  board_sparkf.h:0  BOARD_UART_TX_PIN = PD6 absent du boitier LQFP64
+    ERREUR  board_sparkf.h:0  BOARD_UART_RX_PIN = PD5 absent du boitier LQFP64
+    DOUBLON PB10: BOARD_I2C_SCL_PIN, BOARD_LED_GREEN_PIN
+    DOUBLON PB11: BOARD_I2C_SDA_PIN, BOARD_LED_RED_PIN
+boards/vesc/trampa/board_str500.h  "STR500"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=720 A  Vbus=11-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/trampa/board_str500_01.h  "STR500_01"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=1200 A  Vbus=11-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/trampa/board_str500_hp.h  "STR500_HP"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=1200 A  Vbus=11-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maxim_100.h  "Maxim_100"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=900 A  Vbus=20-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maxim_120.h  "Maxim_120"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=900 A  Vbus=20-115 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maxim_120_ph.h  "Maxim_120_PH"  [IMPORTED]  OCP=GPIO  CS=3 en ligne  I_abs=900 A  Vbus=20-115 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maxim_150.h  "Maxim_150"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=800 A  Vbus=20-145 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maxim_150_ph.h  "Maxim_150_PH"  [IMPORTED]  OCP=GPIO  CS=3 en ligne  I_abs=800 A  Vbus=20-145 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maximp_120.h  "Maximp_120"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=1500 A  Vbus=20-115 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maximp_120_ph.h  "Maximp_120_PH"  [IMPORTED]  OCP=GPIO  CS=3 en ligne  I_abs=1500 A  Vbus=20-115 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maximp_150.h  "Maximp_150"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=1200 A  Vbus=20-145 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_maximp_150_ph.h  "Maximp_150_PH"  [IMPORTED]  OCP=GPIO  CS=3 en ligne  I_abs=1200 A  Vbus=20-145 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_pronto.h  "Pronto"  [IMPORTED]  OCP=aucune  CS=3 en ligne  I_abs=300 A  Vbus=20-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_str365.h  "STR365"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=720 A  Vbus=11-97 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+boards/vesc/vesc/board_str365_150.h  "STR365_150"  [IMPORTED]  OCP=aucune  CS=3 low-side  I_abs=720 A  Vbus=20-145 V  f_pwm=15000 Hz
+    DOUBLON PA3: BOARD_ADC_EXT3_CH, BOARD_TFET_CH
+
+154 cartes, 33 avec erreurs/doublons, dont 0 non IMPORTED
