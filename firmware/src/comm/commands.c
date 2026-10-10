@@ -259,7 +259,7 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     }
 
     case COMM_DETECT_MOTOR_R_L:
-        detect_app_start_rl(src);
+        detect_app_start_rl(src, 0.0f);   /* la requete ne porte pas de courant */
         break;
     case COMM_DETECT_MOTOR_FLUX_LINKAGE_OPENLOOP: {
         if (n < 16) break;

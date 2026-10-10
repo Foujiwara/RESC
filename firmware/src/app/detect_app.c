@@ -4,7 +4,7 @@
  * Toutes les sequences sont celles du coeur RESC (foc.c) :
  *  offsets  : pont coupe (courants + tensions de phase), puis vecteur nul sous PWM
  *             (courants + ecarts de tension entre phases)
- *  R/L      : recherche du courant, 3 paliers montants (pente dV/dI), creneaux de tension d/q
+ *  R/L      : rampe au courant de mesure, 3 paliers montants (pente dV/dI), creneaux d/q
  *  flux     : rotation I/f jusqu'au rapport cyclique cible, FEM pont actif et pont coupe
  *  Hall     : rotation lente a courant d impose, 3 tours avant / arriere / avant,
  *             centre circulaire de chaque etat
@@ -81,13 +81,15 @@ static void send_rl(float r, float l_uh, float diff_uh)
     put(b, o);
 }
 
-bool detect_app_start_rl(const comm_iface_t *reply)
+bool detect_app_start_rl(const comm_iface_t *reply, float cur)
 {
     if (s_st != DA_IDLE) return false;
     s_reply = reply;
     foc_det_t d = { 0 };
     d.kind = FOC_DET_RL;
-    d.i_test = fm_max(0.8f * i_cap(), 2.0f);      /* courant max de recherche : 80 % du courant autorise */
+    /* Courant du palier haut : valeur demandee, sinon une fraction du courant moteur max
+     * configure (l_current_max, borne par le statut de la carte). Paliers a 1/2, 3/4, 1. */
+    d.i_test = fm_sat(cur > 0.5f ? cur : RESC_RL_CURRENT_FRAC * i_cap(), 1.0f, i_cap());
     if (!launch(&d)) { send_rl(0, 0, 0); return false; }
     s_st = DA_RL;
     commands_printf("Mesure R/L a %.1f A...", (double)d.i_test);

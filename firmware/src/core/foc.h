@@ -95,6 +95,9 @@ typedef struct {
     volatile uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty */
     volatile float   ol_omega;     /* rad/s el. (signe = sens) */
     volatile float   ol_duty;      /* -1..1, mode 2 */
+    volatile uint8_t duty_mode;    /* marche a rapport cyclique impose (tension q), courant borne */
+    volatile float   duty;         /* -1..1 */
+    volatile float   i_hi, i_lo;   /* A : bornes de iq en mode duty (i_lo <= 0 : frein) */
 } foc_cmd_t;
 
 /* ------------------------------------------------------------ Etats */

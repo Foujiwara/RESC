@@ -1,6 +1,6 @@
 # 12. Premier essai au banc — Ubox SINGLE 85_200
 
-> **À lire avant de brancher.** Ce firmware a été compilé et validé **en simulation** (51 vérifications : identification, démarrage, observateur, Hall, codeur, frein, vitesse, boucle ouverte, timeout, défauts) et par des tests PC de configuration (30 vérifications). **Il n'a jamais tourné sur la vraie carte.** Les drivers matériels (TIM1, ADC, USB, CAN, flash) sont écrits d'après le manuel RM0090 et n'ont pas encore été vérifiés en réel. L'essai se fait donc **par paliers**, avec une alimentation de labo **limitée en courant**.
+> **À lire avant de brancher.** Ce firmware a été compilé et validé **en simulation** (56 vérifications : identification, démarrage, observateur, Hall, codeur, frein, vitesse, duty, boucle ouverte, timeout, défauts) et par des tests PC de configuration (30 vérifications). **Il n'a jamais tourné sur la vraie carte.** Les drivers matériels (TIM1, ADC, USB, CAN, flash) sont écrits d'après le manuel RM0090 et n'ont pas encore été vérifiés en réel. L'essai se fait donc **par paliers**, avec une alimentation de labo **limitée en courant**.
 
 ## 0. Matériel
 
@@ -77,8 +77,8 @@ Les offsets de tension sont l'écart de chaque phase à la moyenne des trois (le
 
 ## 5. Identification du moteur (manuelle : R/L, puis flux, puis Hall)
 
-1. `detect_rl` : le moteur **ne tourne pas** (il se cale une fois). Durée environ 6 s :
-   - recherche du courant : paliers ×1,5 de 0,4 s jusqu'à au moins 1,5 V et 8 A (ou 80 % du courant autorisé) ;
+1. `detect_rl` (ou `detect_rl 20` pour imposer 20 A) : le moteur **ne tourne pas** (il se cale une fois). Durée environ 5 s :
+   - rampe de 0,5 s jusqu'au courant de mesure : **50 % de `l_current_max`** par défaut (le bouton R/L de VESC Tool n'envoie pas de courant) ;
    - trois paliers montants de 0,8 s à ½, ¾ et 1 × ce courant : R = pente ΔV/ΔI ;
    - sifflement (créneaux de tension) sur l'axe d puis sur l'axe q : Ld, Lq ;
    - retour du courant à zéro.
@@ -112,6 +112,7 @@ Sauvegarder avec `store`, puis vérifier avec `status` : le moteur doit apparaî
 | `stop` | roue libre |
 | `current -3` | démarrage en sens inverse |
 | `rpm 3000` | vitesse régulée |
+| `duty 0.2` | rapport cyclique imposé ; le courant est seulement borné par les limites (accélération et frein) |
 | `brake 3` | freinage puis coupure du pont à basse vitesse |
 | `rt` | charge ISR, nombre de reconstructions de courant |
 

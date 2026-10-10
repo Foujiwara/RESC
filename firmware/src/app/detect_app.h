@@ -9,7 +9,8 @@
 #include "packet.h"
 
 bool detect_app_start_offsets(const comm_iface_t *reply);
-bool detect_app_start_rl(const comm_iface_t *reply);
+/* cur <= 0 : RESC_RL_CURRENT_FRAC x courant moteur max */
+bool detect_app_start_rl(const comm_iface_t *reply, float cur);
 bool detect_app_start_lambda(const comm_iface_t *reply, float current, float erpm_per_s, float duty, float r, float l);
 bool detect_app_start_hall(const comm_iface_t *reply, float current);
 bool detect_app_start_encoder(const comm_iface_t *reply, float current);

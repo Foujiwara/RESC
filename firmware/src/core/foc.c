@@ -59,6 +59,8 @@ typedef struct {
     bool  br, br_p1, br_p2;
     float theta, omega;
     float slew, slew_t;
+    bool  duty_on;
+    float vq_duty, int_hi, int_lo;
 
     /* demarrage */
     start_sub_t sub;
@@ -81,7 +83,7 @@ typedef struct {
     uint8_t inj_phase;
     float lam_ed, lam_eq, lam_w;
     float lam_driven, lam_vacc;
-    float r_ilev, r_ihi;
+    float r_ihi;
 
     /* capteurs d'angle */
     uint16_t raw_cs[3];
@@ -256,6 +258,39 @@ RAMFUNC static bool current_loop(float kp, float ki, float vd_ff, float vq_ff, f
     return sat;
 }
 
+/* Mode duty : tension q imposee (rampe de 0.1 s pleine echelle), axe d regule.
+ * Le courant n'intervient qu'aux bornes : deux integrateurs a sens unique
+ * reduisent (ou augmentent) la tension tant que iq sort de [i_lo, i_hi],
+ * puis se relachent vers zero. Pas de boucle sur le duty mesure. */
+RAMFUNC static void duty_loop(float kp, float ki, float vmax)
+{
+    const float dt = S.dt;
+    if (!S.duty_on) {
+        S.duty_on = true;
+        S.vq_duty = S.vq;
+        S.int_hi = S.int_lo = 0.0f;
+    }
+    float tgt = fm_sat_sym(g_foc_cmd.duty * S.vbus_f * FM_1_SQRT3, vmax);
+    S.vq_duty += fm_sat_sym(tgt - S.vq_duty, vmax * dt / 0.1f);
+
+    float ehi = g_foc_cmd.i_hi - S.iq, elo = g_foc_cmd.i_lo - S.iq;
+    S.int_hi = fm_min(S.int_hi + ki * dt * ehi, 0.0f);
+    S.int_lo = fm_max(S.int_lo + ki * dt * elo, 0.0f);
+    float corr = S.int_hi + S.int_lo + kp * (fm_min(ehi, 0.0f) + fm_max(elo, 0.0f));
+
+    float ed = S.id_ref - S.id;
+    float vd_ff = -S.omega * S.p.lq * S.iq;
+    S.int_d += ki * dt * ed;
+    float vd = kp * ed + S.int_d + vd_ff;
+    float vd_s = fm_sat_sym(vd, vmax);
+    if (vd_s != vd) S.int_d = vd_s - kp * ed - vd_ff;
+    float vq_lim = fm_sqrt(vmax * vmax - vd_s * vd_s);
+    S.vq_duty = fm_sat_sym(S.vq_duty, vq_lim);
+    S.vd = vd_s;
+    S.vq = fm_sat_sym(S.vq_duty + corr, vq_lim);
+    S.iq_ref = S.iq;                       /* reprise sans a-coup si on quitte le mode */
+}
+
 /* Park inverse avec angle predit + SVPWM (injection min-max) */
 RAMFUNC static void modulate(float theta_out)
 {
@@ -280,6 +315,7 @@ RAMFUNC static void modulate(float theta_out)
 RAMFUNC static void bridge_off(void)
 {
     S.br = false;
+    S.duty_on = false;
     S.int_d = S.int_q = 0.0f;
     S.vd = S.vq = 0.0f;
     S.duty[0] = S.duty[1] = S.duty[2] = 0.5f;
@@ -443,7 +479,7 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
         S.dst = 0.0f;
         S.acc_v = S.acc_i = S.acc_n = 0.0f;
         switch (S.det.kind) {
-        case FOC_DET_RL:      S.ds = DS_R_SEARCH; S.r_ilev = fm_min(2.0f, I); S.acc_v = S.acc_n = 0.0f; break;
+        case FOC_DET_RL:      S.ds = DS_R_SEARCH; break;
         case FOC_DET_LAMBDA:  S.ds = DS_LAM_ALIGN; break;
         case FOC_DET_OFFSETS:
             if (fm_abs(S.obs.omega) > 0.3f * S.p.st_omega_exit) { det_finish(-9); return; }   /* moteur en rotation */
@@ -458,24 +494,19 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
         S.ol_omega = 0.0f;
         break;
 
-    /* --- Resistance, etape 1 : recherche du courant de mesure.
-     *     Paliers x1.5 de 0.4 s jusqu'a |vd| >= 1.5 V avec au moins 8 A, ou jusqu'au
-     *     courant autorise (det.i_test). Le courant doit etre assez grand pour que
-     *     l'erreur de temps mort soit saturee (constante) meme au palier le plus bas. */
+    /* --- Resistance, etape 1 : rampe (0.5 s) jusqu'au courant de mesure det.i_test,
+     *     fixe par l'application (fraction du courant moteur max configure).
+     *     Moteur tres resistant : la rampe s'arrete si |vd| depasse 30 % de la tension
+     *     disponible ; le palier haut est alors le courant atteint. */
     case DS_R_SEARCH:
-        S.id_ref += fm_sat_sym(S.r_ilev - S.id_ref, I * dt / 0.1f);
-        if (S.dst > 0.25f) { S.acc_v += S.vd; S.acc_n += 1.0f; }
-        if (S.dst >= 0.4f) {
-            float v = S.acc_v / S.acc_n;
-            if ((fm_abs(v) >= 1.5f && S.r_ilev >= fm_min(8.0f, I)) || S.r_ilev >= I) {
-                S.r_ihi = S.r_ilev;
-                S.det.r_i_high = S.r_ihi;
-                S.det.r_i_low = 0.5f * S.r_ihi;
-                S.r_step = 0;
-                S.ds = DS_R_STEP;
-            } else {
-                S.r_ilev = fm_min(S.r_ilev * 1.5f, I);
-            }
+        S.id_ref = fm_min(S.id_ref + I * dt / 0.5f, I);
+        if (fm_abs(S.vd) > 0.3f * vmax) S.id_ref = fm_max(S.id - 0.02f * I, 0.1f * I);
+        if (S.id_ref >= I || (fm_abs(S.vd) > 0.3f * vmax && S.dst > 0.1f)) {
+            S.r_ihi = S.id_ref;
+            S.det.r_i_high = S.r_ihi;
+            S.det.r_i_low = 0.5f * S.r_ihi;
+            S.r_step = 0;
+            S.ds = DS_R_STEP;
             S.dst = 0.0f;
             S.acc_v = S.acc_i = S.acc_n = 0.0f;
         }
@@ -1121,7 +1152,16 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.id = c * S.i_a + s * S.i_b;
         S.iq = -s * S.i_a + c * S.i_b;
     }
-    current_loop(S.p.kp, S.p.ki, vd_ff, vq_ff, vmax);
+    if (S.st == FOC_ST_RUN && g_foc_cmd.duty_mode) {
+        duty_loop(S.p.kp, S.p.ki, vmax);
+    } else {
+        if (S.duty_on) {
+            /* sortie du mode duty : l'integrateur q reprend la tension appliquee */
+            S.duty_on = false;
+            S.int_q = S.vq - vq_ff;
+        }
+        current_loop(S.p.kp, S.p.ki, vd_ff, vq_ff, vmax);
+    }
     theta_out = S.theta + S.omega * S.p.delay_comp * dt;
     modulate(theta_out);
 
