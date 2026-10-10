@@ -1,0 +1,11 @@
+# Compilation
+firmware/build/
+*.o
+*.elf
+*.map
+# Python
+__pycache__/
+*.pyc
+# Systeme
+.DS_Store
+Thumbs.db

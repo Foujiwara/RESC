@@ -1,0 +1,46 @@
+/*
+ * sim_motor.h — Modele de PMSM + onduleur + ADC pour tester le coeur FOC RESC sur PC.
+ * Modele moyen par periode PWM (pas d'ondulation), temps mort modelise comme
+ * une perte de tension dependant du signe du courant, mise a jour des rapports
+ * cycliques au creux du compteur (une demi-periode apres l'echantillon).
+ */
+#ifndef SIM_MOTOR_H
+#define SIM_MOTOR_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "foc.h"
+
+typedef struct {
+    /* moteur */
+    double r, ld, lq, lambda;
+    int    pp;
+    double j, b, t_load;      /* inertie (kg m^2), frottement visqueux, couple resistant */
+    /* onduleur et mesure */
+    double vbus;
+    double t_dead;            /* s, temps mort effectif */
+    double f_pwm;
+    double i_lsb;             /* A par LSB (signe = polarite de l'ampli) */
+    double v_lsb, vph_lsb;    /* V par LSB */
+    double off[3];            /* offsets ADC des courants */
+    double noise_lsb;
+    /* capteurs */
+    double hall_off;          /* rad electriques : calage des sondes */
+    uint32_t enc_cpr;
+    double enc_off;           /* rad mecaniques */
+    bool enc_rev;
+    /* etat */
+    double id, iq, theta, omega_m;
+    double t;
+    double duty_cur[3], duty_next[3];
+    bool   en_cur, en_next;
+} sim_motor_t;
+
+void sim_init(sim_motor_t *m);
+/* Avance d'une periode PWM : applique la sortie FOC precedente et produit l'echantillon suivant. */
+void sim_step(sim_motor_t *m, const foc_pwm_t *out, foc_adc_t *adc);
+double sim_theta_e(const sim_motor_t *m);
+double sim_omega_e(const sim_motor_t *m);
+void sim_phase_currents(const sim_motor_t *m, double i[3]);
+
+#endif
