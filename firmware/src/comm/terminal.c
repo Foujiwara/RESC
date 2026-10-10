@@ -15,6 +15,7 @@
 #include "systime.h"
 #include "wdg.h"
 #include "board.h"
+#include "flash.h"
 
 #define P commands_printf
 
@@ -200,6 +201,7 @@ void terminal_process(char *line)
         P("Carte %s (%s), statut %d, OCP materielle %d, dead-time %d ns", BOARD_NAME, BOARD_ORIGIN, BOARD_STATUS, BOARD_HW_OCP, BOARD_DEADTIME_NS);
         P("Offsets courant %.1f %.1f %.1f, reset watchdog : %s", (double)g_foc_telem.off_cs[0], (double)g_foc_telem.off_cs[1],
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
+        P("Bootloader (secteur 11, mise a jour par VESC Tool) : %s", flash_bootloader_present() ? "present" : "ABSENT");
     }
     else if (!strcmp(c, "faults")) P("Defaut actif : %s (%u), crete de phase vue : %.1f A", fault_name(g_foc_telem.fault),
                                      (unsigned)g_foc_telem.fault, (double)g_foc_telem.i_phase_max);
