@@ -161,8 +161,6 @@ p, li { white-space: pre-wrap; }
             <enumNames>Status 4</enumNames>
             <enumNames>Status 5</enumNames>
             <enumNames>Status 6</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
         </can_status_msgs_r1>
         <can_status_msgs_r2>
             <longName>Can Messages Rate 2</longName>
@@ -211,8 +209,6 @@ p, li { white-space: pre-wrap; }
             <enumNames>Status 4</enumNames>
             <enumNames>Status 5</enumNames>
             <enumNames>Status 6</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
         </can_status_msgs_r2>
         <can_baud_rate>
             <longName>CAN Baud Rate</longName>
@@ -292,14 +288,14 @@ p, li { white-space: pre-wrap; }
             <valInt>3</valInt>
             <enumNames>No App</enumNames>
             <enumNames>PPM</enumNames>
-            <enumNames>ADC (buttons on UART pins)</enumNames>
+            <enumNames>ADC</enumNames>
             <enumNames>UART</enumNames>
             <enumNames>PPM and UART</enumNames>
             <enumNames>ADC and UART</enumNames>
-            <enumNames>VESC Remote (packets)</enumNames>
-            <enumNames>VESC Remote (radio module packets)</enumNames>
-            <enumNames>Unused (no app)</enumNames>
-            <enumNames>PAS (sensor on UART pins)</enumNames>
+            <enumNames>Nunchuk (I2C, Nyko Kama)</enumNames>
+            <enumNames>NRF</enumNames>
+            <enumNames>Custom User App</enumNames>
+            <enumNames>PAS</enumNames>
             <enumNames>ADC and PAS</enumNames>
         </app_to_use>
         <app_ppm_conf.ctrl_type>
@@ -1073,11 +1069,6 @@ p, li { white-space: pre-wrap; }
             <enumNames>Enable Cruise Control</enumNames>
             <enumNames>Invert CC Button</enumNames>
             <enumNames>Invert Reverse Button</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
         </app_adc_conf.buttons>
         <app_adc_conf.voltage_inverted>
             <longName>Invert ADC1 Voltage</longName>

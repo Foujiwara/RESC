@@ -2134,7 +2134,7 @@ p, li { white-space: pre-wrap; }
             <longName>HFI Ambiguity Resolve Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the response stronger towards the magnet. &lt;b&gt;Single&lt;/b&gt;: +I compared with no bias. &lt;b&gt;Double&lt;/b&gt; and &lt;b&gt;Six vectors&lt;/b&gt;: +I compared with -I.&lt;/p&gt;</description>
+            <description>&lt;p&gt;Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the response stronger towards the magnet. &lt;b&gt;Single&lt;/b&gt;: +I compared with no bias. &lt;b&gt;Double&lt;/b&gt;: +I compared with -I.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_HFI_AMB_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>Six Vectors</enumNames>

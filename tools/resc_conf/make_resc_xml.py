@@ -20,6 +20,7 @@ Regles du format (VESC Tool, ConfigParams) : un parametre retire l'est de <Param
 <SerOrder> et <Grouping> ; un parametre ajoute est copie d'un parametre du meme type.
 """
 import copy
+import json
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -69,16 +70,13 @@ def html(*paras):
 
 # --------------------------------------------------- textes et choix propres a RESC
 MC_EDIT = {
-    "motor_type": dict(enums=["BLDC (not supported, FOC used)", "DC (not supported, FOC used)", "FOC"], description=html(
+    "motor_type": dict(description=html(
         "RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).")),
-    "l_additional_faults": dict(enums=["Encoder Slip", "Overspeed", "Unused", "Absolute Overspeed",
-                                       "Unused", "Unused", "Unused", "Unused"], description=html(
+    "l_additional_faults": dict(description=html(
         "<b>Encoder Slip</b>: fault when the encoder speed differs from the observer speed by more than 30 % "
         "for 0.1 s (above twice the I/f exit speed). <b>Overspeed</b>: above 110 % of the ERPM limit. "
         "<b>Absolute Overspeed</b>: above 130 %.")),
-    "sp_pid_loop_rate": dict(enums=["25 Hz", "50 Hz", "100 Hz", "250 Hz", "500 Hz", "1000 Hz",
-                                    "1000 Hz (2500 not available)", "1000 Hz (5000 not available)",
-                                    "1000 Hz (10000 not available)"], description=html(
+    "sp_pid_loop_rate": dict(description=html(
         "Rate of the speed and position PID. The RESC control layer runs at 1 kHz at most.")),
     "foc_observer_type": dict(
         enums=["Active flux, non-linear correction", "Active flux, radial correction (gain 2|w|)",
@@ -120,10 +118,10 @@ MC_EDIT = {
         "Minimum time at hand-over speed with the observer locked before switching to it (min 50 ms).")),
     "foc_sl_openloop_hyst": dict(description=html(
         "Time below the exit speed (half of the hand-over speed) before going back to I/f.")),
-    "foc_hfi_amb_mode": dict(enums=["Six Vectors (= Double Pulse)", "Id Single Pulse", "Id Double Pulse"], description=html(
+    "foc_hfi_amb_mode": dict(description=html(
         "Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the "
         "response stronger towards the magnet. <b>Single</b>: +I compared with no bias. "
-        "<b>Double</b> and <b>Six vectors</b>: +I compared with -I.")),
+        "<b>Double</b>: +I compared with -I.")),
     "foc_hfi_amb_tres": dict(description=html("Duration of each polarity pulse (ms).")),
     "foc_hfi_gain": dict(description=html("HFI angle tracking: PLL bandwidth = 2000 x gain rad/s.")),
     "foc_hfi_samples": dict(description=html(
@@ -137,8 +135,7 @@ MC_EDIT = {
         "Duty mode: when the duty request decreases, a PI from duty error to braking current brings the duty "
         "down within the current limits. Proportional gain (A per unit of duty).")),
     "foc_duty_dowmramp_ki": dict(description=html("Duty mode, decreasing duty: integral gain (A/s per unit of duty).")),
-    "foc_offsets_cal_mode": dict(enums=["Calibrate on Boot", "Unused", "Unused", "Unused", "Unused", "Unused",
-                                        "Unused", "Unused"], description=html(
+    "foc_offsets_cal_mode": dict(description=html(
         "Bit 0 set: offsets measured at every boot. Bit 0 clear: the offsets of the manual calibration "
         "(offsets_cal) are used when they agree with the boot measurement.")),
     "l_slow_abs_current": dict(description=html(
@@ -146,9 +143,7 @@ MC_EDIT = {
         "analog watchdog is then set 50 % higher).")),
 }
 APP_EDIT = {
-    "app_to_use": dict(enums=["No App", "PPM", "ADC (buttons on UART pins)", "UART", "PPM and UART", "ADC and UART",
-                              "VESC Remote (packets)", "VESC Remote (radio module packets)", "Unused (no app)",
-                              "PAS (sensor on UART pins)", "ADC and PAS"], description=html(
+    "app_to_use": dict(description=html(
         "Control application. <b>UART</b> also accepts the VESC Remote through packets (radio module on the "
         "permanent UART, BLE). <b>ADC</b> alone uses the UART TX/RX pins for the cruise and reverse buttons; "
         "<b>PAS</b> uses them for the pedal sensor. Servo input on the PPM pin (TIM4).")),
@@ -165,6 +160,56 @@ APP_EDIT = {
 }
 for p in ("app_adc_conf.throttle_exp_mode", "app_chuk_conf.throttle_exp_mode"):
     APP_EDIT[p] = APP_EDIT["app_ppm_conf.throttle_exp_mode"]
+
+# --------------------------------------------- choix conserves (les autres sont retires)
+# Pour chaque liste : (valeur interne, nom affiche) dans l'ordre affiche. Pour les champs de bits,
+# la valeur interne est le numero du bit. Le firmware traduit position <-> valeur interne
+# (firmware/conf/resc_enum_map.json, lu par gen_resc_conf.py et board_xml.py).
+# motor_type et app_to_use restent complets : RESC Tool choisit les pages affichees d'apres leur
+# numero (FOC = 2, PPM = 1, ADC = 2, PAS = 9...) ; le firmware ramene les choix sans effet sur un
+# choix valide (FOC ; Nunchuk I2C, NRF, app personnalisee -> UART).
+ENUM_KEEP = {
+    "l_additional_faults": [(0, "Encoder Slip"), (1, "Overspeed"), (3, "Absolute Overspeed")],
+    "sp_pid_loop_rate": [(0, "25 Hz"), (1, "50 Hz"), (2, "100 Hz"), (3, "250 Hz"), (4, "500 Hz"), (5, "1000 Hz")],
+    "foc_hfi_amb_mode": [(1, "Id Single Pulse"), (2, "Id Double Pulse")],
+    "foc_offsets_cal_mode": [(0, "Calibrate on Boot")],
+    "m_out_aux_mode": [(0, "Off"), (1, "On after 2 seconds"), (2, "On after 5 seconds"), (3, "On after 10 seconds"),
+                       (5, "On when running"), (6, "On when not running"), (7, "Temp motor > 50 C"),
+                       (8, "Temp mosfet > 50 C"), (9, "Temp motor > 70 C"), (10, "Temp mosfet > 70 C"),
+                       (11, "Temp motor or mosfet > 50 C"), (12, "Temp motor or mosfet > 70 C")],
+}
+APP_ENUM_KEEP = {
+    "can_status_msgs_r1": [(k, "Status %d" % (k + 1)) for k in range(6)],
+    "can_status_msgs_r2": [(k, "Status %d" % (k + 1)) for k in range(6)],
+    "app_adc_conf.buttons": [(0, "Enable Cruise Control"), (1, "Invert CC Button"), (2, "Invert Reverse Button")],
+}
+
+
+def apply_keep(root, keep, emap):
+    params = root.find("Params")
+    for name, items in keep.items():
+        e = params.find(name)
+        bits = e.findtext("type") == "6"
+        old_def = int(e.findtext("valInt") or "0")
+        for x in e.findall("enumNames"):
+            e.remove(x)
+        for _, label in items:
+            ET.SubElement(e, "enumNames").text = label
+        vals = [v for v, _ in items]
+        if bits:
+            new_def = sum(1 << j for j, v in enumerate(vals) if old_def & (1 << v))
+        else:
+            new_def = vals.index(old_def) if old_def in vals else 0
+        set_text(e, "valInt", str(new_def))
+        if not bits:
+            set_text(e, "maxInt", str(len(vals) - 1))
+        emap[flat_name(name)] = {"bits": bits, "keep": vals}
+
+
+def flat_name(n):
+    import re as _re
+    return _re.sub(r"__(\d+)", r"_\1", n).replace(".", "_")
+
 
 # ------------------------------------------------------------ ajouts RESC
 # (nom, modele a copier, champs, groupe, sous-groupe, separateur)
@@ -332,6 +377,11 @@ def main():
     add(mc, MC_ADD)
     remove(app, APP_REMOVE)
     edit(app, APP_EDIT)
+    emap = {}
+    apply_keep(mc, ENUM_KEEP, emap)
+    apply_keep(app, APP_ENUM_KEEP, emap)
+    with open(os.path.join(DST, "resc_enum_map.json"), "w") as fh:
+        json.dump(emap, fh, indent=1)
     write(mc, os.path.join(DST, "resc_mcconf.xml"))
     write(app, os.path.join(DST, "resc_appconf.xml"))
     print("RESC   : mcconf %d parametres, appconf %d" % (len(ser_names(mc)), len(ser_names(app))))

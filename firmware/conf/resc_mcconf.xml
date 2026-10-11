@@ -8,8 +8,8 @@
             <description>&lt;p&gt;RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).&lt;/p&gt;</description>
             <cDefine>MCCONF_DEFAULT_MOTOR_TYPE</cDefine>
             <valInt>2</valInt>
-            <enumNames>BLDC (not supported, FOC used)</enumNames>
-            <enumNames>DC (not supported, FOC used)</enumNames>
+            <enumNames>BLDC</enumNames>
+            <enumNames>DC</enumNames>
             <enumNames>FOC</enumNames>
         </motor_type>
         <l_current_max>
@@ -611,12 +611,7 @@ p, li { white-space: pre-wrap; }
             <valInt>0</valInt>
             <enumNames>Encoder Slip</enumNames>
             <enumNames>Overspeed</enumNames>
-            <enumNames>Unused</enumNames>
             <enumNames>Absolute Overspeed</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
         </l_additional_faults>
         <foc_current_kp>
             <longName>Current KP</longName>
@@ -1584,12 +1579,12 @@ p, li { white-space: pre-wrap; }
             <longName>HFI Ambiguity Resolve Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the response stronger towards the magnet. &lt;b&gt;Single&lt;/b&gt;: +I compared with no bias. &lt;b&gt;Double&lt;/b&gt; and &lt;b&gt;Six vectors&lt;/b&gt;: +I compared with -I.&lt;/p&gt;</description>
+            <description>&lt;p&gt;Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the response stronger towards the magnet. &lt;b&gt;Single&lt;/b&gt;: +I compared with no bias. &lt;b&gt;Double&lt;/b&gt;: +I compared with -I.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_HFI_AMB_MODE</cDefine>
             <valInt>0</valInt>
-            <enumNames>Six Vectors (= Double Pulse)</enumNames>
             <enumNames>Id Single Pulse</enumNames>
             <enumNames>Id Double Pulse</enumNames>
+            <maxInt>1</maxInt>
         </foc_hfi_amb_mode>
         <foc_hfi_amb_current>
             <longName>HFI Ambiguity Resolve Current</longName>
@@ -1816,13 +1811,6 @@ p, li { white-space: pre-wrap; }
             <cDefine>MCCONF_FOC_OFFSETS_CAL_MODE</cDefine>
             <valInt>1</valInt>
             <enumNames>Calibrate on Boot</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
-            <enumNames>Unused</enumNames>
         </foc_offsets_cal_mode>
         <foc_offsets_current__0>
             <longName>Current Offset 0</longName>
@@ -2214,9 +2202,7 @@ p, li { white-space: pre-wrap; }
             <enumNames>250 Hz</enumNames>
             <enumNames>500 Hz</enumNames>
             <enumNames>1000 Hz</enumNames>
-            <enumNames>1000 Hz (2500 not available)</enumNames>
-            <enumNames>1000 Hz (5000 not available)</enumNames>
-            <enumNames>1000 Hz (10000 not available)</enumNames>
+            <maxInt>5</maxInt>
         </sp_pid_loop_rate>
         <s_pid_kp>
             <longName>Speed PID Kp</longName>
@@ -2655,7 +2641,6 @@ p, li { white-space: pre-wrap; }
             <enumNames>On after 2 seconds</enumNames>
             <enumNames>On after 5 seconds</enumNames>
             <enumNames>On after 10 seconds</enumNames>
-            <enumNames>Unused</enumNames>
             <enumNames>On when running</enumNames>
             <enumNames>On when not running</enumNames>
             <enumNames>Temp motor &gt; 50 C</enumNames>
@@ -2664,6 +2649,7 @@ p, li { white-space: pre-wrap; }
             <enumNames>Temp mosfet &gt; 70 C</enumNames>
             <enumNames>Temp motor or mosfet &gt; 50 C</enumNames>
             <enumNames>Temp motor or mosfet &gt; 70 C</enumNames>
+            <maxInt>11</maxInt>
         </m_out_aux_mode>
         <m_motor_temp_sens_type>
             <longName>Motor Temperature Sensor Type</longName>

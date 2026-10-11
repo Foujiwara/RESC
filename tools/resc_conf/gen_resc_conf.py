@@ -95,8 +95,15 @@ def fmt_scale(s):
     return ("%g" % s) if s != int(s) else str(int(s))
 
 
-def ser_line(p, ct):
+EMAP = {}     # profil RESC : listes reduites (resc_enum_map.json)
+
+
+def ser_line(p, ct, rmap=False):
     c = "c->" + p.c
+    m = EMAP.get(p.c) if rmap else None
+    if m:
+        f = "map_bits_out" if m["bits"] else "map_out"
+        return "buf[i++] = %s((uint8_t)%s, KEEP_%s, %d);" % (f, c, p.c.upper(), len(m["keep"]))
     if p.type == 1:
         if p.vtx == 7:
             return "vb_put_f16(buf, %s, %s, &i);" % (c, fmt_scale(p.scale))
@@ -110,8 +117,12 @@ def ser_line(p, ct):
             6: "vb_put_i32(buf, %s, &i);"}[p.vtx] % c
 
 
-def deser_line(p, ct):
+def deser_line(p, ct, rmap=False):
     c = "c->" + p.c
+    m = EMAP.get(p.c) if rmap else None
+    if m:
+        f = "map_bits_in" if m["bits"] else "map_in"
+        return "%s = (%s)%s(buf[i++], KEEP_%s, %d);" % (c, ct, f, p.c.upper(), len(m["keep"]))
     if p.type == 1:
         if p.vtx == 7:
             return "%s = vb_get_f16(buf, %s, &i);" % (c, fmt_scale(p.scale))
@@ -146,6 +157,7 @@ CT_CODE = {"float": 0, "uint8_t": 1, "int8_t": 2, "uint16_t": 3, "int16_t": 4, "
 
 def main():
     ctypes = json.load(open(os.path.join(HERE, "vesc700_ctypes.json")))
+    EMAP.update(json.load(open(os.path.join(CONF, "resc_enum_map.json"))))
     dflt = json.load(open(os.path.join(HERE, "vesc700_defaults.json")))
     prof = {}
     for pname, files in (("vesc700", ("vesc700/parameters_mcconf.xml", "vesc700/parameters_appconf.xml")),
@@ -170,6 +182,15 @@ def main():
     h.append(" * ne serialise que les siens. Les champs hors profil gardent leur valeur interne. */")
     c.append("/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */")
     c.append('#include <stddef.h>\n#include "vesc_conf.h"\n#include "vesc_buffer.h"\n#include "vesc_compat_defaults.h"\n')
+    c.append("/* Profil RESC : listes reduites aux choix pris en charge. Position affichee <-> valeur interne")
+    c.append(" * (valeur du format 7.00) ; pour les champs de bits, bit affiche <-> bit interne. */")
+    c.append("static uint8_t map_out(uint8_t v, const uint8_t *k, uint8_t n) { for (uint8_t j = 0; j < n; j++) if (k[j] == v) return j; return 0; }")
+    c.append("static uint8_t map_in(uint8_t j, const uint8_t *k, uint8_t n) { return j < n ? k[j] : k[0]; }")
+    c.append("static uint8_t map_bits_out(uint8_t v, const uint8_t *k, uint8_t n) { uint8_t o = 0; for (uint8_t j = 0; j < n; j++) if (v & (1u << k[j])) o |= (uint8_t)(1u << j); return o; }")
+    c.append("static uint8_t map_bits_in(uint8_t o, const uint8_t *k, uint8_t n) { uint8_t v = 0; for (uint8_t j = 0; j < n; j++) if (o & (1u << j)) v |= (uint8_t)(1u << k[j]); return v; }")
+    for name, m in sorted(EMAP.items()):
+        c.append("static const uint8_t KEEP_%s[] = { %s };" % (name.upper(), ", ".join(str(v) for v in m["keep"])))
+    c.append("")
 
     for k, sname, lname in (("mc", "vesc_mcconf_t", "mcconf"), ("app", "vesc_appconf_t", "appconf")):
         v_ps, r_ps = prof["vesc700"][k][1], prof["resc"][k][1]
@@ -211,14 +232,14 @@ def main():
             c.append("    int32_t i = 0;")
             c.append("    vb_put_u32(buf, %s, &i);" % sigm)
             for p in ps:
-                c.append("    " + ser_line(p, ct[p.c]))
+                c.append("    " + ser_line(p, ct[p.c], pre == "rescp"))
             c.append("    return i;\n}\n")
             c.append("bool %s_%s_deserialize(const uint8_t *buf, int32_t len, %s *c)\n{" % (pre, lname, sname))
             c.append("    int32_t i = 0;")
             c.append("    if (len < %d) return false;" % (4 + sum(ser_size(p) for p in ps)))
             c.append("    if (vb_get_u32(buf, &i) != %s) return false;" % sigm)
             for p in ps:
-                c.append("    " + deser_line(p, ct[p.c]))
+                c.append("    " + deser_line(p, ct[p.c], pre == "rescp"))
             c.append("    return true;\n}\n")
         c.append("#ifdef RESC_CONF_PROFILE_RESC")
         c.append("int32_t vesc_%s_serialize(uint8_t *buf, const %s *c) { return rescp_%s_serialize(buf, c); }" % (lname, sname, lname))
@@ -241,7 +262,7 @@ def main():
         c.append("    /* defauts propres au profil RESC (valeurs du XML RESC) */")
         for p in r_ps:
             vp = vmap.get(p.c)
-            if vp is not None and xml_default(p) != xml_default(vp):
+            if vp is not None and p.c not in EMAP and xml_default(p) != xml_default(vp):
                 c.append("    c->%s = (%s)(%s);" % (p.c, ct[p.c], xml_default(p)))
         c.append("#endif")
         c.append("}\n")
