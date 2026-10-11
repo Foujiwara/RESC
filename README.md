@@ -21,6 +21,7 @@ For interoperability with VESC Tool, displays and existing controllers, RESC reu
 | Control: current, brake, duty (voltage mode, down-ramp brake), speed, position, open loop, limits | `firmware/src/core/ctrl.c` | simulation OK |
 | Apps: PPM, ADC (+ buttons), VESC Remote, PAS, multi-ESC over CAN with traction control, kill switch | `firmware/src/app/apps.c`, `bsp/inputs.c` | PC tests OK |
 | Configuration: VESC700 / RESC profiles generated from the XMLs, storage by name with migration, description sent to RESC Tool (command 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | PC tests OK |
+| VESC 7.00 features: V0/V7 sampling, overmodulation, brake held to standstill with low-side short, handbrake, sampled data, statistics, odometer, absolute encoders (AS5047, MT6816, AS5x47U, TLE5012, AMT22, MA782, AD2S1205, sin/cos, PWM), IMU (BMI160), VESC BMS over CAN, setup wizard (auto detection, CAN included), firmware update over the CAN bus | `core/`, `bsp/abs_enc.c`, `app/imu.c`, `app/bms.c`, `app/detect_all.c`, `comm/sampler.c` | simulation and PC tests OK |
 | Protections: software overcurrent + ADC watchdog, overvoltage, undervoltage, temperatures, driver fault, break, overspeed | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partly simulated |
 | STM32F405: TIM1, triple ADC, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **to validate on the board** |
 
@@ -29,7 +30,7 @@ For interoperability with VESC Tool, displays and existing controllers, RESC reu
 | | VESC700 profile (default) | RESC profile |
 |---|---|---|
 | Tool | Official VESC Tool, Android, and RESC Tool | **RESC Tool only** (version that reads the description) |
-| Parameters | The 202 + 121 of VESC 7.00, byte-identical | 149 + 80: no BLDC, DC, sin/cos, DRV8301, BMS, UAVCAN, NRF24, IMU; only the options RESC supports remain in the lists |
+| Parameters | The 202 + 121 of VESC 7.00, byte-identical | 179 + 104: no BLDC, DC, DRV8301, UAVCAN, NRF24; only the options RESC and the board support remain in the lists |
 | In RESC Tool | Unused parameters hidden | **Only the parameters used by the current settings are shown** (see below) |
 
 **Motor Type** (Motor > General > General): **FOC Permanent Magnets (PMSM / BLDC / IPM)** or **FOC Induction (ACIM)**.

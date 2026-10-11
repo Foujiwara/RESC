@@ -2,7 +2,7 @@
 
 Ce document décrit ce que fait chaque fonction ajoutée en version 1.0 et le paramètre qui la règle. Les noms sont ceux de VESC Tool / RESC Tool. Le terminal accepte les mêmes noms avec `get`, `set` et `list` (les `.` et `__` du XML y deviennent `_`, par exemple `app_ppm_conf_ctrl_type`).
 
-État : tout est **validé en simulation** (104 vérifications) et par des **tests PC** (configuration, migration, commande 250, applications). Rien n'a encore été essayé sur la carte : les essais se font par paliers, comme dans [12_essai_banc.md](12_essai_banc.md).
+État : tout est **validé en simulation** (134 vérifications) et par des **tests PC** (configuration, migration, commande 250, applications). Rien n'a encore été essayé sur la carte : les essais se font par paliers, comme dans [12_essai_banc.md](12_essai_banc.md).
 
 ## 1. Observateurs (`foc_observer_type`)
 
@@ -163,7 +163,7 @@ Commandes du terminal pour l'induction :
 |---|---|---|
 | Compilation | `python firmware/build.py` | `python firmware/build.py --conf resc` |
 | Outil | VESC Tool officiel, Android | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 149 + 80 : sans BLDC, DC, sin/cos, DRV8301, BMS, UAVCAN, NRF24, IMU ; avec aides RESC, induction, bande passante, courant de mesure R |
+| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 179 + 104 : sans BLDC, DC, DRV8301, UAVCAN, NRF24 ; avec aides RESC, induction, bande passante, courant de mesure R |
 | Version annoncée | 7.00 | 1.00 |
 
 Points communs aux deux profils :
@@ -179,7 +179,8 @@ Points communs aux deux profils :
 - **Ancien format de RESC 0.1 :** relu au premier démarrage, puis réécrit. `status` affiche « MIGRÉE ».
 
 **Paramètres visibles.**
-- **Profil RESC :** 149 paramètres moteur et 80 paramètres d'application, tous utilisés par le firmware et tous visibles.
+- **Profil RESC :** 179 paramètres moteur et 104 paramètres d'application, tous utilisés par le firmware et tous visibles (selon les réglages en cours).
+- **Choix selon la carte (profil RESC) :** les choix qui n'existent pas sur la carte compilée sont retirés des listes (V0 et V7 sans shunts en ligne, modes à trois capteurs, codeurs SPI1 / PWM / sin/cos sans leurs broches, IMU interne). Règles : `tools/resc_conf/board_enum.py`.
 - **Profil VESC700 :** la description envoyée à RESC Tool par la commande 250 est l'officielle, avec la même sérialisation et la même signature. Seule différence : les paramètres inutilisés sont retirés des onglets, donc invisibles (141/202 et 80/121 visibles), et les aides décrivent le comportement de RESC.
 - **VESC Tool officiel :** il ne demande pas la description et affiche toujours tous les paramètres de VESC 7.00. On ne peut rien y cacher sans casser la compatibilité.
 - **Onglets BLDC, DC et GPD :** ils restent présents, mais vides.
@@ -200,3 +201,33 @@ Le contrôle est automatique dans `python firmware/build.py --tests`, via `tools
 **Ne pas distribuer le profil RESC avant la version de RESC Tool qui lit la description.**
 
 Génération : `python -I tools/resc_conf/make_resc_xml.py` (XML RESC), puis `python -I tools/resc_conf/gen_resc_conf.py` (code). Tests : `python firmware/build.py --tests`.
+
+## 9. Fonctions reprises de VESC 7.00 (version 1.1)
+
+Toutes passent par les paramètres et les commandes de VESC Tool, avec les mêmes noms. Validées en simulation et par tests PC, pas encore sur la carte.
+
+**Cœur FOC**
+- **`foc_control_sample_mode`** : V0 seul ; V0 + V7 interpolé (mise à jour de demi-période au creux du compteur avec l'angle avancé d'une demi-période) ; V0 et V7 (boucle complète deux fois par période, cartes à shunts en ligne seulement, retiré des listes sinon).
+- **`foc_current_sample_mode`** : plus longue fenêtre (la phase à la fenêtre la plus courte est reconstruite), tous les capteurs, fort courant (la phase au plus fort courant est reconstruite).
+- **`foc_overmod_factor`** (surmodulation), **`foc_mag_vd_max`** (part de la tension pour l'axe d), **`foc_current_filter_const`** (filtre des courants affichés et des limites), **`foc_fw_backoff`** (défluxage réduit quand iq dépasse sa consigne).
+- **`foc_short_ls_on_zero_duty`** : tension nulle = low-sides passants en continu.
+- **Frein (`SET_CURRENT_BRAKE`) comme VESC :** courant opposé à la vitesse ; quand il n'est plus atteignable (basse vitesse, changement de sens), phases en court-circuit, jusqu'à l'arrêt et à l'arrêt. Avec `foc_short_ls_on_zero_duty`, court-circuit par les low-sides.
+- **Frein à main (`SET_HANDBRAKE`)** : courant continu à angle figé.
+- **HFI :** `foc_hfi_reset_erpm` (reprise sur l'observateur au-dessus, recherche de position en dessous) et `foc_hfi_obs_ovr_sec` (angle HFI recalé sur l'observateur après le retour à basse vitesse).
+- **`l_in_current_map_start`, `l_in_current_map_filter`** : courant moteur réduit à l'approche de la limite batterie. **`p_pid_kd_proc`** : dérivée sur la position mesurée.
+- **Limites batterie :** `l_in_current_min` (régénération) et `l_watt_min` sont désormais appliqués ; les limites batterie sont converties en limite de courant moteur (I batterie ≈ I moteur × duty), puis corrigées par une boucle lente.
+
+**Codeurs (`m_sensor_port_mode`)** : ABI, AS5047, AMT22, TLE5012 (port Hall), MT6816, AS5x47U, MA782 (SPI1), AD2S1205, sin/cos (`m_encoder_sin_*`, `m_encoder_cos_*`, filtre, correction de phase), PWM (entrée servo). Lecture à chaque période, contrôle de parité ou de CRC, échantillon invalide ignoré.
+
+**IMU (`imu_conf.*`)** : BMI160 interne (Ubox) ou externe sur le port UART ; filtres, rotation de montage, décalages ; attitude Madgwick, Mahony ou Madgwick Fusion ; page IMU et calibration de VESC Tool.
+
+**BMS (`bms.*`)** : BMS VESC sur le bus CAN ; limites par température des cellules, état de charge, cellule la plus basse et la plus haute ; page BMS et commandes de l'outil relayées ; relais des trames (`bms.fwd_can_mode`).
+
+**Outil et protocole**
+- **Échantillonnage (page Sampled Data)** : 1000 périodes (courants, tensions de phase, point milieu, courant filtré, état Hall, angle), modes immédiat, au démarrage, sur démarrage ou sur défaut avec historique.
+- **Affichage de la position** (observateur, capteur, PID position et écarts), **statistiques** (moyennes et maxima), **odomètre** enregistré à l'arrêt et au redémarrage, **coupure batterie** (`SET/GET_BATTERY_CUT`, diffusée par CAN), **limites temporaires** (`SET_MCCONF_TEMP(_SETUP)`), **arrêt et redémarrage** (`COMM_SHUTDOWN`), **informations firmware**.
+- **Détection automatique (assistant de VESC Tool)** : R/L, flux, Hall puis codeur ; courant max = √(P / 1,5 R) d'après la puissance de pertes ; autres contrôleurs du bus en parallèle ; configuration précédente remise en cas d'échec.
+- **CAN :** trames brutes (`CAN_FWD_FRAME`), changement de vitesse pour tout le bus, arrêt par CAN, `can_mode` (VESC, pont vers l'outil, inutilisé), mise à jour du firmware sur tout le bus, effacement et écriture du bootloader.
+- **Sortie servo** (`servo_out_enable`, `SET_SERVO_POS`) et **UART permanent** (`permanent_uart_enabled`).
+
+**Non repris :** Lisp (et ce qui en dépend : paquets, QML, codeur personnalisé), DRV8301, UAVCAN, NRF24, BiSS-C, TS5700N8501, TLE5012 en SSC matériel, PWM + ABI, IMU MPU9x50 / ICM20948 / LSM6DS3, programmateur SWD (BM_*), cartes CAN GNSS / IO / PSW, compression LZO (l'outil envoie sans compression), modes BLDC et DC.
