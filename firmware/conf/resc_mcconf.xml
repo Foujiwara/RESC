@@ -5,7 +5,7 @@
             <longName>Motor Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).&lt;/p&gt;</description>
+            <description>&lt;p&gt;RESC drives motors in FOC only. Transmitted for RESC Tool (FOC page); the visible Motor Type (foc_motor_kind) chooses between permanent magnet and induction motors.&lt;/p&gt;</description>
             <cDefine>MCCONF_DEFAULT_MOTOR_TYPE</cDefine>
             <valInt>2</valInt>
             <enumNames>BLDC</enumNames>
@@ -2946,14 +2946,14 @@ p, li { white-space: pre-wrap; }
             <vTx>9</vTx>
         </si_motor_nl_current>
         <foc_motor_kind>
-            <longName>Motor Kind</longName>
+            <longName>Motor Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Permanent magnet motor, or induction motor (no magnet): rotor flux oriented control with slip from the rotor time constant. For induction motors set the parameters of the Induction Motor section: run the R/L detection, then detect_acim in the terminal (DC current step, the motor does not turn), then set the magnetizing current. Angle source: encoder (indirect FOC) or sensorless (magnetization, frequency ramp, observer).&lt;/p&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;FOC Permanent Magnets&lt;/b&gt;: surface (PMSM, BLDC) or interior (IPM) magnet motor.&lt;/p&gt;&lt;p&gt;&lt;b&gt;FOC Induction&lt;/b&gt;: induction motor without magnet, rotor flux oriented control with slip from the rotor time constant. Set the Induction Motor section (FOC, General): run the R/L detection, then detect_acim in the terminal (DC current step, the motor does not turn), then set the magnetizing current. Angle source: encoder (indirect FOC) or sensorless (magnetization, frequency ramp, observer).&lt;/p&gt;&lt;p&gt;Only the parameters used by the selected motor type and options are shown. After changing it, write the configuration and reconnect to update the list.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_MOTOR_KIND</cDefine>
             <valInt>0</valInt>
-            <enumNames>Permanent magnet (PMSM / BLDC)</enumNames>
-            <enumNames>Induction (ACIM)</enumNames>
+            <enumNames>FOC Permanent Magnets (PMSM / BLDC / IPM)</enumNames>
+            <enumNames>FOC Induction (ACIM)</enumNames>
         </foc_motor_kind>
         <foc_acim_lm>
             <longName>Magnetizing Inductance</longName>
@@ -3239,6 +3239,7 @@ p, li { white-space: pre-wrap; }
             <subgroup>
                 <subgroupName>General</subgroupName>
                 <subgroupParams>
+                    <param>foc_motor_kind</param>
                     <param>m_invert_direction</param>
                 </subgroupParams>
             </subgroup>
@@ -3341,8 +3342,6 @@ p, li { white-space: pre-wrap; }
                     <param>foc_encoder_offset</param>
                     <param>foc_encoder_ratio</param>
                     <param>foc_encoder_inverted</param>
-                    <param>::sep::Motor Kind</param>
-                    <param>foc_motor_kind</param>
                     <param>::sep::Induction Motor</param>
                     <param>foc_acim_lm</param>
                     <param>foc_acim_lr</param>

@@ -377,10 +377,14 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     case COMM_SET_CHUCK_DATA:
         apps_set_chuck(d, n, systime_ms());
         break;
-    case COMM_RESC_GET_CONF_XML:
+    case COMM_RESC_GET_CONF_XML: {
+        /* onglets selon la configuration en cours (type de moteur, capteur, application...) */
+        static bool src_set;
+        if (!src_set) { conf_desc_source(&g_mcconf, &g_appconf); src_set = true; }
         o = conf_desc_reply(d, n, b);
         reply(src, b, (uint32_t)o);
         break;
+    }
     case COMM_APP_DISABLE_OUTPUT:
         if (n >= 4) apps_disable_output(vb_get_i32(d, &i), systime_ms());
         break;

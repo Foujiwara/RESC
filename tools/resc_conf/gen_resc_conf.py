@@ -32,6 +32,9 @@ import sys
 import xml.etree.ElementTree as ET
 import zlib
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import desc_vis  # noqa: E402
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONF = os.path.join(ROOT, "firmware", "conf")
@@ -280,30 +283,19 @@ def main():
     i0 = h.index("/* Profils de configuration : VESC700 (defaut, VESC Tool officiel) ou RESC (RESC Tool).")
     h[i0:i0] = ["/* Champ de configuration : crc32 du nom, decalage, type (0 float, 1 u8, 2 i8, 3 u16, 4 i16, 5 u32, 6 i32) */",
                 "typedef struct {\n    uint32_t hash;\n    uint16_t offset;\n    uint8_t  ctype;\n    const char *name;\n} conf_field_t;\n"]
-    h.append("\n/* XML compresses du profil compile (commande 250) : u32 taille XML + flux zlib */")
-    h.append("extern const uint8_t conf_xml_mc[], conf_xml_app[];")
-    h.append("extern const uint32_t conf_xml_mc_len, conf_xml_app_len;")
     h.append("\n#endif")
 
-    x = ['/* GENERE par tools/resc_conf/gen_resc_conf.py - XML compresses (qCompress) pour la commande 250. */',
-         '#include "vesc_conf.h"\n']
-
-    def arr(name, data):
-        lines = ["const uint8_t %s[] = {" % name]
-        for i in range(0, len(data), 20):
-            lines.append("    " + ", ".join("0x%02X" % b for b in data[i:i + 20]) + ",")
-        lines.append("};")
-        lines.append("const uint32_t %s_len = %d;" % (name, len(data)))
-        return lines
-
+    # description de la commande 250 : partie fixe compressee + onglets conditionnels (desc_vis.py)
+    x = ['/* GENERE par tools/resc_conf/gen_resc_conf.py - description de la commande 250. */',
+         '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
     sizes = {}
     for pname, macro in (("resc", "#ifdef RESC_CONF_PROFILE_RESC"), ("vesc700", "#else")):
         x.append(macro)
         for k in ("mc", "app"):
             raw = view[k][0] if pname == "vesc700" else prof[pname][k][0]
-            q = struct.pack(">I", len(raw)) + zlib.compress(raw, 9)
-            sizes["%s_%s" % (pname, k)] = (len(raw), len(q))
-            x += arr("conf_xml_" + k, q)
+            vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if pname == "resc" else {}
+            sizes["%s_%s" % (pname, k)] = (len(raw), len(zlib.compress(raw, 9)))
+            x += desc_vis.c_lines(raw, ET.fromstring(raw), k, vis)
     x.append("#endif")
 
     open(os.path.join(OUT, "vesc_conf.h"), "w", encoding="utf-8", newline="\n").write("\n".join(h) + "\n")

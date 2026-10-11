@@ -71,7 +71,8 @@ def html(*paras):
 # --------------------------------------------------- textes et choix propres a RESC
 MC_EDIT = {
     "motor_type": dict(description=html(
-        "RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).")),
+        "RESC drives motors in FOC only. Transmitted for RESC Tool (FOC page); the visible Motor Type "
+        "(foc_motor_kind) chooses between permanent magnet and induction motors.")),
     "l_additional_faults": dict(description=html(
         "<b>Encoder Slip</b>: fault when the encoder speed differs from the observer speed by more than 30 % "
         "for 0.1 s (above twice the I/f exit speed). <b>Overspeed</b>: above 110 % of the ERPM limit. "
@@ -219,14 +220,17 @@ def flat_name(n):
 # (nom, modele a copier, champs, groupe, sous-groupe, separateur)
 MC_ADD = [
     ("foc_motor_kind", "foc_sat_comp_mode", dict(
-        longName="Motor Kind", cDefine="MCCONF_FOC_MOTOR_KIND", valInt="0",
-        enums=["Permanent magnet (PMSM / BLDC)", "Induction (ACIM)"],
-        description=html("Permanent magnet motor, or induction motor (no magnet): rotor flux oriented control "
-                         "with slip from the rotor time constant. For induction motors set the parameters of the "
-                         "Induction Motor section: run the R/L detection, then detect_acim in the terminal "
-                         "(DC current step, the motor does not turn), then set the magnetizing current. "
-                         "Angle source: encoder (indirect FOC) or sensorless (magnetization, frequency ramp, observer).")),
-     "FOC", "General", "Motor Kind"),
+        longName="Motor Type", cDefine="MCCONF_FOC_MOTOR_KIND", valInt="0",
+        enums=["FOC Permanent Magnets (PMSM / BLDC / IPM)", "FOC Induction (ACIM)"],
+        description=html("<b>FOC Permanent Magnets</b>: surface (PMSM, BLDC) or interior (IPM) magnet motor.",
+                         "<b>FOC Induction</b>: induction motor without magnet, rotor flux oriented control with "
+                         "slip from the rotor time constant. Set the Induction Motor section (FOC, General): run "
+                         "the R/L detection, then detect_acim in the terminal (DC current step, the motor does "
+                         "not turn), then set the magnetizing current. Angle source: encoder (indirect FOC) or "
+                         "sensorless (magnetization, frequency ramp, observer).",
+                         "Only the parameters used by the selected motor type and options are shown. After "
+                         "changing it, write the configuration and reconnect to update the list.")),
+     "General", "General", None),
     ("foc_acim_lm", "foc_motor_l", dict(
         longName="Magnetizing Inductance", cDefine="MCCONF_FOC_ACIM_LM", valDouble="0", maxDouble="1",
         description=html("Induction motor: magnetizing inductance Lm (equivalent circuit, per phase).")),
@@ -263,6 +267,19 @@ MC_ADD = [
                          "Max. Steps at 1/2, 3/4 and 1 of it; R is the slope dV/dI.")),
      "FOC", "Advanced", None),
 ]
+
+
+# Parametres places en tete de leur onglet
+MC_FIRST = {("General", "General"): ["foc_motor_kind"]}
+
+
+def put_first(root, first):
+    for (group, sub), names in first.items():
+        sp = find_subgroup(root, group, sub)
+        for n in reversed(names):
+            e = [p for p in sp if p.text == n][0]
+            sp.remove(e)
+            sp.insert(0, e)
 
 
 def ser_names(root):
@@ -409,6 +426,7 @@ def main():
     remove(mc, MC_REMOVE)
     edit(mc, MC_EDIT)
     add(mc, MC_ADD)
+    put_first(mc, MC_FIRST)
     remove(app, APP_REMOVE)
     edit(app, APP_EDIT)
     remove(mc, MC_HIDE, hide_only=True)

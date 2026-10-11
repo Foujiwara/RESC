@@ -140,7 +140,7 @@ Dans tous les cas, le moteur doit être arrêté. Par défaut : arrêt après 30
 
 ## 7. Moteur à induction (profil RESC, ou terminal en profil VESC)
 
-Réglage : `foc_motor_kind` = 1. Procédure :
+Réglage : **Motor Type** (General, General ; `foc_motor_kind`) = **FOC Induction (ACIM)**. L'autre choix est **FOC Permanent Magnets (PMSM / BLDC / IPM)**. Procédure :
 1. `detect_rl` : mesure Rs et l'inductance transitoire σLs, qui devient « Motor L ».
 2. `detect_acim` : échelon de courant continu, le moteur ne tourne pas, environ 5 s. On en tire Lm, Lr et Rr, à partir de la constante de temps rotorique.
 3. Règle le courant magnétisant `foc_acim_im`, de l'ordre du courant à vide du moteur.
@@ -168,6 +168,13 @@ Commandes du terminal pour l'induction :
 
 Points communs aux deux profils :
 - **Description de la configuration :** la commande 250 envoie le XML du profil compilé.
+- **Affichage selon la configuration (profil RESC) :** les onglets envoyés par la commande 250 sont construits par le firmware à chaque connexion. Seuls les paramètres utilisés avec les réglages en cours y figurent :
+  - type de moteur : en induction, plus de flux de l'aimant, de Ld - Lq, de MTPA, de défluxage ni de choix d'observateur ; en aimants permanents, plus de paramètres d'induction ;
+  - source d'angle : table Hall, codeur, injection (HFI, VSS) et démarrage I/f selon le capteur choisi ; plus d'observateur avec un codeur seul ;
+  - options : sonde de température, compensation de saturation et de température, filtre de phase, défluxage ;
+  - applications : réglages propres au type de commande PPM et ADC (centre, ADC2, PID, marche arrière), antipatinage seulement en multi-contrôleurs, messages CAN seulement si leur fréquence n'est pas nulle.
+
+  Les valeurs cachées restent transmises et conservées. Après un changement de type de moteur ou de capteur, écrire la configuration puis se reconnecter pour mettre la liste à jour. Les conditions sont dans `tools/resc_conf/desc_vis.py`.
 - **Stockage en flash :** champ par champ, par nom. On peut passer d'un profil à l'autre, ou changer de version, sans perdre les réglages.
 - **Ancien format de RESC 0.1 :** relu au premier démarrage, puis réécrit. `status` affiche « MIGRÉE ».
 
