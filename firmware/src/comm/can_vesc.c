@@ -126,7 +126,7 @@ static void handle_frame(const can_frame_t *fr)
     switch (cmd) {
     case CAN_PACKET_SET_DUTY: case CAN_PACKET_SET_CURRENT: case CAN_PACKET_SET_CURRENT_BRAKE:
     case CAN_PACKET_SET_RPM: case CAN_PACKET_SET_CURRENT_REL: case CAN_PACKET_SET_CURRENT_BRAKE_REL:
-    case CAN_PACKET_SET_CURRENT_HANDBRAKE: case CAN_PACKET_SET_CURRENT_HANDBRAKE_REL:
+    case CAN_PACKET_SET_CURRENT_HANDBRAKE: case CAN_PACKET_SET_CURRENT_HANDBRAKE_REL: case CAN_PACKET_SET_POS:
         if (fr->len < 4) return;
         break;
     case CAN_PACKET_CONF_CURRENT_LIMITS: case CAN_PACKET_CONF_STORE_CURRENT_LIMITS:
@@ -152,6 +152,9 @@ static void handle_frame(const can_frame_t *fr)
         break;
     case CAN_PACKET_SET_RPM:
         ctrl_set_rpm((float)vb_get_i32(d, &i));
+        break;
+    case CAN_PACKET_SET_POS:
+        ctrl_set_pos((float)vb_get_i32(d, &i) / 1e6f);
         break;
     case CAN_PACKET_SET_CURRENT_REL:
         ctrl_set_current_rel((float)vb_get_i32(d, &i) / 1e5f);

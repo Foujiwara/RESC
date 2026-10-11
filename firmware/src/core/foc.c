@@ -1624,6 +1624,8 @@ output:
             S.omega_ctl = S.omega;
         }
         FM_LPF(t->omega, S.omega_ctl, 0.05f);
+        FM_LPF(t->omega_fast, S.omega_ctl, 0.3f);
+        t->omega_raw = S.omega_ctl;
         t->theta = S.theta;
         t->obs_omega = S.obs.omega;
         t->obs_theta = S.obs.theta;

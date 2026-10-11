@@ -208,6 +208,8 @@ typedef struct {
     float vbus;
     float duty;                   /* modulation signee (-1..1) */
     float omega;                  /* rad/s el. (PLL) */
+    float omega_fast;             /* rad/s el., filtrage leger */
+    float omega_raw;              /* rad/s el., sans filtrage */
     float theta;                  /* rad el. (angle de commande) */
     float obs_omega, obs_theta;   /* observateur sensorless seul (diagnostic) */
     float flux_ratio;             /* |flux estime| / lambda */
