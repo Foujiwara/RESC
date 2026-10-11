@@ -141,7 +141,7 @@ def main():
             os.makedirs(sys.argv[4], exist_ok=True)
             open(os.path.join(sys.argv[4], os.path.basename(f)), "wb").write(raw)
         vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if prof == "resc" else {}
-        lines += desc_vis.c_lines(raw, root, k, vis)
+        lines += desc_vis.c_lines(raw, root, k, vis, emap)
         print("  %s : %d valeurs par defaut de la carte, XML %d octets, %d parametres a affichage conditionnel" % (
             k, n, len(raw), len(vis)))
     open(out, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")

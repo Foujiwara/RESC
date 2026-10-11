@@ -172,11 +172,13 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
     c->foc_offsets_cal_mode &= 0x01u;
     /* echantillonnage : V0 et V7 seulement avec des shunts en ligne ; modes a trois capteurs */
     /* port capteur : choix sans codeur pris en charge -> ABI */
-    if (!abs_enc_supported(c->m_sensor_port_mode)) c->m_sensor_port_mode = 1;
-    if ((c->m_sensor_port_mode == 3 || c->m_sensor_port_mode == 7 || c->m_sensor_port_mode == 8 ||
-         c->m_sensor_port_mode == 15) && BOARD_SPI_SCK_PIN == HW_PIN_NONE) c->m_sensor_port_mode = 1;
-    if (c->m_sensor_port_mode == 13 && (BOARD_SERVO_PIN == HW_PIN_NONE || BOARD_ENC_TIM == 4)) c->m_sensor_port_mode = 1;
-    if (c->m_sensor_port_mode == 4 && BOARD_ADC_EXT2_CH == HW_ADC_CH_NONE) c->m_sensor_port_mode = 1;
+    uint8_t pm = c->m_sensor_port_mode;
+    if (pm > 16 || pm == 12) c->m_sensor_port_mode = 1;                  /* codeur personnalise (Lisp) */
+    if ((pm == 3 || pm == 7 || pm == 8 || pm == 9 || pm == 11 || pm == 15) && BOARD_SPI_SCK_PIN == HW_PIN_NONE)
+        c->m_sensor_port_mode = 1;
+    if ((pm == 13 || pm == 14) && (BOARD_SERVO_PIN == HW_PIN_NONE || BOARD_ENC_TIM == 4)) c->m_sensor_port_mode = 1;
+    if (pm == 4 && BOARD_ADC_EXT2_CH == HW_ADC_CH_NONE) c->m_sensor_port_mode = 1;
+    if ((pm == 5 || pm == 6) && BOARD_ADC_EXT1_CH == HW_ADC_CH_NONE) c->m_sensor_port_mode = 1;
     if (c->bms_type > 1) c->bms_type = 0;
     c->bms_limit_mode &= 0x0Fu;
     if (c->bms_fwd_can_mode > 2) c->bms_fwd_can_mode = 0;
@@ -289,20 +291,21 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 
     float i_abs_cap = (float)HWLIM_I_ABS_TRIP_A * cap;
     fp->i_abs_trip = fm_min(mc->l_abs_current_max, i_abs_cap);
-    fp->i_abs_slow = mc->l_slow_abs_current != 0;
     fp->enc_slip_fault = (mc->l_additional_faults & 0x01u) != 0;
     fp->vbus_trip_max = mc->l_max_vin;
     fp->vbus_trip_min = mc->l_min_vin;
 
     float i_max_eff = fm_min(mc->l_current_max, (float)HWLIM_I_MOTOR_A * cap);
-    fp->st_i = mc->foc_sl_openloop_boost_q > 0.5f ? mc->foc_sl_openloop_boost_q : 0.3f * i_max_eff;
-    if (mc->foc_sl_openloop_max_q > mc->cc_min_current) fp->st_i = fm_min(fp->st_i, mc->foc_sl_openloop_max_q);
-    fp->st_i = fm_max(fp->st_i, 1.0f);
+    /* Courant de demarrage comme VESC : la consigne, au moins foc_sl_openloop_boost_q, au plus
+     * foc_sl_openloop_max_q (si > 0). Plancher de 0,5 A pour que le calage reste possible. */
+    fp->st_i_max = mc->foc_sl_openloop_max_q > 0.0f ? fm_min(mc->foc_sl_openloop_max_q, i_max_eff) : i_max_eff;
     if (fp->motor_kind == 1) {
         fp->acim_im = fm_sat(mc->foc_acim_im, 0.0f, 0.9f * i_max_eff);
         /* demarrage : le courant total (magnetisant + couple) reste dans la limite */
-        fp->st_i = fm_min(fp->st_i, fm_sqrt(fm_max(i_max_eff * i_max_eff - fp->acim_im * fp->acim_im, 1.0f)));
+        fp->st_i_max = fm_min(fp->st_i_max, fm_sqrt(fm_max(i_max_eff * i_max_eff - fp->acim_im * fp->acim_im, 1.0f)));
     }
+    fp->st_i_max = fm_max(fp->st_i_max, 0.5f);
+    fp->st_i = fm_min(fm_max(mc->foc_sl_openloop_boost_q, 0.5f), fp->st_i_max);
     fp->st_t_align = fm_max(mc->foc_sl_openloop_time_lock, 0.2f);
     fp->st_t_ramp = fm_max(mc->foc_sl_openloop_time_ramp, 0.4f);
     fp->st_omega = rpm_to_rad(fm_max(mc->foc_openloop_rpm, 300.0f));
@@ -389,7 +392,9 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         fp->sl_omega_start = fm_min(rpm_to_rad(mc->foc_sl_erpm_start), fp->sl_omega);
         fp->hall_extra = (uint8_t)fm_sat(mc->m_hall_extra_samples, 0.0f, 10.0f);
         /* codeur absolu (m_sensor_port_mode) : 16384 pas par tour, sinon ABI (m_encoder_counts) */
-        fp->enc.cpr = abs_enc_supported(mc->m_sensor_port_mode) ? ABS_ENC_CPR : mc->m_encoder_counts;
+        fp->enc.cpr = mc->m_sensor_port_mode == 0 ? 0u :                  /* port des sondes Hall */
+                      (abs_enc_supported(mc->m_sensor_port_mode) && mc->m_sensor_port_mode != 14) ? ABS_ENC_CPR :
+                      mc->m_encoder_counts;
         fp->enc.ratio = mc->foc_encoder_ratio;
         fp->enc.offset = fm_wrap_pi(mc->foc_encoder_offset * (FM_PI / 180.0f));
         fp->enc.inverted = mc->foc_encoder_inverted != 0;

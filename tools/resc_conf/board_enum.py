@@ -18,6 +18,7 @@ Capacites (relevees par firmware/tests/dump_defaults.c) :
   adc2   : deux entrees ADC externes (sin/cos)
   imu    : IMU interne (I2C logiciel de la carte)
   i2c    : I2C sur les broches du port UART (IMU externe)
+  rs485  : UART du port COMM et entree ADC 1 (sens du transceiver, TS5700N8501)
 """
 import copy
 import re
@@ -28,7 +29,8 @@ BOARD_ENUM = {
     "mc": {
         "foc_control_sample_mode": {1: "inline"},
         "foc_current_sample_mode": {1: "three", 2: "three"},
-        "m_sensor_port_mode": {3: "spi", 7: "spi", 8: "spi", 15: "spi", 13: "servo", 4: "adc2"},
+        "m_sensor_port_mode": {3: "spi", 7: "spi", 8: "spi", 9: "spi", 11: "spi", 15: "spi", 13: "servo",
+                               14: "servo", 4: "adc2", 5: "rs485", 6: "rs485"},
     },
     "app": {
         "imu_conf.type": {1: "imu", 4: "i2c"},

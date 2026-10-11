@@ -9,12 +9,22 @@
 #define COMM_RESC_GET_CONF_XML 250   /* hors de la plage du protocole de reference (<= 159) */
 
 /* Entree des onglets : 'G' groupe, 'S' onglet, 'P' parametre ou separateur (::sep::), 'E' fin.
- * cond : condition d'affichage (0 = toujours), evaluee par vis() sur la configuration en cours. */
+ * cond : condition d'affichage (0 = toujours), evaluee par vis() sur la configuration en cours.
+ * vif : variante complete (bit 7) ; 0 = sans condition, CONF_VIF_BOARD = condition de la carte seule
+ * (cond evaluee par le firmware), sinon index de l'attribut visibleIf dans conf_desc_t.vif. */
+#define CONF_VIF_BOARD 0xFFFFu
 typedef struct {
     char kind;
     uint16_t cond;
+    uint16_t vif;
     const char *text;
 } conf_grp_t;
+
+/* Page de RESC Tool et sa condition (variante complete) */
+typedef struct {
+    const char *name;
+    const char *vif;
+} conf_page_t;
 
 /* Description generee (tools/resc_conf/desc_vis.py) : partie fixe <Params>/<SerOrder> en flux
  * zlib sans bloc final, taille et adler32 de cette partie, onglets et conditions. */
@@ -25,6 +35,8 @@ typedef struct {
     uint32_t adler;
     const conf_grp_t *grp;
     bool (*vis)(uint16_t cond, const vesc_mcconf_t *mc, const vesc_appconf_t *app);
+    const char *const *vif;          /* textes visibleIf (deja echappes pour un attribut XML) */
+    const conf_page_t *pages;        /* termine par { 0, 0 } */
 } conf_desc_t;
 
 extern const conf_desc_t conf_desc_mc, conf_desc_app;

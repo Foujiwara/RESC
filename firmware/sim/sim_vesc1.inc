@@ -212,6 +212,42 @@
         check("BMS : sans limite au-dela de 6 A, tenu a 4 A (+1 A) avec", ibd[0] > 6.0 && ibd[1] < 5.0 && ibd[1] > 3.0);
     }
 
+    /* ------------------------------------------------------------------ */
+    printf("== 34. ADC hybride courant / rapport cyclique (ctrl_set_current_hybrid) : vitesse a vide selon les gaz\n");
+    p = p0;
+    foc_set_params(&p);
+    {
+        double wss[2] = { 0, 0 }, rip[2] = { 0, 0 };
+        static const double thr[2] = { 0.5, 1.0 };
+        for (int k = 0; k < 2; k++) {
+            STOP_AT(0.5);
+            M.b = 0.0005; M.t_load = 0.02;
+            double wmin = 1e9, wmax = -1e9;
+            for (int j = 0; j < 2000; j++) {          /* 4 s, une commande toutes les 2 ms (app ADC) */
+                ctrl_set_current_hybrid((float)(thr[k] * L.i_max), (float)(thr[k] * L.duty_max), 0.15f);
+                RUN_CTRL(0.002);
+                if (getenv("SIM_HYB") && j % 50 == 0)
+                    printf("    t=%.2f erpm=%.0f iq=%.2f duty=%.3f\n", j * 0.002, ERPM(sim_omega_e(&M)), g_foc_telem.iq,
+                           g_foc_telem.duty);
+                if (j >= 1500) {
+                    double w = ERPM(sim_omega_e(&M));
+                    if (w < wmin) wmin = w;
+                    if (w > wmax) wmax = w;
+                }
+            }
+            wss[k] = 0.5 * (wmin + wmax);
+            rip[k] = wmax - wmin;
+            char t[40];
+            snprintf(t, sizeof t, "hybride gaz %.0f %%", thr[k] * 100);
+            report(t);
+            ctrl_release(); RUN_CTRL(0.05);
+        }
+        printf("  vitesse a vide : %.0f ERPM a mi-gaz, %.0f ERPM plein gaz (rapport %.2f), ondulation %.0f / %.0f ERPM\n",
+               wss[0], wss[1], wss[0] / wss[1], rip[0], rip[1]);
+        check("hybride : mi-gaz = environ mi-vitesse (rapport 0.4 a 0.6)", wss[0] / wss[1] > 0.4 && wss[0] / wss[1] < 0.6);
+        check("hybride : vitesse stable (ondulation < 3 %)", rip[0] < 0.03 * wss[0] && rip[1] < 0.03 * wss[1]);
+    }
+
     p = p0;
     STOP_AT(0.5);
     foc_set_params(&p);

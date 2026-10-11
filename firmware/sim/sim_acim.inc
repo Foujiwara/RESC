@@ -28,7 +28,7 @@
     q.f_pwm = 15000; q.i_scale = (float)M.i_lsb; q.v_scale = (float)M.v_lsb; q.vph_scale = (float)M.vph_lsb;
     q.cs_lowside = true; q.kp = 0.05f; q.ki = 30.0f; q.pll_kp = 2000; q.pll_ki = 30000;
     q.dt_comp = 300e-9f; q.m_max = 0.95f; q.t_win = 3e-6f; q.delay_comp = 1.0f; q.i_abs_trip = 200;
-    q.vbus_trip_max = 90; q.vbus_trip_min = 10; q.st_i = 40; q.st_t_align = 0.3f; q.st_t_ramp = 1.0f;
+    q.vbus_trip_max = 90; q.vbus_trip_min = 10; q.st_i = 40; q.st_i_max = 60; q.st_t_align = 0.3f; q.st_t_ramp = 1.0f;
     q.st_omega = RAD(1500); q.st_omega_exit = RAD(700); q.st_timeout = 4; q.i_slew = 2000;
     q.decoupling = 3; q.st_dec = 1.0f; q.obs_gain_slow = 0.05f;
     q.motor_kind = 1;

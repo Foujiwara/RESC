@@ -17,6 +17,7 @@ typedef struct {
     volatile ctrl_mode_t mode;
     volatile float value;            /* A, duty ou ERPM selon le mode */
     volatile float ol_erpm;          /* vitesse imposee des modes boucle ouverte */
+    volatile float hyb_lim, hyb_band; /* mode hybride : limite de rapport cyclique et bande (duty) */
     volatile uint32_t last_cmd_ms;
     volatile bool cmd_flag;          /* nouvelle commande recue */
     volatile float off_delay;        /* s : maintien apres consigne nulle */
@@ -84,6 +85,12 @@ void ctrl_set_current_rel(float r)
 void ctrl_set_brake(float a)        { command(CTRL_MODE_BRAKE, fm_abs(a)); }
 void ctrl_set_brake_rel(float r)    { command(CTRL_MODE_BRAKE, fm_abs(fm_sat_sym(r, 1.0f)) * fm_abs(C.l.i_min)); }
 void ctrl_set_handbrake(float a)    { command(CTRL_MODE_HANDBRAKE, fm_abs(a)); }
+void ctrl_set_current_hybrid(float a, float lim, float band)
+{
+    C.hyb_lim = fm_sat(lim, 0.0f, C.l.duty_max);
+    C.hyb_band = fm_max(fm_sat(band, 0.0f, 1.0f) * C.hyb_lim, 0.002f);
+    command(CTRL_MODE_CURRENT_HYB, a);
+}
 void ctrl_set_duty(float d)         { command(CTRL_MODE_DUTY, fm_sat_sym(d, C.l.duty_max)); }
 void ctrl_set_rpm(float erpm)       { command(CTRL_MODE_RPM, erpm); }
 void ctrl_set_pos(float deg)        { command(CTRL_MODE_POS, deg); }
@@ -309,6 +316,19 @@ void ctrl_update(uint32_t now_ms, float dt)
             /* maintien du pont pendant off_delay (reprise rapide) */
             C.off_t -= dt;
             run = t->state == FOC_ST_RUN;
+        }
+        break;
+
+    case CTRL_MODE_CURRENT_HYB:
+        /* courant reduit lineairement a l'approche de la limite de rapport cyclique (mesure dans le sens
+         * demande) ; pont maintenu meme a courant nul pour garder la mesure et eviter les relances */
+        if (fm_abs(v) > l->cc_min_current) {
+            float d = t->duty * (v >= 0.0f ? 1.0f : -1.0f);
+            iq = v * fm_sat((C.hyb_lim - d) / C.hyb_band, 0.0f, 1.0f);
+            run = t->state == FOC_ST_RUN || fm_abs(iq) > l->cc_min_current;
+            allow_start = fm_abs(iq) > l->cc_min_current;
+            dir = v >= 0.0f ? 1 : -1;
+            C.off_t = C.off_delay;
         }
         break;
 

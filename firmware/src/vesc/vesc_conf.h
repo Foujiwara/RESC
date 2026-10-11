@@ -231,9 +231,9 @@ typedef struct {
 } vesc_mcconf_t;
 
 #define VESC700_MCCONF_SIGNATURE 1470992211u
-#define RESCP_MCCONF_SIGNATURE   3988168616u
+#define RESCP_MCCONF_SIGNATURE   3387911185u
 #define VESC700_MCCONF_SER_SIZE 488
-#define RESCP_MCCONF_SER_SIZE   438
+#define RESCP_MCCONF_SER_SIZE   437
 #ifdef RESC_CONF_PROFILE_RESC
 #define VESC_MCCONF_SIGNATURE RESCP_MCCONF_SIGNATURE
 #else
@@ -378,12 +378,19 @@ typedef struct {
     float     imu_conf_gyro_offsets_0;
     float     imu_conf_gyro_offsets_1;
     float     imu_conf_gyro_offsets_2;
+    uint8_t   app_adc_conf_resc_smart_rev;
+    float     app_adc_conf_resc_smart_rev_erpm;
+    float     app_adc_conf_resc_smart_rev_max_duty;
+    float     app_adc_conf_resc_smart_rev_ramp_time;
+    uint8_t   app_adc_conf_resc_hybrid;
+    float     app_adc_conf_resc_hybrid_duty;
+    float     app_adc_conf_resc_hybrid_band;
 } vesc_appconf_t;
 
 #define VESC700_APPCONF_SIGNATURE 2384027283u
-#define RESCP_APPCONF_SIGNATURE   3809187766u
+#define RESCP_APPCONF_SIGNATURE   3017840187u
 #define VESC700_APPCONF_SER_SIZE 284
-#define RESCP_APPCONF_SER_SIZE   264
+#define RESCP_APPCONF_SER_SIZE   284
 #ifdef RESC_CONF_PROFILE_RESC
 #define VESC_APPCONF_SIGNATURE RESCP_APPCONF_SIGNATURE
 #else

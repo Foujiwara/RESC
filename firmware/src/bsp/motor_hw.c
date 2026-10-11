@@ -87,12 +87,13 @@ void motor_hw_sensor_config(uint8_t mode, uint32_t cpr, uint8_t port, const abs_
     s_enc_tim = 0;
     s_abs = false;
     abs_enc_config(0, 0);
-    if (mode == 1 && abs_enc_supported(port)) {
+    if (mode == 1 && abs_enc_supported(port) && port != 14) {
         /* codeur absolu : broches et peripherique propres au capteur */
         abs_enc_config(port, sc);
         s_abs = true;
         return;
     }
+    if (mode == 1 && port == 0) cpr = 0;        /* port des sondes Hall : pas de codeur */
     if (mode != 1 || cpr < 4) {
         gpio_cfg(BOARD_HALL1_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
         gpio_cfg(BOARD_HALL2_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
@@ -119,6 +120,12 @@ void motor_hw_sensor_config(uint8_t mode, uint32_t cpr, uint8_t port, const abs_
     t->CNT = 0;
     t->CR1 = TIM_CR1_CEN;
     s_enc_tim = t;
+    if (port == 14) {
+        /* PWM + ABI : compteur ABI recale par la position absolue PWM */
+        abs_enc_config(port, sc);
+        abs_enc_set_abi_timer(t);
+        s_abs = true;
+    }
 }
 
 static ADC_TypeDef *const ADCS[3] = { ADC1, ADC2, ADC3 };

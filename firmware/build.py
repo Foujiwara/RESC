@@ -165,7 +165,8 @@ def check_cmd250(conf):
     blobs = [(k, f, f"cmd250_{k}.bin", True) for k, f in files.items()]
     if conf == "resc":
         blobs += [("mc", files["mc"], "cmd250_mc_pm.bin", False), ("mc", files["mc"], "cmd250_mc_acim.bin", False),
-                  ("app", files["app"], "cmd250_app_cond.bin", False)]
+                  ("app", files["app"], "cmd250_app_cond.bin", False),
+                  ("mc", files["mc"], "vis_conf_xml_mc.bin", "vis"), ("app", files["app"], "vis_conf_xml_app.bin", "vis")]
     for k, f, bname, full in blobs:
         blob = open(os.path.join(HERE, "build", bname), "rb").read()
         src = open(os.path.join(HERE, "conf", f), "rb").read()
@@ -180,8 +181,13 @@ def check_cmd250(conf):
         # parametres et serialisation identiques ; onglets : sous-ensemble ordonne des onglets de la source
         it = iter(st)
         subset = all(any(e == s for s in it) for e in xt)
-        good = n == len(xml) and xml[:i] == src[:i] and subset and (not full or xt == st)
-        what = "onglets identiques" if full else "onglets = sous-ensemble (%d / %d entrees)" % (len(xt), len(st))
+        if full == "vis":
+            # variante complete : tous les onglets (hors conditions de la carte), conditions et <Pages>
+            good = n == len(xml) and xml[:i] == src[:i] and subset and len(xt) >= len(st) - 2 and                 xroot.find("Pages") is not None and any(p.get("visibleIf") for p in xroot.iter("param"))
+            what = "tous les onglets (%d / %d entrees), visibleIf et <Pages>" % (len(xt), len(st))
+        else:
+            good = n == len(xml) and xml[:i] == src[:i] and subset and (not full or xt == st)
+            what = "onglets identiques" if full else "onglets = sous-ensemble (%d / %d entrees)" % (len(xt), len(st))
         print(f"  [{' OK ' if good else 'ECHEC'}] commande 250, {bname} : decompression, partie fixe = conf/{f}, {what}")
         ok &= good
     return ok

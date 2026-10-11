@@ -2300,6 +2300,112 @@ p, li { white-space: pre-wrap; }
             <suffix> °/s</suffix>
             <vTx>9</vTx>
         </imu_conf.gyro_offsets__2>
+        <app_adc_conf.resc_smart_rev>
+            <longName>Smart Reverse</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Reverse request while rolling forward: brake (current proportional to the request). Below Smart Reverse Brake Above ERPM: reverse at a limited duty cycle, reached with a ramp, like the PPM Smart Reverse.&lt;/p&gt;&lt;p&gt;Applies to the reverse current control types (Reverse Center, Reverse Button, Reverse ADC2 Brake Button, Reverse Button Brake Center).&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_SMART_REV</cDefine>
+            <valInt>0</valInt>
+        </app_adc_conf.resc_smart_rev>
+        <app_adc_conf.resc_smart_rev_erpm>
+            <longName>Smart Reverse Brake Above ERPM</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Forward speed above which a reverse request brakes. Below it, the motor reverses.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_SMART_REV_ERPM</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>30000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>10</stepDouble>
+            <valDouble>1000</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </app_adc_conf.resc_smart_rev_erpm>
+        <app_adc_conf.resc_smart_rev_max_duty>
+            <longName>Smart Reverse Max Duty Cycle</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty cycle in reverse at full request.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_SMART_REV_MAX_DUTY</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.07</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </app_adc_conf.resc_smart_rev_max_duty>
+        <app_adc_conf.resc_smart_rev_ramp_time>
+            <longName>Smart Reverse Ramp Time</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Time to go from 0 to Smart Reverse Max Duty Cycle.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_SMART_REV_RAMP_TIME</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>100</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>3</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> s</suffix>
+            <vTx>9</vTx>
+        </app_adc_conf.resc_smart_rev_ramp_time>
+        <app_adc_conf.resc_hybrid>
+            <longName>Hybrid Current / Duty Control</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current control with a duty cycle limit proportional to the throttle: half throttle gives half torque and, without load, about half speed (in current control alone, a few percent of throttle bring an unloaded motor to full speed).&lt;/p&gt;&lt;p&gt;Duty limit = throttle x Duty Limit at Full Throttle x Maximum Duty Cycle. The current is reduced linearly over the Current Taper Band below the limit and reaches zero at the limit, so the speed settles without a sudden cut. Braking is not affected.&lt;/p&gt;&lt;p&gt;Applies to the current control types.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_HYBRID</cDefine>
+            <valInt>0</valInt>
+        </app_adc_conf.resc_hybrid>
+        <app_adc_conf.resc_hybrid_duty>
+            <longName>Duty Limit at Full Throttle</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty cycle limit at full throttle, as a fraction of Maximum Duty Cycle (Motor, General). Lower it to cap the top speed.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_HYBRID_DUTY</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0.05</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </app_adc_conf.resc_hybrid_duty>
+        <app_adc_conf.resc_hybrid_band>
+            <longName>Current Taper Band</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Part of the duty cycle limit over which the current decreases to zero. Wider: softer approach of the limit, the speed settles a little lower under load. Narrower: firmer, the current is held closer to the limit.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_HYBRID_BAND</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>0.6</maxDouble>
+            <minDouble>0.02</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.15</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </app_adc_conf.resc_hybrid_band>
     </Params>
     <SerOrder>
         <ser>controller_id</ser>
@@ -2406,6 +2512,13 @@ p, li { white-space: pre-wrap; }
         <ser>imu_conf.gyro_offsets__0</ser>
         <ser>imu_conf.gyro_offsets__1</ser>
         <ser>imu_conf.gyro_offsets__2</ser>
+        <ser>app_adc_conf.resc_smart_rev</ser>
+        <ser>app_adc_conf.resc_smart_rev_erpm</ser>
+        <ser>app_adc_conf.resc_smart_rev_max_duty</ser>
+        <ser>app_adc_conf.resc_smart_rev_ramp_time</ser>
+        <ser>app_adc_conf.resc_hybrid</ser>
+        <ser>app_adc_conf.resc_hybrid_duty</ser>
+        <ser>app_adc_conf.resc_hybrid_band</ser>
     </SerOrder>
     <Grouping>
         <group>
@@ -2486,6 +2599,15 @@ p, li { white-space: pre-wrap; }
                     <param>app_adc_conf.multi_esc</param>
                     <param>app_adc_conf.tc</param>
                     <param>app_adc_conf.tc_max_diff</param>
+                    <param>::sep::Smart Reverse</param>
+                    <param>app_adc_conf.resc_smart_rev</param>
+                    <param>app_adc_conf.resc_smart_rev_erpm</param>
+                    <param>app_adc_conf.resc_smart_rev_max_duty</param>
+                    <param>app_adc_conf.resc_smart_rev_ramp_time</param>
+                    <param>::sep::Hybrid Current / Duty</param>
+                    <param>app_adc_conf.resc_hybrid</param>
+                    <param>app_adc_conf.resc_hybrid_duty</param>
+                    <param>app_adc_conf.resc_hybrid_band</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>

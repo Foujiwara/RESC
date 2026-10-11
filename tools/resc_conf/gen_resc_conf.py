@@ -307,7 +307,7 @@ def main():
             raw = view[k][0] if pname == "vesc700" else prof[pname][k][0]
             vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if pname == "resc" else {}
             sizes["%s_%s" % (pname, k)] = (len(raw), len(zlib.compress(raw, 9)))
-            x += desc_vis.c_lines(raw, ET.fromstring(raw), k, vis)
+            x += desc_vis.c_lines(raw, ET.fromstring(raw), k, vis, EMAP if pname == "resc" else None)
     x.append("#endif")
 
     # valeurs generiques (faibles) : la description de la carte compilee les remplace
