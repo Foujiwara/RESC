@@ -52,6 +52,8 @@ static void cmd_status(void)
       (double)t->id, (double)t->iq, (double)s->i_in);
     P("T_FET=%.1f C  T_mot=%.1f C  flux=%.2f  limitation=%.2f  moteur %s", (double)s->tfet, (double)s->tmot,
       (double)t->flux_ratio, (double)s->i_scale_lim, resc_motor_configured() ? "identifie" : "NON IDENTIFIE");
+    if (foc_params()->motor_kind == 1)
+        P("Induction : flux rotorique %.1f mWb  glissement %.1f rad/s", (double)(t->acim_psir * 1e3f), (double)t->acim_slip);
     static const char *const ld[4] = { "vide (defauts)", "OK", "MIGREE depuis l'ancien format", "ILLISIBLE (defauts)" };
     P("Configuration en flash : moteur %s, application %s", ld[resc_conf_load_status(false)], ld[resc_conf_load_status(true)]);
 }
@@ -69,8 +71,13 @@ static void cmd_conf(void)
 {
     const foc_params_t *p = foc_params();
     const ctrl_limits_t *l = ctrl_limits();
-    P("Moteur : R=%.2f mOhm Ld=%.1f uH Lq=%.1f uH lambda=%.3f mWb", (double)(p->r * 1e3f), (double)(p->ld * 1e6f),
-      (double)(p->lq * 1e6f), (double)(p->lambda * 1e3f));
+    if (p->motor_kind == 1)
+        P("Moteur a induction : Rs=%.2f mOhm sigmaLs=%.1f uH Lm=%.3f mH Lr=%.3f mH Rr=%.2f mOhm Im=%.1f A",
+          (double)(p->r * 1e3f), (double)(p->ld * 1e6f), (double)(p->acim_lm * 1e3f), (double)(p->acim_lr * 1e3f),
+          (double)(p->acim_rr * 1e3f), (double)p->acim_im);
+    else
+        P("Moteur a aimants : R=%.2f mOhm Ld=%.1f uH Lq=%.1f uH lambda=%.3f mWb", (double)(p->r * 1e3f), (double)(p->ld * 1e6f),
+          (double)(p->lq * 1e6f), (double)(p->lambda * 1e3f));
     P("Courant : kp=%.4f ki=%.1f  obs gamma=%.3g  PLL %.0f/%.0f", (double)p->kp, (double)p->ki, (double)p->obs_gamma,
       (double)p->pll_kp, (double)p->pll_ki);
     P("Limites effectives : I=%.1f/%.1f A  Ibat=%.1f/%.1f A  Iabs=%.1f A  (plafond carte %.0f %%)", (double)l->i_min,
@@ -140,6 +147,42 @@ static void cmd_get_set(int argc, char **argv)
     show_field(app, f);
 }
 
+/* Moteur a induction : parametres, etat du modele de flux, ou bascule du type de moteur */
+static void cmd_acim(int argc, char **argv)
+{
+    vesc_mcconf_t *m = &g_mcconf;
+    if (argc >= 2 && (!strcmp(argv[1], "on") || !strcmp(argv[1], "off"))) {
+        if (foc_state() == FOC_ST_RUN || foc_state() == FOC_ST_START) { P("Refuse : moteur en marche"); return; }
+        m->foc_motor_kind = !strcmp(argv[1], "on") ? 1 : 0;
+        resc_conf_apply();
+        P("Type de moteur : %s (applique ; 'store' pour sauvegarder)", m->foc_motor_kind ? "induction" : "aimants permanents");
+        return;
+    }
+    const foc_params_t *p = foc_params();
+    const foc_telem_t *t = &g_foc_telem;
+    float tr = m->foc_acim_rr > 0.0f ? m->foc_acim_lr / m->foc_acim_rr : 0.0f;
+    float nom = m->foc_acim_lm * m->foc_acim_im;
+    P("Type de moteur : %s", m->foc_motor_kind == 1 ? "INDUCTION" : "aimants permanents ('acim on' pour l'induction)");
+    P("Rs=%.2f mOhm  sigmaLs=%.1f uH  Lm=%.3f mH  Lr=%.3f mH  Rr=%.2f mOhm  Tr=%.1f ms", (double)(m->foc_motor_r * 1e3f),
+      (double)(m->foc_motor_l * 1e6f), (double)(m->foc_acim_lm * 1e3f), (double)(m->foc_acim_lr * 1e3f),
+      (double)(m->foc_acim_rr * 1e3f), (double)(tr * 1e3f));
+    P("Courant magnetisant %.1f A (flux nominal %.1f mWb)  vitesse de base %.0f ERPM  source d'angle %s",
+      (double)m->foc_acim_im, (double)(nom * 1e3f), (double)m->foc_acim_base_erpm,
+      p->sensor_mode == FOC_SENSOR_ENCODER ? "codeur (commande indirecte)" : "sans capteur (observateur)");
+    if (p->motor_kind == 1) {
+        float ws = t->acim_slip;
+        P("En marche : flux rotorique %.1f mWb (%.0f %%)  glissement %.1f rad/s (%.0f ERPM)  rotor %.0f ERPM  flux obs %.2f",
+          (double)(t->acim_psir * 1e3f), (double)(nom > 0.0f ? 100.0f * t->acim_psir / nom : 0.0f), (double)ws,
+          (double)(ws * 60.0f / 6.2831853f), (double)((t->omega - ws) * 60.0f / 6.2831853f), (double)t->flux_ratio);
+    }
+    /* ce qui manque */
+    if (!(m->foc_motor_r > 0.0f && m->foc_motor_l > 0.0f)) P("A faire : detect_rl (Rs et sigma Ls)");
+    else if (!(m->foc_acim_lm > 0.0f && m->foc_acim_lr > m->foc_acim_lm && m->foc_acim_rr > 0.0f)) P("A faire : detect_acim (Lm, Lr, Rr)");
+    else if (!(m->foc_acim_im > 0.1f)) P("A faire : set foc_acim_im <A> (courant a vide du moteur)");
+    else if (m->foc_motor_kind != 1) P("Parametres complets : 'acim on' puis 'store'");
+    else P("Parametres complets.");
+}
+
 /* Gains a partir de R, L, lambda, sur demande : bande passante de courant en rad/s */
 static void cmd_foc_gains(int argc, char **argv)
 {
@@ -167,12 +210,14 @@ static void cmd_help(void)
     P("  hw                             : carte, offsets courant, dead-time, bootloader, reset watchdog");
     P("  faults                         : defaut actif et crete de courant vue");
     P("  sensor                         : mode capteur, etat Hall, source d'angle active");
+    P("  acim                           : moteur a induction : parametres, flux, glissement, ce qui manque");
     P("  clear                          : efface le defaut (refuse si la ligne de defaut du driver est active)");
     P("-- Detections (moteur a l'arret sauf indication ; resultats appliques et sauvegardes)");
     P("  offsets_cal | foc_dc_cal       : offsets courant et tension, pont coupe puis sous PWM");
     P("  detect_rl [A]                  : R (paliers 1/2, 3/4, 1 x A ; defaut foc_resc_rl_frac x courant max), Ld, Lq, gains");
     P("  detect_lambda <A> [duty]       : flux d'aimant (moteur LIBRE : il tourne en boucle ouverte)");
     P("  detect_acim [A]                : moteur a induction : Lm, Lr, Rr (apres detect_rl ; echelon continu, ne tourne pas)");
+    P("  acim on | acim off             : moteur a induction / a aimants (foc_motor_kind)");
     P("  detect_hall [A]                : table des sondes Hall (le moteur tourne lentement)");
     P("  detect_enc [A]                 : codeur ABI : rapport, sens, offset (le moteur tourne lentement)");
     P("  foc_gains [bande_rad_s]        : recalcule kp, ki, gain observateur (defaut foc_resc_cc_bw)");
@@ -225,6 +270,7 @@ void terminal_process(char *line)
     else if (!strcmp(c, "offsets_cal") || !strcmp(c, "foc_dc_cal")) detect_app_start_offsets(0);
     else if (!strcmp(c, "detect_hall")) detect_app_start_hall(0, argc >= 2 ? (float)atof(argv[1]) : 0.0f);
     else if (!strcmp(c, "detect_enc")) detect_app_start_encoder(0, argc >= 2 ? (float)atof(argv[1]) : 0.0f);
+    else if (!strcmp(c, "acim")) cmd_acim(argc, argv);
     else if (!strcmp(c, "sensor")) {
         const foc_params_t *p = foc_params();
         static const char *mode[] = { "sensorless", "codeur", "Hall" };
