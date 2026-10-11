@@ -2937,158 +2937,6 @@ p, li { white-space: pre-wrap; }
             <suffix> A</suffix>
             <vTx>9</vTx>
         </si_motor_nl_current>
-        <motor_brand>
-            <longName>Motor Brand</longName>
-            <type>3</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;The motor brand, e.g. Turnigy.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <valString />
-            <maxLen>0</maxLen>
-        </motor_brand>
-        <motor_model>
-            <longName>Motor Model</longName>
-            <type>3</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;The motor model, e.g. 6374 168KV.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <valString />
-            <maxLen>0</maxLen>
-        </motor_model>
-        <motor_weight>
-            <longName>Motor Weight</longName>
-            <type>1</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;The weight of the motor in grams.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <editorDecimalsDouble>2</editorDecimalsDouble>
-            <editorScale>1</editorScale>
-            <editAsPercentage>0</editAsPercentage>
-            <maxDouble>500000</maxDouble>
-            <minDouble>0</minDouble>
-            <showDisplay>0</showDisplay>
-            <stepDouble>1</stepDouble>
-            <valDouble>0</valDouble>
-            <vTxDoubleScale>1</vTxDoubleScale>
-            <suffix> g</suffix>
-            <vTx>9</vTx>
-        </motor_weight>
-        <motor_sensor_type>
-            <longName>Position Sensor</longName>
-            <type>4</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Does this motor come with some kind of position sensor?&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <valInt>0</valInt>
-            <enumNames>No sensor</enumNames>
-            <enumNames>Hall Sensors</enumNames>
-            <enumNames>ABI Encoder</enumNames>
-            <enumNames>AS5047 Encoder</enumNames>
-            <enumNames>AS5X47U Encoder</enumNames>
-            <enumNames>Other Sensor</enumNames>
-        </motor_sensor_type>
-        <motor_description>
-            <longName>Motor Description</longName>
-            <type>3</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;This is an editor where a description can be stored for your motor configuration. Images can also be inserted. Notice that this information is not written to the VESC, so it has to be stored in an XML file.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <valString>A motor description can be edited here.</valString>
-            <maxLen>0</maxLen>
-        </motor_description>
-        <motor_quality_bearings>
-            <longName>Bearing Quality</longName>
-            <type>2</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Motor bearing quality. 0 is neutral/unknown, negative is bad and positive is good.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <editorScale>1</editorScale>
-            <editAsPercentage>0</editAsPercentage>
-            <maxInt>5</maxInt>
-            <minInt>-5</minInt>
-            <showDisplay>1</showDisplay>
-            <stepInt>1</stepInt>
-            <valInt>0</valInt>
-            <suffix />
-            <vTx>2</vTx>
-        </motor_quality_bearings>
-        <motor_quality_magnets>
-            <longName>Magnet Quality</longName>
-            <type>2</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Motor magnet quality. 0 is neutral/unknown, negative is bad and positive is good.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <editorScale>1</editorScale>
-            <editAsPercentage>0</editAsPercentage>
-            <maxInt>5</maxInt>
-            <minInt>-5</minInt>
-            <showDisplay>1</showDisplay>
-            <stepInt>1</stepInt>
-            <valInt>0</valInt>
-            <suffix />
-            <vTx>2</vTx>
-        </motor_quality_magnets>
-        <motor_quality_construction>
-            <longName>Construction Quality</longName>
-            <type>2</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Motor construction quality. 0 is neutral/unknown, negative is bad and positive is good.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <editorScale>1</editorScale>
-            <editAsPercentage>0</editAsPercentage>
-            <maxInt>5</maxInt>
-            <minInt>-5</minInt>
-            <showDisplay>1</showDisplay>
-            <stepInt>1</stepInt>
-            <valInt>0</valInt>
-            <suffix />
-            <vTx>2</vTx>
-        </motor_quality_construction>
-        <motor_quality_description>
-            <longName>Quality Description</longName>
-            <type>3</type>
-            <transmittable>0</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;A text summary of the motor quality.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
-            <cDefine />
-            <valString>Some comments about the motor quality. Images can be added as well.</valString>
-            <maxLen>0</maxLen>
-        </motor_quality_description>
         <foc_motor_kind>
             <longName>Motor Kind</longName>
             <type>4</type>
@@ -3383,7 +3231,6 @@ p, li { white-space: pre-wrap; }
             <subgroup>
                 <subgroupName>General</subgroupName>
                 <subgroupParams>
-                    <param>motor_type</param>
                     <param>m_invert_direction</param>
                 </subgroupParams>
             </subgroup>
@@ -3454,11 +3301,6 @@ p, li { white-space: pre-wrap; }
                 </subgroupParams>
             </subgroup>
             <subgroup>
-                <subgroupName>BMS</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
-            </subgroup>
-            <subgroup>
                 <subgroupName>Advanced</subgroupName>
                 <subgroupParams>
                     <param>l_min_vin</param>
@@ -3471,37 +3313,6 @@ p, li { white-space: pre-wrap; }
                     <param>l_duty_start</param>
                     <param>l_additional_faults</param>
                 </subgroupParams>
-            </subgroup>
-        </group>
-        <group>
-            <groupName>BLDC</groupName>
-            <subgroup>
-                <subgroupName>General</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>Sensorless</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>Sensors</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>Advanced</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
-            </subgroup>
-        </group>
-        <group>
-            <groupName>DC</groupName>
-            <subgroup>
-                <subgroupName>General</subgroupName>
-                <subgroupParams>
-                    </subgroupParams>
             </subgroup>
         </group>
         <group>
@@ -3699,23 +3510,6 @@ p, li { white-space: pre-wrap; }
                     <param>si_battery_cells</param>
                     <param>si_battery_ah</param>
                     <param>si_motor_nl_current</param>
-                </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>General</subgroupName>
-                <subgroupParams>
-                    <param>motor_brand</param>
-                    <param>motor_model</param>
-                    <param>motor_weight</param>
-                    <param>motor_sensor_type</param>
-                </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>Quality</subgroupName>
-                <subgroupParams>
-                    <param>motor_quality_bearings</param>
-                    <param>motor_quality_magnets</param>
-                    <param>motor_quality_construction</param>
                 </subgroupParams>
             </subgroup>
         </group>

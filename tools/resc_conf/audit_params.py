@@ -16,7 +16,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 GENERATED = ("vesc_conf.c", "vesc_conf.h", "conf_xml.c", "vesc_defaults.h", "vesc_compat_defaults.h")
 # lus par l'outil seulement (affichage vitesse/batterie, assistant) : a garder visibles
 TOOL_ONLY = {"si_gear_ratio", "si_wheel_diameter", "si_battery_type", "si_battery_cells", "si_battery_ah",
-             "si_motor_nl_current", "motor_type"}
+             "si_motor_nl_current"}
+# transmis mais volontairement invisibles (lus par l'outil pour choisir ses pages)
+HIDDEN_OK = {"motor_type"}
 
 
 def firmware_source():
@@ -60,7 +62,7 @@ def main():
                 continue
             ser, used, grouped = audit(p, src)
             unused_visible = [n for n in ser if n not in used and n in grouped]
-            used_hidden = [n for n in ser if n in used and n not in grouped]
+            used_hidden = [n for n in ser if n in used and n not in grouped and n not in HIDDEN_OK]
             print("%-24s %-26s %3d serialises, %3d utilises" % (prof, os.path.basename(f), len(ser), len(used)))
             print("    inutilises mais visibles :", ", ".join(unused_visible) or "aucun")
             print("    utilises mais invisibles :", ", ".join(used_hidden) or "aucun")
