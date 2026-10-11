@@ -69,6 +69,15 @@ uart_t *uart_open(int inst, uint8_t tx, uint8_t rx, uint32_t baud)
     return u;
 }
 
+/* Rebranche les broches d'un UART deja ouvert (apres usage en entrees par les applications) */
+void uart_attach_pins(int inst, uint8_t tx, uint8_t rx)
+{
+    if (inst < 1 || inst > 6 || !s_by_inst[inst]) return;
+    uint32_t af = inst <= 3 ? 7u : 8u;
+    gpio_cfg(tx, GPIO_MODE_AF, false, 2, GPIO_PUPD_NONE, af);
+    gpio_cfg(rx, GPIO_MODE_AF, false, 2, GPIO_PUPD_UP, af);
+}
+
 void uart_set_baud(uart_t *u, uint32_t baud)
 {
     if (!u || baud == 0) return;

@@ -116,17 +116,41 @@ def sim():
     sys.exit(r.returncode)
 
 
+def tests(board):
+    """Tests PC : configuration (serialisation, bornage) et applications (entrees simulees)."""
+    gcc = find_tool("gcc", HOST_DIRS)
+    out = os.path.join(HERE, "build")
+    os.makedirs(out, exist_ok=True)
+    flags = ["-std=gnu11", "-O1", "-Wall", "-Wextra", "-DRESC_HOST", f'-DRESC_BOARD_HEADER="boards/{board}.h"',
+             "-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm", "-Isrc/bsp"]
+    suites = {
+        "test_conf": ["tests/test_conf.c", "src/app/resc_conf.c", "src/vesc/vesc_conf.c", "src/comm/packet.c",
+                      "src/core/foc.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"],
+        "test_apps": ["tests/test_apps.c", "src/app/apps.c", "src/vesc/vesc_conf.c"],
+    }
+    rc = 0
+    for name, srcs in suites.items():
+        exe = os.path.join(out, name + ".exe")
+        run([gcc] + flags + srcs + ["-lm", "-o", exe])
+        print(f"== {name}")
+        rc |= subprocess.run([exe], cwd=HERE).returncode
+    sys.exit(rc)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--board", default="ubox/board_ubox_single_85_200")
     ap.add_argument("--sim", action="store_true")
     ap.add_argument("--clean", action="store_true")
+    ap.add_argument("--tests", action="store_true")
     a = ap.parse_args()
     if a.clean:
         shutil.rmtree(os.path.join(HERE, "build"), ignore_errors=True)
         return
     if a.sim:
         sim()
+    if a.tests:
+        tests(a.board)
     build(a.board)
 
 

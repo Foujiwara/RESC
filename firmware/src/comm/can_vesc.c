@@ -39,6 +39,41 @@ uint32_t can_baud_from_enum(uint8_t e)
     }
 }
 
+static can_peer_t s_peers[CAN_PEERS_MAX];
+static int s_npeers;
+static uint32_t s_now;
+
+const can_peer_t *can_vesc_peers(int *n) { *n = s_npeers; return s_peers; }
+
+static void peer_update(uint8_t id, const uint8_t *d)
+{
+    int k = 0;
+    while (k < s_npeers && s_peers[k].id != id) k++;
+    if (k == s_npeers) {
+        if (s_npeers >= CAN_PEERS_MAX) return;
+        s_npeers++;
+        s_peers[k].id = id;
+    }
+    int32_t i = 0;
+    s_peers[k].erpm = (float)vb_get_i32(d, &i);
+    s_peers[k].current = (float)vb_get_i16(d, &i) / 10.0f;
+    s_peers[k].duty = (float)vb_get_i16(d, &i) / 1000.0f;
+    s_peers[k].ms = s_now;
+}
+
+static void send_i32(uint32_t cmd, uint8_t id, int32_t v)
+{
+    uint8_t f[4];
+    int32_t i = 0;
+    vb_put_i32(f, v, &i);
+    can_send(EID(cmd, id), f, 4);
+}
+void can_vesc_send_current(uint8_t id, float a)     { send_i32(CAN_PACKET_SET_CURRENT, id, (int32_t)(a * 1e3f)); }
+void can_vesc_send_current_rel(uint8_t id, float r) { send_i32(CAN_PACKET_SET_CURRENT_REL, id, (int32_t)(r * 1e5f)); }
+void can_vesc_send_brake(uint8_t id, float a)       { send_i32(CAN_PACKET_SET_CURRENT_BRAKE, id, (int32_t)(a * 1e3f)); }
+void can_vesc_send_duty(uint8_t id, float d)        { send_i32(CAN_PACKET_SET_DUTY, id, (int32_t)(d * 1e5f)); }
+void can_vesc_send_rpm(uint8_t id, float e)         { send_i32(CAN_PACKET_SET_RPM, id, (int32_t)e); }
+
 void can_vesc_init(void)
 {
     can_init(can_baud_from_enum(g_appconf.can_baud_rate));
@@ -120,6 +155,7 @@ static void handle_frame(const can_frame_t *fr)
         if (s_ping_reply && id == me && fr->len >= 1 && s_ping_n < 255) s_ping_found[s_ping_n++] = d[0];
         return;
     }
+    if (cmd == CAN_PACKET_STATUS && fr->len >= 8 && id != me) { peer_update(id, d); return; }
     if (id != me && !(id == 255 && cmd <= CAN_PACKET_SET_CURRENT_HANDBRAKE_REL)) return;
 
     /* Longueur minimale de chaque commande : une trame tronquee est ignoree */
@@ -297,6 +333,7 @@ void can_vesc_start_ping_scan(const comm_iface_t *reply)
 
 void can_vesc_poll(uint32_t now)
 {
+    s_now = now;
     can_frame_t f;
     for (int k = 0; k < 32 && can_recv(&f); k++) handle_frame(&f);
 
