@@ -15,7 +15,8 @@ typedef enum {
     IN_UART_PAS            /* capteur de pedalage en quadrature : TX = A, RX = B */
 } in_uart_use_t;
 
-void inputs_init(bool servo, in_uart_use_t uart_use);
+/* servo_pin_owned : la broche servo sert a un autre usage (codeur PWM), n'y pas toucher */
+void inputs_init(bool servo, in_uart_use_t uart_use, bool servo_pin_owned);
 
 /* Derniere impulsion servo (ms) ; false si aucune impulsion depuis 100 ms */
 bool inputs_servo_ms(float *ms, uint32_t now_ms);

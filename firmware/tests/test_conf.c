@@ -23,7 +23,7 @@ bool plat_conf_write(uint32_t s, const uint8_t *d, uint32_t n) { (void)s; (void)
 const uint8_t *plat_conf_read(uint32_t s, uint32_t *n) { (void)s; *n = 0; return 0; }
 uint8_t plat_default_controller_id(void) { return 42; }
 void plat_pwm_set_freq(float f, uint8_t m) { (void)f; (void)m; }
-void plat_sensor_config(uint8_t m, uint32_t c) { (void)m; (void)c; }
+void plat_sensor_config(uint8_t m, uint32_t c, uint8_t p, const abs_enc_sincos_t *s) { (void)m; (void)c; (void)p; (void)s; }
 void plat_hall_samples(uint8_t e) { (void)e; }
 void foc_hw_phase_filter(bool on) { (void)on; }
 void foc_hw_kill(void) { }

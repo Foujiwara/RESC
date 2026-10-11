@@ -14,7 +14,7 @@ bool plat_conf_write(uint32_t s, const uint8_t *d, uint32_t n) { (void)s; (void)
 const uint8_t *plat_conf_read(uint32_t s, uint32_t *n) { (void)s; *n = 0; return 0; }
 uint8_t plat_default_controller_id(void) { return 0; }
 void plat_pwm_set_freq(float f, uint8_t m) { (void)f; (void)m; }
-void plat_sensor_config(uint8_t m, uint32_t c) { (void)m; (void)c; }
+void plat_sensor_config(uint8_t m, uint32_t c, uint8_t p, const abs_enc_sincos_t *s) { (void)m; (void)c; (void)p; (void)s; }
 void plat_hall_samples(uint8_t e) { (void)e; }
 void foc_hw_phase_filter(bool on) { (void)on; }
 void foc_hw_kill(void) { }
@@ -33,8 +33,12 @@ int main(void)
     resc_conf_defaults_app(&g_appconf);
     printf("{\n  \"board\": \"%s\",\n", BOARD_NAME);
     /* capacites de la carte pour les choix qui en dependent (tools/resc_conf/board_enum.py) */
-    printf("  \"caps\": [\"%s\", \"%s\"],\n", BOARD_CS_TOPOLOGY == HW_CS_INLINE_3 ? "inline" : "",
-           BOARD_CS_TOPOLOGY != HW_CS_LOWSIDE_2 ? "three" : "");
+    printf("  \"caps\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],\n",
+           BOARD_CS_TOPOLOGY == HW_CS_INLINE_3 ? "inline" : "",
+           BOARD_CS_TOPOLOGY != HW_CS_LOWSIDE_2 ? "three" : "",
+           (BOARD_SPI_SCK_PIN != HW_PIN_NONE && BOARD_SPI_MISO_PIN != HW_PIN_NONE) ? "spi" : "",
+           (BOARD_SERVO_PIN != HW_PIN_NONE && BOARD_ENC_TIM != 4) ? "servo" : "",
+           (BOARD_ADC_EXT1_CH != HW_ADC_CH_NONE && BOARD_ADC_EXT2_CH != HW_ADC_CH_NONE) ? "adc2" : "");
     printf("  \"limits\": {\"i_motor\": %g, \"i_input\": %g, \"i_abs\": %g, \"vbus_min\": %g, \"vbus_max\": %g, "
            "\"erpm\": %g, \"f_pwm_min\": %g, \"f_pwm_max\": %g, \"duty_max\": %g, \"t_fet\": %g, \"cap\": %g},\n",
            (double)HWLIM_I_MOTOR_A, (double)HWLIM_I_INPUT_A, (double)HWLIM_I_ABS_TRIP_A, (double)HWLIM_VBUS_MIN_V,

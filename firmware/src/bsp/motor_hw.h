@@ -14,7 +14,9 @@ uint32_t motor_hw_isr_cycles(void);
 uint32_t motor_hw_isr_cycles_max(void);
 uint32_t motor_hw_overruns(void);
 void motor_hw_reset_stats(void);
-void motor_hw_sensor_config(uint8_t sensor_mode, uint32_t encoder_counts);   /* 1 = codeur ABI */
+#include "abs_enc.h"
+/* sensor_mode 1 (codeur) : ABI sur le port Hall, ou codeur absolu selon port (m_sensor_port_mode) */
+void motor_hw_sensor_config(uint8_t sensor_mode, uint32_t encoder_counts, uint8_t port, const abs_enc_sincos_t *sc);
 
 void motor_hw_set_hall_samples(uint8_t extra);
 

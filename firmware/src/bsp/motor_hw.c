@@ -30,6 +30,7 @@
 #include "fault_codes.h"
 #include "platform.h"
 #include "sampler.h"
+#include "abs_enc.h"
 
 #define ADC_SMP_15   1u          /* 15 cycles d'echantillonnage */
 #define TRIG_ADVANCE 60u         /* ticks avant le sommet : centre l'echantillonnage */
@@ -79,9 +80,19 @@ RAMFUNC void foc_hw_phase_filter(bool on)
 #endif
 }
 
-void motor_hw_sensor_config(uint8_t mode, uint32_t cpr)
+static bool s_abs;
+
+void motor_hw_sensor_config(uint8_t mode, uint32_t cpr, uint8_t port, const abs_enc_sincos_t *sc)
 {
     s_enc_tim = 0;
+    s_abs = false;
+    abs_enc_config(0, 0);
+    if (mode == 1 && abs_enc_supported(port)) {
+        /* codeur absolu : broches et peripherique propres au capteur */
+        abs_enc_config(port, sc);
+        s_abs = true;
+        return;
+    }
     if (mode != 1 || cpr < 4) {
         gpio_cfg(BOARD_HALL1_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
         gpio_cfg(BOARD_HALL2_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
@@ -378,6 +389,7 @@ RAMFUNC void ADC_IRQHandler(void)
     in.vbus = r[BOARD_VBUS_ADC - 1][2];
     in.hall = hall_read();
     in.enc = s_enc_tim ? s_enc_tim->CNT : 0u;
+    if (s_abs) { uint32_t c; if (abs_enc_sample(&c)) in.enc = c; }
 
     for (int k = 0; k < 3; k++) {
         if (H.cur_slow[k][0] != 0xFF) s_slow_raw[H.cur_slow[k][0]] = r[k][2];
@@ -503,5 +515,5 @@ uint32_t motor_hw_overruns(void) { return H.overruns; }
 void motor_hw_reset_stats(void) { H.cyc_max = 0; H.overruns = 0; }
 
 void plat_pwm_set_freq(float f, uint8_t ctl_mode) { motor_hw_set_freq(f, ctl_mode); }
-void plat_sensor_config(uint8_t mode, uint32_t cpr) { motor_hw_sensor_config(mode, cpr); }
+void plat_sensor_config(uint8_t mode, uint32_t cpr, uint8_t port, const abs_enc_sincos_t *sc) { motor_hw_sensor_config(mode, cpr, port, sc); }
 void plat_hall_samples(uint8_t extra) { motor_hw_set_hall_samples(extra); }

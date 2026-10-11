@@ -38,8 +38,6 @@ MC_REMOVE = [
     "cc_ramp_step_max", "m_duty_ramp_step", "m_current_backoff_gain", "m_bldc_f_sw_min", "m_bldc_f_sw_max",
     "m_dc_f_sw", "l_max_erpm_fbrake", "l_max_erpm_fbrake_cc",
     # entrees et capteurs absents ou non pris en charge
-    "m_encoder_sin_amp", "m_encoder_cos_amp", "m_encoder_sin_offset", "m_encoder_cos_offset",
-    "m_encoder_sincos_filter_constant", "m_encoder_sincos_phase_correction", "m_sensor_port_mode",
     "m_drv8301_oc_mode", "m_drv8301_oc_adj",
 ] + ["hall_table__%d" % k for k in range(8)] + [
     "bms.type", "bms.limit_mode", "bms.t_limit_start", "bms.t_limit_end", "bms.soc_limit_start",
@@ -181,6 +179,19 @@ MC_EDIT = {
         "Low-pass filter of the input current used by the map (per PWM period).")),
     "p_pid_kd_proc": dict(description=html(
         "Derivative on the measured position (damping without kick when the setpoint changes).")),
+    "m_sensor_port_mode": dict(description=html(
+        "Encoder type used when the angle source (FOC, General) is Encoder.",
+        "<b>ABI</b>: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. "
+        "<b>AS5047</b>, <b>AMT22</b>: SPI on the Hall port (H1 SCK, H2 MISO, H3 CS). "
+        "<b>TLE5012</b>: SSC on the Hall port (H1 SCK, H2 data, H3 CS). "
+        "<b>MT6816</b>, <b>AS5X47U</b>, <b>MA782</b>: SPI1 on the COMM port (SCK, MISO, MOSI, NSS = CS). "
+        "<b>AD2S1205</b>: resolver converter, SPI on the COMM port pins. "
+        "<b>Sin/Cos</b>: analog sine on ADC1 and cosine on ADC2. "
+        "<b>PWM</b>: PWM output of the encoder on the servo input.",
+        "Absolute encoders are read every PWM period; an invalid sample (parity, CRC, magnet, signal "
+        "level) keeps the previous angle. Then run the encoder detection (ratio, direction, offset).")),
+    "m_encoder_sincos_phase_correction": dict(description=html(
+        "Sin/Cos encoder: phase error between the two signals (degrees).")),
     "l_slow_abs_current": dict(description=html(
         "Absolute current limit on the filtered current magnitude instead of each sample (the hardware "
         "analog watchdog is then set 50 % higher).")),
@@ -216,6 +227,9 @@ ENUM_KEEP = {
     "sp_pid_loop_rate": [(0, "25 Hz"), (1, "50 Hz"), (2, "100 Hz"), (3, "250 Hz"), (4, "500 Hz"), (5, "1000 Hz")],
     "foc_hfi_amb_mode": [(1, "Id Single Pulse"), (2, "Id Double Pulse")],
     "foc_offsets_cal_mode": [(0, "Calibrate on Boot")],
+    "m_sensor_port_mode": [(1, "ABI Encoder"), (2, "AS5047 Encoder"), (3, "AD2S1205 Resolver"),
+                           (4, "Sin/Cos Encoder"), (7, "MT6816 Encoder (SPI)"), (8, "AS5X47U Encoder (SPI)"),
+                           (10, "TLE5012 Encoder (SSC SW)"), (13, "PWM"), (15, "MA782"), (16, "AMT22 (SW SPI)")],
     "foc_control_sample_mode": [(0, "V0 Only"), (2, "V0 and V7 Interpolation"), (1, "V0 and V7")],
     "foc_current_sample_mode": [(0, "Longest Zero Time"), (1, "All Sensors Combined"), (2, "High Current")],
     "m_out_aux_mode": [(0, "Off"), (1, "On after 2 seconds"), (2, "On after 5 seconds"), (3, "On after 10 seconds"),
