@@ -579,6 +579,13 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f32_auto(buf, c->cc_min_current, &i);
     vb_put_i32(buf, c->m_fault_stop_time_ms, &i);
     vb_put_u32(buf, c->m_encoder_counts, &i);
+    vb_put_f16(buf, c->m_encoder_sin_amp, 1000, &i);
+    vb_put_f16(buf, c->m_encoder_cos_amp, 1000, &i);
+    vb_put_f16(buf, c->m_encoder_sin_offset, 1000, &i);
+    vb_put_f16(buf, c->m_encoder_cos_offset, 1000, &i);
+    vb_put_f16(buf, c->m_encoder_sincos_filter_constant, 1000, &i);
+    vb_put_f16(buf, c->m_encoder_sincos_phase_correction, 1000, &i);
+    buf[i++] = map_out((uint8_t)c->m_sensor_port_mode, g_keepb_m_sensor_port_mode, g_keepb_m_sensor_port_mode_n);
     buf[i++] = (uint8_t)c->m_invert_direction;
     vb_put_f32_auto(buf, c->m_ntc_motor_beta, &i);
     buf[i++] = map_out((uint8_t)c->m_out_aux_mode, KEEP_M_OUT_AUX_MODE, 12);
@@ -609,7 +616,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < 408) return false;
+    if (len < 421) return false;
     if (vb_get_u32(buf, &i) != g_rescp_mcconf_sig) return false;
     c->motor_type = (uint8_t)buf[i++];
     c->l_current_max = vb_get_f32_auto(buf, &i);
@@ -748,6 +755,13 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->cc_min_current = vb_get_f32_auto(buf, &i);
     c->m_fault_stop_time_ms = vb_get_i32(buf, &i);
     c->m_encoder_counts = vb_get_u32(buf, &i);
+    c->m_encoder_sin_amp = vb_get_f16(buf, 1000, &i);
+    c->m_encoder_cos_amp = vb_get_f16(buf, 1000, &i);
+    c->m_encoder_sin_offset = vb_get_f16(buf, 1000, &i);
+    c->m_encoder_cos_offset = vb_get_f16(buf, 1000, &i);
+    c->m_encoder_sincos_filter_constant = vb_get_f16(buf, 1000, &i);
+    c->m_encoder_sincos_phase_correction = vb_get_f16(buf, 1000, &i);
+    c->m_sensor_port_mode = (uint8_t)map_in(buf[i++], g_keepb_m_sensor_port_mode, g_keepb_m_sensor_port_mode_n);
     c->m_invert_direction = (uint8_t)buf[i++];
     c->m_ntc_motor_beta = vb_get_f32_auto(buf, &i);
     c->m_out_aux_mode = (uint8_t)map_in(buf[i++], KEEP_M_OUT_AUX_MODE, 12);
@@ -1936,8 +1950,10 @@ const uint16_t vesc_appconf_nfields = 121;
 
 
 /* choix dependant de la carte (tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3930393213u;
+__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 480116984u;
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 2 };
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode_n = 3;
+__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 1, 2, 3, 4, 7, 8, 10, 13, 15, 16 };
+__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 10;

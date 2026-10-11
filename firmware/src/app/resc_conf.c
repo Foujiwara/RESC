@@ -4,6 +4,7 @@
 #include <string.h>
 #include "resc_conf.h"
 #include "stats.h"
+#include "abs_enc.h"
 #include "vesc_compat_defaults.h"
 #include "hw_config.h"
 #include "fmath.h"
@@ -141,7 +142,8 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(si_motor_poles); FIN(si_gear_ratio); FIN(si_wheel_diameter); FIN(si_battery_cells);
     FIN(foc_overmod_factor); FIN(foc_mag_vd_max); FIN(foc_current_filter_const); FIN(foc_fw_backoff);
     FIN(foc_hfi_reset_erpm); FIN(foc_hfi_obs_ovr_sec); FIN(l_in_current_map_start); FIN(l_in_current_map_filter);
-    FIN(p_pid_kd_proc);
+    FIN(p_pid_kd_proc); FIN(m_encoder_sin_amp); FIN(m_encoder_cos_amp); FIN(m_encoder_sin_offset);
+    FIN(m_encoder_cos_offset); FIN(m_encoder_sincos_filter_constant); FIN(m_encoder_sincos_phase_correction);
 #undef FIN
     /* parametres physiques : strictement positifs ou nuls */
     if (c->foc_motor_r < 0.0f) c->foc_motor_r = d.foc_motor_r;
@@ -167,6 +169,12 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
     c->l_additional_faults &= 0x0Bu;                                                   /* glissement, survitesses */
     c->foc_offsets_cal_mode &= 0x01u;
     /* echantillonnage : V0 et V7 seulement avec des shunts en ligne ; modes a trois capteurs */
+    /* port capteur : choix sans codeur pris en charge -> ABI */
+    if (!abs_enc_supported(c->m_sensor_port_mode)) c->m_sensor_port_mode = 1;
+    if ((c->m_sensor_port_mode == 3 || c->m_sensor_port_mode == 7 || c->m_sensor_port_mode == 8 ||
+         c->m_sensor_port_mode == 15) && BOARD_SPI_SCK_PIN == HW_PIN_NONE) c->m_sensor_port_mode = 1;
+    if (c->m_sensor_port_mode == 13 && (BOARD_SERVO_PIN == HW_PIN_NONE || BOARD_ENC_TIM == 4)) c->m_sensor_port_mode = 1;
+    if (c->m_sensor_port_mode == 4 && BOARD_ADC_EXT2_CH == HW_ADC_CH_NONE) c->m_sensor_port_mode = 1;
     if (c->foc_control_sample_mode > 2) c->foc_control_sample_mode = 0;
     if (c->foc_control_sample_mode == 1 && BOARD_CS_TOPOLOGY != HW_CS_INLINE_3) c->foc_control_sample_mode = 2;
     if (c->foc_current_sample_mode > 2 || BOARD_CS_TOPOLOGY == HW_CS_LOWSIDE_2) c->foc_current_sample_mode = 0;
@@ -367,7 +375,8 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         fp->sl_omega = rpm_to_rad(mc->foc_sl_erpm);
         fp->sl_omega_start = fm_min(rpm_to_rad(mc->foc_sl_erpm_start), fp->sl_omega);
         fp->hall_extra = (uint8_t)fm_sat(mc->m_hall_extra_samples, 0.0f, 10.0f);
-        fp->enc.cpr = mc->m_encoder_counts;
+        /* codeur absolu (m_sensor_port_mode) : 16384 pas par tour, sinon ABI (m_encoder_counts) */
+        fp->enc.cpr = abs_enc_supported(mc->m_sensor_port_mode) ? ABS_ENC_CPR : mc->m_encoder_counts;
         fp->enc.ratio = mc->foc_encoder_ratio;
         fp->enc.offset = fm_wrap_pi(mc->foc_encoder_offset * (FM_PI / 180.0f));
         fp->enc.inverted = mc->foc_encoder_inverted != 0;
@@ -476,7 +485,23 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 
 /* Fourni par la plateforme : changement de frequence PWM (pont coupe) */
 void plat_pwm_set_freq(float f_loop, uint8_t ctl_mode);
-void plat_sensor_config(uint8_t mode, uint32_t cpr);
+void plat_sensor_config(uint8_t mode, uint32_t cpr, uint8_t port, const abs_enc_sincos_t *sc);
+
+/* Capteurs (broches, codeur absolu, sin/cos) : moteur arrete seulement */
+void resc_conf_sensor_hw(const vesc_mcconf_t *mc, const foc_params_t *fp)
+{
+    abs_enc_sincos_t sc;
+    sc.s_gain = mc->m_encoder_sin_amp > 0.01f ? 1.0f / mc->m_encoder_sin_amp : 1.0f;
+    sc.c_gain = mc->m_encoder_cos_amp > 0.01f ? 1.0f / mc->m_encoder_cos_amp : 1.0f;
+    sc.s_offset = mc->m_encoder_sin_offset;
+    sc.c_offset = mc->m_encoder_cos_offset;
+    sc.filter = fm_sat(mc->m_encoder_sincos_filter_constant, 0.001f, 1.0f);
+    float ph = mc->m_encoder_sincos_phase_correction * (FM_PI / 180.0f);
+    sc.sph = sinf(ph);
+    sc.cph = cosf(ph);
+    uint8_t port = fp->sensor_mode == FOC_SENSOR_ENCODER ? mc->m_sensor_port_mode : 0;
+    plat_sensor_config(fp->sensor_mode, fp->enc.cpr, port, &sc);
+}
 void plat_hall_samples(uint8_t extra);
 
 static volatile bool s_apply_pending;
@@ -503,14 +528,8 @@ void resc_conf_apply(void)
     }
     s_apply_pending = false;
     if (fp.f_pwm != foc_params()->f_pwm || fp.ctl_mode != foc_params()->ctl_mode) plat_pwm_set_freq(fp.f_pwm, fp.ctl_mode);
-    static uint8_t last_mode = 0xFF;
-    static uint32_t last_cpr = 0;
     plat_hall_samples(fp.hall_extra);
-    if (fp.sensor_mode != last_mode || fp.enc.cpr != last_cpr) {
-        plat_sensor_config(fp.sensor_mode, fp.enc.cpr);
-        last_mode = fp.sensor_mode;
-        last_cpr = fp.enc.cpr;
-    }
+    resc_conf_sensor_hw(&g_mcconf, &fp);
     foc_set_params(&fp);
 }
 

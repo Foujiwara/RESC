@@ -11,6 +11,9 @@ carte en tiennent compte (variables g_rescp_mcconf_sig, g_keepb_* compilees avec
 Capacites (relevees par firmware/tests/dump_defaults.c) :
   inline : courants mesures en permanence (shunts en ligne ou de phase)
   three  : trois capteurs de courant
+  spi    : broches SPI1 du port COMM
+  servo  : entree servo sur TIM4 (libre du codeur ABI)
+  adc2   : deux entrees ADC externes (sin/cos)
 """
 import copy
 
@@ -18,6 +21,7 @@ import copy
 BOARD_ENUM = {
     "foc_control_sample_mode": {1: "inline"},
     "foc_current_sample_mode": {1: "three", 2: "three"},
+    "m_sensor_port_mode": {3: "spi", 7: "spi", 8: "spi", 15: "spi", 13: "servo", 4: "adc2"},
 }
 
 

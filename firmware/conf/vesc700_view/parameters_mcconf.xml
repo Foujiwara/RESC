@@ -3455,11 +3455,7 @@ p, li { white-space: pre-wrap; }
             <longName>Sin/Cos Phase Correction</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Sin/Cos Phase error compensation in deg. Some sin/cos encoders do not output perfect 90° phase between sin and cos signals. This parameter allows for compensating a phase error between sin and cos signals.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Sin/Cos encoder: phase error between the two signals (degrees).&lt;/p&gt;</description>
             <cDefine>MCCONF_M_ENCODER_SINCOS_PHASE</cDefine>
             <editorDecimalsDouble>2</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -3477,62 +3473,7 @@ p, li { white-space: pre-wrap; }
             <longName>Sensor Port Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Mode for the sensor port. Can be changed for compatibility with different rotor position sensors. Notice that this setting does not have any impact when running sensorless. &lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;The modes are:&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Hall Sensors&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;The motor has hall sensors built in which give a position resolution of 120 degrees.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;ABI Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;A rotary encoder with A-B-Index output. Notice that this encoder does not help until the index pulse is found, so when running FOC open loop mode will be used for up to one mechanical revolution to find the index position when trying to run a motor for the first time after a power cycle.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Notice that you also have to set the number of encoder counts in order to use this type of encoder. This usually is the number of pulses per revolution times 4, since every edge of both pulse trains is counted.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;AS5047 Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;An AS5047 magnetic encoder connected over SPI. This one provides absolute positions from start, but tends to have a bit of nonlinearity.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;AS5X47U Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;An AS5147U or AS5247U magnetic encoder connected over SPI. It is similar to the AS5047 but with additional safety features making it capable of automotive safety levels. It must be connected to SPI in the COMM port. To use this encoder, you have to make sure that no app uses UART, I2C, ADC2, or ADC3.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;SIN/COS Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;A Sin/Cos encoder is a position feedback device similar to a quadrature encoder, except instead of outputting digital pulses, it outputs analog voltages with sinusoidal shapes offset by 90°. Provides absolute positions from the start, but its sensitive to EMI and requires special filtering,  transient protections and shielded wiring.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;TS5700N8501 Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This encoder uses RS485, so it has to be connected to the COMM port. A RS485-transceiver such as the &lt;span style=" font-family:'sans-serif';"&gt;ADM485 is required, where RX and TX are used as the data lines. ADC1 is used to trigger between RX and TX, which is needed as the communication is half duplex. To use this encoder, you have to make sure that no app uses UART or ADC1.&lt;/span&gt;&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'sans-serif';"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;TS5700N8501 Encoder Multiturn&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Same as above, but uses the multiturn function. The angle is divided by 10000, thus can be used for up to 10000 revolutions. The position PID parameters need to be increased by a factor of around 10000 for this to work similarly to the single turn mode. Note that this is not a good implementation and needs improvement in the future. 180 degrees PID setpoint corresponds to multiturn position 0.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'sans-serif';"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;MT6816 Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;A magnetic encoder using a high speed SPI communication. Provides absolute position from start. It has to be connected to a hardware-based SPI peripheral.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;BISSC Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This encoder uses  RS422, so it has to be connected to the COMM port for high speed communication. A RS422-transceiver such as the MAX490 is required, where CLK and MISO are used as clock and data input lines. To use this encoder, you have to make sure that no app uses UART or ADC1. The ABI resolution field is used to set the BISSC encoder accuracy: 2^(BissC Resolution)&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;TLE5102 Encoder&lt;/span&gt; &lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;A magnetic encoder using the bidirectional SSC protocol. Provides absolute position from start and error protected communication. Currently both “SSC SW” and “SSC HW” use software bitbanging. “SSC SW” uses the hall connector pins which must not have filters. “SSC HW” uses the 7-8 pin adc/uart connector. Recommend 5v sensor power.&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Wires must be shielded and/or run together or you will get communication errors.&lt;br /&gt;&lt;br /&gt;“SSC SW” Connections: H1 = SCK, H2 = DATA , H3 = CS &lt;br /&gt;“SSC HW” Connections: ADC1 = SCK, TX = DATA , NSS = CS&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Custom Encoder&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This means that a native library is loaded that handles reading of the encoder and provides the decoded angle. LispBM can also be used to implement a custom encoder.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;PWM&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Use the PPM/PWM input for the encoder. Make sure that the PPM-app is disabled.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;PWM + ABI&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Use the PPM/PWM input until the ABI index-pulse is found, then switch to ABI mode. Make sure that the PPM-app is disabled.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;MA782&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;MPS MA782 encoder. Require HW SPI.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;AMT22 (SW SPI)&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;AMT22 encoder connected over software SPI on the hall sensor port. SCK connects to HALL1, MISO to HALL2 and CS to HALL3. Note that MOSI on the encoder must be connected to GND.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Encoder type used when the angle source (FOC, General) is Encoder.&lt;/p&gt;&lt;p&gt;&lt;b&gt;ABI&lt;/b&gt;: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. &lt;b&gt;AS5047&lt;/b&gt;, &lt;b&gt;AMT22&lt;/b&gt;: SPI on the Hall port (H1 SCK, H2 MISO, H3 CS). &lt;b&gt;TLE5012&lt;/b&gt;: SSC on the Hall port (H1 SCK, H2 data, H3 CS). &lt;b&gt;MT6816&lt;/b&gt;, &lt;b&gt;AS5X47U&lt;/b&gt;, &lt;b&gt;MA782&lt;/b&gt;: SPI1 on the COMM port (SCK, MISO, MOSI, NSS = CS). &lt;b&gt;AD2S1205&lt;/b&gt;: resolver converter, SPI on the COMM port pins. &lt;b&gt;Sin/Cos&lt;/b&gt;: analog sine on ADC1 and cosine on ADC2. &lt;b&gt;PWM&lt;/b&gt;: PWM output of the encoder on the servo input.&lt;/p&gt;&lt;p&gt;Absolute encoders are read every PWM period; an invalid sample (parity, CRC, magnet, signal level) keeps the previous angle. Then run the encoder detection (ratio, direction, offset).&lt;/p&gt;</description>
             <cDefine>MCCONF_M_SENSOR_PORT_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>Hall Sensors</enumNames>
@@ -4644,8 +4585,16 @@ p, li { white-space: pre-wrap; }
             <subgroup>
                 <subgroupName>Sensors</subgroupName>
                 <subgroupParams>
+                    <param>m_sensor_port_mode</param>
                     <param>::sep::ABI Encoder</param>
                     <param>m_encoder_counts</param>
+                    <param>::sep::Sin/Cos Encoder</param>
+                    <param>m_encoder_sin_amp</param>
+                    <param>m_encoder_cos_amp</param>
+                    <param>m_encoder_sin_offset</param>
+                    <param>m_encoder_cos_offset</param>
+                    <param>m_encoder_sincos_filter_constant</param>
+                    <param>m_encoder_sincos_phase_correction</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>

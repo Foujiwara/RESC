@@ -14,6 +14,7 @@
 #include "vesc_conf.h"
 #include "foc.h"
 #include "ctrl.h"
+#include "abs_enc.h"
 
 extern vesc_mcconf_t  g_mcconf;
 extern vesc_appconf_t g_appconf;
@@ -34,6 +35,8 @@ bool resc_conf_apply_pending(void);
 bool resc_conf_store_mc(void);                  /* refuse si le moteur tourne */
 bool resc_conf_store_app(void);
 bool resc_conf_store_backup(void);              /* odometre (arret, redemarrage), s'il a change */
+/* Capteurs : broches, codeur absolu (m_sensor_port_mode), sin/cos ; moteur arrete */
+void resc_conf_sensor_hw(const vesc_mcconf_t *mc, const foc_params_t *fp);
 
 /* Etat de la lecture en flash au demarrage */
 typedef enum {

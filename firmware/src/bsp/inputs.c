@@ -24,9 +24,9 @@ static uint32_t s_servo_t;
 static uint32_t s_ms_count;
 static uint8_t s_pas_state;
 
-void inputs_init(bool servo, in_uart_use_t uart_use)
+void inputs_init(bool servo, in_uart_use_t uart_use, bool servo_pin_owned)
 {
-    s_servo = servo && SERVO_TIM_OK;
+    s_servo = servo && SERVO_TIM_OK && !servo_pin_owned;
     s_uart_use = uart_use;
 #if SERVO_TIM_OK
     if (s_servo) {
@@ -45,7 +45,7 @@ void inputs_init(bool servo, in_uart_use_t uart_use)
         TIM4->CR1 = TIM_CR1_CEN;
     } else
 #endif
-    {
+    if (!servo_pin_owned) {
         gpio_cfg(BOARD_SERVO_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
     }
     if (uart_use != IN_UART_COMM) {

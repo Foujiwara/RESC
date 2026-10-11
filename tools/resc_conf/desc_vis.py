@@ -44,8 +44,16 @@ def both(*c):
     return "(" + " && ".join(c) + ")"
 
 
+PORT = "mc->m_sensor_port_mode"
 VIS_MC = {
-    "m_encoder_counts": ENC,
+    "m_sensor_port_mode": ENC,
+    "m_encoder_counts": both(ENC, "(%s <= 1)" % PORT),
+    "m_encoder_sin_amp": both(ENC, "(%s == 4)" % PORT),
+    "m_encoder_cos_amp": both(ENC, "(%s == 4)" % PORT),
+    "m_encoder_sin_offset": both(ENC, "(%s == 4)" % PORT),
+    "m_encoder_cos_offset": both(ENC, "(%s == 4)" % PORT),
+    "m_encoder_sincos_filter_constant": both(ENC, "(%s == 4)" % PORT),
+    "m_encoder_sincos_phase_correction": both(ENC, "(%s == 4)" % PORT),
     "m_ntc_motor_beta": any_of(TT, (0, 3, 5)),
     "m_ptc_motor_coeff": any_of(TT, (1, 6)),
     "m_ntcx_ptcx_res": any_of(TT, (5, 6)),

@@ -186,7 +186,9 @@ void apps_configure(void)
     if (A.app == APP_ADC) u = IN_UART_BUTTONS;
     if (A.pas_on) u = IN_UART_PAS;
     bool servo = A.ppm_on;
-    inputs_init(servo, u);
+    /* codeur PWM sur l'entree servo (m_sensor_port_mode) : la broche lui appartient */
+    bool enc_pwm = g_mcconf.foc_sensor_mode == 1 && g_mcconf.m_sensor_port_mode == 13;
+    inputs_init(servo && !enc_pwm, u, enc_pwm);
     if (u == IN_UART_COMM && A.uart_use != IN_UART_COMM) uart_attach_pins(BOARD_UART_INST, BOARD_UART_TX_PIN, BOARD_UART_RX_PIN);
     A.uart_use = u;
 }

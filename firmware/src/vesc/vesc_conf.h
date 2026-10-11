@@ -231,9 +231,9 @@ typedef struct {
 } vesc_mcconf_t;
 
 #define VESC700_MCCONF_SIGNATURE 1470992211u
-#define RESCP_MCCONF_SIGNATURE   3930393213u
+#define RESCP_MCCONF_SIGNATURE   480116984u
 #define VESC700_MCCONF_SER_SIZE 488
-#define RESCP_MCCONF_SER_SIZE   408
+#define RESCP_MCCONF_SER_SIZE   421
 #ifdef RESC_CONF_PROFILE_RESC
 #define VESC_MCCONF_SIGNATURE RESCP_MCCONF_SIGNATURE
 #else
@@ -244,6 +244,7 @@ typedef struct {
 extern const uint32_t g_rescp_mcconf_sig;
 extern const uint8_t g_keepb_foc_control_sample_mode[], g_keepb_foc_control_sample_mode_n;
 extern const uint8_t g_keepb_foc_current_sample_mode[], g_keepb_foc_current_sample_mode_n;
+extern const uint8_t g_keepb_m_sensor_port_mode[], g_keepb_m_sensor_port_mode_n;
 
 int32_t vesc700_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c);
 bool    vesc700_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c);
