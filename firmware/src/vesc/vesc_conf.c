@@ -1,12 +1,13 @@
-/* GENERE par tools/vesc_compat/gen_conf.py depuis bldc release_7_00 - ne pas editer. */
+/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */
+#include <stddef.h>
 #include "vesc_conf.h"
 #include "vesc_buffer.h"
 #include "vesc_compat_defaults.h"
 
-int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
+int32_t vesc700_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    vb_put_u32(buf, VESC_MCCONF_SIGNATURE, &i);
+    vb_put_u32(buf, VESC700_MCCONF_SIGNATURE, &i);
     buf[i++] = (uint8_t)c->pwm_mode;
     buf[i++] = (uint8_t)c->comm_mode;
     buf[i++] = (uint8_t)c->motor_type;
@@ -212,11 +213,11 @@ int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     return i;
 }
 
-bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
+bool vesc700_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < VESC_MCCONF_SER_MAX) return false;
-    if (vb_get_u32(buf, &i) != VESC_MCCONF_SIGNATURE) return false;
+    if (len < 488) return false;
+    if (vb_get_u32(buf, &i) != VESC700_MCCONF_SIGNATURE) return false;
     c->pwm_mode = (uint8_t)buf[i++];
     c->comm_mode = (uint8_t)buf[i++];
     c->motor_type = (uint8_t)buf[i++];
@@ -422,6 +423,327 @@ bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     return true;
 }
 
+int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
+{
+    int32_t i = 0;
+    vb_put_u32(buf, RESCP_MCCONF_SIGNATURE, &i);
+    buf[i++] = (uint8_t)c->motor_type;
+    vb_put_f32_auto(buf, c->l_current_max, &i);
+    vb_put_f32_auto(buf, c->l_current_min, &i);
+    vb_put_f32_auto(buf, c->l_in_current_max, &i);
+    vb_put_f32_auto(buf, c->l_in_current_min, &i);
+    vb_put_f32_auto(buf, c->l_abs_current_max, &i);
+    vb_put_f32_auto(buf, c->l_min_erpm, &i);
+    vb_put_f32_auto(buf, c->l_max_erpm, &i);
+    vb_put_f16(buf, c->l_erpm_start, 10000, &i);
+    vb_put_f16(buf, c->l_min_vin, 10, &i);
+    vb_put_f16(buf, c->l_max_vin, 10, &i);
+    vb_put_f16(buf, c->l_battery_cut_start, 10, &i);
+    vb_put_f16(buf, c->l_battery_cut_end, 10, &i);
+    vb_put_f16(buf, c->l_battery_regen_cut_start, 10, &i);
+    vb_put_f16(buf, c->l_battery_regen_cut_end, 10, &i);
+    buf[i++] = (uint8_t)c->l_slow_abs_current;
+    buf[i++] = (uint8_t)c->l_temp_fet_start;
+    buf[i++] = (uint8_t)c->l_temp_fet_end;
+    buf[i++] = (uint8_t)c->l_temp_motor_start;
+    buf[i++] = (uint8_t)c->l_temp_motor_end;
+    vb_put_f16(buf, c->l_temp_accel_dec, 10000, &i);
+    vb_put_f16(buf, c->l_min_duty, 10000, &i);
+    vb_put_f16(buf, c->l_max_duty, 10000, &i);
+    vb_put_f32_auto(buf, c->l_watt_max, &i);
+    vb_put_f32_auto(buf, c->l_watt_min, &i);
+    vb_put_f16(buf, c->l_current_max_scale, 10000, &i);
+    vb_put_f16(buf, c->l_current_min_scale, 10000, &i);
+    vb_put_f16(buf, c->l_duty_start, 10000, &i);
+    buf[i++] = (uint8_t)c->l_additional_faults;
+    vb_put_f32_auto(buf, c->foc_current_kp, &i);
+    vb_put_f32_auto(buf, c->foc_current_ki, &i);
+    vb_put_f32_auto(buf, c->foc_f_zv, &i);
+    vb_put_f32_auto(buf, c->foc_dt_us, &i);
+    buf[i++] = (uint8_t)c->foc_encoder_inverted;
+    vb_put_f32_auto(buf, c->foc_encoder_offset, &i);
+    vb_put_f32_auto(buf, c->foc_encoder_ratio, &i);
+    buf[i++] = (uint8_t)c->foc_sensor_mode;
+    vb_put_f32_auto(buf, c->foc_pll_kp, &i);
+    vb_put_f32_auto(buf, c->foc_pll_ki, &i);
+    vb_put_f32_auto(buf, c->foc_motor_l, &i);
+    vb_put_f32_auto(buf, c->foc_motor_ld_lq_diff, &i);
+    vb_put_f32_auto(buf, c->foc_motor_r, &i);
+    vb_put_f32_auto(buf, c->foc_motor_flux_linkage, &i);
+    vb_put_f32_auto(buf, c->foc_observer_gain, &i);
+    vb_put_f32_auto(buf, c->foc_observer_gain_slow, &i);
+    vb_put_f16(buf, c->foc_observer_offset, 1000, &i);
+    vb_put_f32_auto(buf, c->foc_duty_dowmramp_kp, &i);
+    vb_put_f32_auto(buf, c->foc_duty_dowmramp_ki, &i);
+    vb_put_f16(buf, c->foc_start_curr_dec, 10000, &i);
+    vb_put_f32_auto(buf, c->foc_start_curr_dec_rpm, &i);
+    vb_put_f32_auto(buf, c->foc_openloop_rpm, &i);
+    vb_put_f16(buf, c->foc_openloop_rpm_low, 1000, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_hyst, 100, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_time_lock, 100, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_time_ramp, 100, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_time, 100, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_boost_q, 100, &i);
+    vb_put_f16(buf, c->foc_sl_openloop_max_q, 100, &i);
+    buf[i++] = (uint8_t)c->foc_hall_table_0;
+    buf[i++] = (uint8_t)c->foc_hall_table_1;
+    buf[i++] = (uint8_t)c->foc_hall_table_2;
+    buf[i++] = (uint8_t)c->foc_hall_table_3;
+    buf[i++] = (uint8_t)c->foc_hall_table_4;
+    buf[i++] = (uint8_t)c->foc_hall_table_5;
+    buf[i++] = (uint8_t)c->foc_hall_table_6;
+    buf[i++] = (uint8_t)c->foc_hall_table_7;
+    vb_put_f32_auto(buf, c->foc_hall_interp_erpm, &i);
+    vb_put_f32_auto(buf, c->foc_sl_erpm_start, &i);
+    vb_put_f32_auto(buf, c->foc_sl_erpm, &i);
+    buf[i++] = (uint8_t)c->foc_sat_comp_mode;
+    vb_put_f16(buf, c->foc_sat_comp, 1000, &i);
+    buf[i++] = (uint8_t)c->foc_temp_comp;
+    vb_put_f16(buf, c->foc_temp_comp_base_temp, 100, &i);
+    buf[i++] = (uint8_t)c->foc_cc_decoupling;
+    buf[i++] = (uint8_t)c->foc_observer_type;
+    buf[i++] = (uint8_t)c->foc_hfi_amb_mode;
+    vb_put_f16(buf, c->foc_hfi_amb_current, 10, &i);
+    buf[i++] = (uint8_t)c->foc_hfi_amb_tres;
+    vb_put_f16(buf, c->foc_hfi_voltage_start, 10, &i);
+    vb_put_f16(buf, c->foc_hfi_voltage_run, 10, &i);
+    vb_put_f16(buf, c->foc_hfi_voltage_max, 10, &i);
+    vb_put_f16(buf, c->foc_hfi_gain, 1000, &i);
+    vb_put_f16(buf, c->foc_hfi_max_err, 1000, &i);
+    vb_put_f16(buf, c->foc_hfi_hyst, 100, &i);
+    vb_put_f32_auto(buf, c->foc_sl_erpm_hfi, &i);
+    vb_put_u16(buf, c->foc_hfi_start_samples, &i);
+    buf[i++] = (uint8_t)c->foc_hfi_samples;
+    buf[i++] = (uint8_t)c->foc_offsets_cal_mode;
+    vb_put_f32_auto(buf, c->foc_offsets_current_0, &i);
+    vb_put_f32_auto(buf, c->foc_offsets_current_1, &i);
+    vb_put_f32_auto(buf, c->foc_offsets_current_2, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_0, 10000, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_1, 10000, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_2, 10000, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_undriven_0, 10000, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_undriven_1, 10000, &i);
+    vb_put_f16(buf, c->foc_offsets_voltage_undriven_2, 10000, &i);
+    buf[i++] = (uint8_t)c->foc_phase_filter_enable;
+    buf[i++] = (uint8_t)c->foc_phase_filter_disable_fault;
+    vb_put_f32_auto(buf, c->foc_phase_filter_max_erpm, &i);
+    buf[i++] = (uint8_t)c->foc_mtpa_mode;
+    vb_put_f32_auto(buf, c->foc_fw_current_max, &i);
+    vb_put_f16(buf, c->foc_fw_duty_start, 10000, &i);
+    vb_put_f16(buf, c->foc_fw_ramp_time, 1000, &i);
+    vb_put_f16(buf, c->foc_fw_q_current_factor, 10000, &i);
+    buf[i++] = (uint8_t)c->foc_speed_soure;
+    buf[i++] = (uint8_t)c->sp_pid_loop_rate;
+    vb_put_f32_auto(buf, c->s_pid_kp, &i);
+    vb_put_f32_auto(buf, c->s_pid_ki, &i);
+    vb_put_f32_auto(buf, c->s_pid_kd, &i);
+    vb_put_f16(buf, c->s_pid_kd_filter, 10000, &i);
+    vb_put_f32_auto(buf, c->s_pid_min_erpm, &i);
+    buf[i++] = (uint8_t)c->s_pid_allow_braking;
+    vb_put_f32_auto(buf, c->s_pid_ramp_erpms_s, &i);
+    buf[i++] = (uint8_t)c->s_pid_speed_source;
+    vb_put_f32_auto(buf, c->p_pid_kp, &i);
+    vb_put_f32_auto(buf, c->p_pid_ki, &i);
+    vb_put_f32_auto(buf, c->p_pid_kd, &i);
+    vb_put_f16(buf, c->p_pid_kd_filter, 10000, &i);
+    vb_put_f32_auto(buf, c->p_pid_ang_div, &i);
+    vb_put_f16(buf, c->p_pid_gain_dec_angle, 10, &i);
+    vb_put_f32_auto(buf, c->p_pid_offset, &i);
+    vb_put_f32_auto(buf, c->cc_min_current, &i);
+    vb_put_i32(buf, c->m_fault_stop_time_ms, &i);
+    vb_put_u32(buf, c->m_encoder_counts, &i);
+    buf[i++] = (uint8_t)c->m_invert_direction;
+    vb_put_f32_auto(buf, c->m_ntc_motor_beta, &i);
+    buf[i++] = (uint8_t)c->m_out_aux_mode;
+    buf[i++] = (uint8_t)c->m_motor_temp_sens_type;
+    vb_put_f32_auto(buf, c->m_ptc_motor_coeff, &i);
+    vb_put_f16(buf, c->m_ntcx_ptcx_res, 0.1, &i);
+    vb_put_f16(buf, c->m_ntcx_ptcx_temp_base, 10, &i);
+    buf[i++] = (uint8_t)c->m_hall_extra_samples;
+    buf[i++] = (uint8_t)c->m_batt_filter_const;
+    buf[i++] = (uint8_t)c->si_motor_poles;
+    vb_put_f32_auto(buf, c->si_gear_ratio, &i);
+    vb_put_f32_auto(buf, c->si_wheel_diameter, &i);
+    buf[i++] = (uint8_t)c->si_battery_type;
+    buf[i++] = (uint8_t)c->si_battery_cells;
+    vb_put_f32_auto(buf, c->si_battery_ah, &i);
+    vb_put_f32_auto(buf, c->si_motor_nl_current, &i);
+    buf[i++] = (uint8_t)c->foc_motor_kind;
+    vb_put_f32_auto(buf, c->foc_acim_lm, &i);
+    vb_put_f32_auto(buf, c->foc_acim_lr, &i);
+    vb_put_f32_auto(buf, c->foc_acim_rr, &i);
+    vb_put_f16(buf, c->foc_acim_im, 100, &i);
+    vb_put_f32_auto(buf, c->foc_acim_base_erpm, &i);
+    vb_put_f32_auto(buf, c->foc_resc_cc_bw, &i);
+    vb_put_f16(buf, c->foc_resc_rl_frac, 10000, &i);
+    return i;
+}
+
+bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
+{
+    int32_t i = 0;
+    if (len < 381) return false;
+    if (vb_get_u32(buf, &i) != RESCP_MCCONF_SIGNATURE) return false;
+    c->motor_type = (uint8_t)buf[i++];
+    c->l_current_max = vb_get_f32_auto(buf, &i);
+    c->l_current_min = vb_get_f32_auto(buf, &i);
+    c->l_in_current_max = vb_get_f32_auto(buf, &i);
+    c->l_in_current_min = vb_get_f32_auto(buf, &i);
+    c->l_abs_current_max = vb_get_f32_auto(buf, &i);
+    c->l_min_erpm = vb_get_f32_auto(buf, &i);
+    c->l_max_erpm = vb_get_f32_auto(buf, &i);
+    c->l_erpm_start = vb_get_f16(buf, 10000, &i);
+    c->l_min_vin = vb_get_f16(buf, 10, &i);
+    c->l_max_vin = vb_get_f16(buf, 10, &i);
+    c->l_battery_cut_start = vb_get_f16(buf, 10, &i);
+    c->l_battery_cut_end = vb_get_f16(buf, 10, &i);
+    c->l_battery_regen_cut_start = vb_get_f16(buf, 10, &i);
+    c->l_battery_regen_cut_end = vb_get_f16(buf, 10, &i);
+    c->l_slow_abs_current = (uint8_t)buf[i++];
+    c->l_temp_fet_start = (float)buf[i++];
+    c->l_temp_fet_end = (float)buf[i++];
+    c->l_temp_motor_start = (float)buf[i++];
+    c->l_temp_motor_end = (float)buf[i++];
+    c->l_temp_accel_dec = vb_get_f16(buf, 10000, &i);
+    c->l_min_duty = vb_get_f16(buf, 10000, &i);
+    c->l_max_duty = vb_get_f16(buf, 10000, &i);
+    c->l_watt_max = vb_get_f32_auto(buf, &i);
+    c->l_watt_min = vb_get_f32_auto(buf, &i);
+    c->l_current_max_scale = vb_get_f16(buf, 10000, &i);
+    c->l_current_min_scale = vb_get_f16(buf, 10000, &i);
+    c->l_duty_start = vb_get_f16(buf, 10000, &i);
+    c->l_additional_faults = (uint8_t)buf[i++];
+    c->foc_current_kp = vb_get_f32_auto(buf, &i);
+    c->foc_current_ki = vb_get_f32_auto(buf, &i);
+    c->foc_f_zv = vb_get_f32_auto(buf, &i);
+    c->foc_dt_us = vb_get_f32_auto(buf, &i);
+    c->foc_encoder_inverted = (uint8_t)buf[i++];
+    c->foc_encoder_offset = vb_get_f32_auto(buf, &i);
+    c->foc_encoder_ratio = vb_get_f32_auto(buf, &i);
+    c->foc_sensor_mode = (uint8_t)buf[i++];
+    c->foc_pll_kp = vb_get_f32_auto(buf, &i);
+    c->foc_pll_ki = vb_get_f32_auto(buf, &i);
+    c->foc_motor_l = vb_get_f32_auto(buf, &i);
+    c->foc_motor_ld_lq_diff = vb_get_f32_auto(buf, &i);
+    c->foc_motor_r = vb_get_f32_auto(buf, &i);
+    c->foc_motor_flux_linkage = vb_get_f32_auto(buf, &i);
+    c->foc_observer_gain = vb_get_f32_auto(buf, &i);
+    c->foc_observer_gain_slow = vb_get_f32_auto(buf, &i);
+    c->foc_observer_offset = vb_get_f16(buf, 1000, &i);
+    c->foc_duty_dowmramp_kp = vb_get_f32_auto(buf, &i);
+    c->foc_duty_dowmramp_ki = vb_get_f32_auto(buf, &i);
+    c->foc_start_curr_dec = vb_get_f16(buf, 10000, &i);
+    c->foc_start_curr_dec_rpm = vb_get_f32_auto(buf, &i);
+    c->foc_openloop_rpm = vb_get_f32_auto(buf, &i);
+    c->foc_openloop_rpm_low = vb_get_f16(buf, 1000, &i);
+    c->foc_sl_openloop_hyst = vb_get_f16(buf, 100, &i);
+    c->foc_sl_openloop_time_lock = vb_get_f16(buf, 100, &i);
+    c->foc_sl_openloop_time_ramp = vb_get_f16(buf, 100, &i);
+    c->foc_sl_openloop_time = vb_get_f16(buf, 100, &i);
+    c->foc_sl_openloop_boost_q = vb_get_f16(buf, 100, &i);
+    c->foc_sl_openloop_max_q = vb_get_f16(buf, 100, &i);
+    c->foc_hall_table_0 = (float)buf[i++];
+    c->foc_hall_table_1 = (float)buf[i++];
+    c->foc_hall_table_2 = (float)buf[i++];
+    c->foc_hall_table_3 = (float)buf[i++];
+    c->foc_hall_table_4 = (float)buf[i++];
+    c->foc_hall_table_5 = (float)buf[i++];
+    c->foc_hall_table_6 = (float)buf[i++];
+    c->foc_hall_table_7 = (float)buf[i++];
+    c->foc_hall_interp_erpm = vb_get_f32_auto(buf, &i);
+    c->foc_sl_erpm_start = vb_get_f32_auto(buf, &i);
+    c->foc_sl_erpm = vb_get_f32_auto(buf, &i);
+    c->foc_sat_comp_mode = (uint8_t)buf[i++];
+    c->foc_sat_comp = vb_get_f16(buf, 1000, &i);
+    c->foc_temp_comp = (uint8_t)buf[i++];
+    c->foc_temp_comp_base_temp = vb_get_f16(buf, 100, &i);
+    c->foc_cc_decoupling = (uint8_t)buf[i++];
+    c->foc_observer_type = (uint8_t)buf[i++];
+    c->foc_hfi_amb_mode = (uint8_t)buf[i++];
+    c->foc_hfi_amb_current = vb_get_f16(buf, 10, &i);
+    c->foc_hfi_amb_tres = (float)buf[i++];
+    c->foc_hfi_voltage_start = vb_get_f16(buf, 10, &i);
+    c->foc_hfi_voltage_run = vb_get_f16(buf, 10, &i);
+    c->foc_hfi_voltage_max = vb_get_f16(buf, 10, &i);
+    c->foc_hfi_gain = vb_get_f16(buf, 1000, &i);
+    c->foc_hfi_max_err = vb_get_f16(buf, 1000, &i);
+    c->foc_hfi_hyst = vb_get_f16(buf, 100, &i);
+    c->foc_sl_erpm_hfi = vb_get_f32_auto(buf, &i);
+    c->foc_hfi_start_samples = vb_get_u16(buf, &i);
+    c->foc_hfi_samples = (uint8_t)buf[i++];
+    c->foc_offsets_cal_mode = (uint8_t)buf[i++];
+    c->foc_offsets_current_0 = vb_get_f32_auto(buf, &i);
+    c->foc_offsets_current_1 = vb_get_f32_auto(buf, &i);
+    c->foc_offsets_current_2 = vb_get_f32_auto(buf, &i);
+    c->foc_offsets_voltage_0 = vb_get_f16(buf, 10000, &i);
+    c->foc_offsets_voltage_1 = vb_get_f16(buf, 10000, &i);
+    c->foc_offsets_voltage_2 = vb_get_f16(buf, 10000, &i);
+    c->foc_offsets_voltage_undriven_0 = vb_get_f16(buf, 10000, &i);
+    c->foc_offsets_voltage_undriven_1 = vb_get_f16(buf, 10000, &i);
+    c->foc_offsets_voltage_undriven_2 = vb_get_f16(buf, 10000, &i);
+    c->foc_phase_filter_enable = (uint8_t)buf[i++];
+    c->foc_phase_filter_disable_fault = (uint8_t)buf[i++];
+    c->foc_phase_filter_max_erpm = vb_get_f32_auto(buf, &i);
+    c->foc_mtpa_mode = (uint8_t)buf[i++];
+    c->foc_fw_current_max = vb_get_f32_auto(buf, &i);
+    c->foc_fw_duty_start = vb_get_f16(buf, 10000, &i);
+    c->foc_fw_ramp_time = vb_get_f16(buf, 1000, &i);
+    c->foc_fw_q_current_factor = vb_get_f16(buf, 10000, &i);
+    c->foc_speed_soure = (uint8_t)buf[i++];
+    c->sp_pid_loop_rate = (uint8_t)buf[i++];
+    c->s_pid_kp = vb_get_f32_auto(buf, &i);
+    c->s_pid_ki = vb_get_f32_auto(buf, &i);
+    c->s_pid_kd = vb_get_f32_auto(buf, &i);
+    c->s_pid_kd_filter = vb_get_f16(buf, 10000, &i);
+    c->s_pid_min_erpm = vb_get_f32_auto(buf, &i);
+    c->s_pid_allow_braking = (uint8_t)buf[i++];
+    c->s_pid_ramp_erpms_s = vb_get_f32_auto(buf, &i);
+    c->s_pid_speed_source = (uint8_t)buf[i++];
+    c->p_pid_kp = vb_get_f32_auto(buf, &i);
+    c->p_pid_ki = vb_get_f32_auto(buf, &i);
+    c->p_pid_kd = vb_get_f32_auto(buf, &i);
+    c->p_pid_kd_filter = vb_get_f16(buf, 10000, &i);
+    c->p_pid_ang_div = vb_get_f32_auto(buf, &i);
+    c->p_pid_gain_dec_angle = vb_get_f16(buf, 10, &i);
+    c->p_pid_offset = vb_get_f32_auto(buf, &i);
+    c->cc_min_current = vb_get_f32_auto(buf, &i);
+    c->m_fault_stop_time_ms = vb_get_i32(buf, &i);
+    c->m_encoder_counts = vb_get_u32(buf, &i);
+    c->m_invert_direction = (uint8_t)buf[i++];
+    c->m_ntc_motor_beta = vb_get_f32_auto(buf, &i);
+    c->m_out_aux_mode = (uint8_t)buf[i++];
+    c->m_motor_temp_sens_type = (uint8_t)buf[i++];
+    c->m_ptc_motor_coeff = vb_get_f32_auto(buf, &i);
+    c->m_ntcx_ptcx_res = vb_get_f16(buf, 0.1, &i);
+    c->m_ntcx_ptcx_temp_base = vb_get_f16(buf, 10, &i);
+    c->m_hall_extra_samples = (float)buf[i++];
+    c->m_batt_filter_const = (float)buf[i++];
+    c->si_motor_poles = (float)buf[i++];
+    c->si_gear_ratio = vb_get_f32_auto(buf, &i);
+    c->si_wheel_diameter = vb_get_f32_auto(buf, &i);
+    c->si_battery_type = (uint8_t)buf[i++];
+    c->si_battery_cells = (float)buf[i++];
+    c->si_battery_ah = vb_get_f32_auto(buf, &i);
+    c->si_motor_nl_current = vb_get_f32_auto(buf, &i);
+    c->foc_motor_kind = (uint8_t)buf[i++];
+    c->foc_acim_lm = vb_get_f32_auto(buf, &i);
+    c->foc_acim_lr = vb_get_f32_auto(buf, &i);
+    c->foc_acim_rr = vb_get_f32_auto(buf, &i);
+    c->foc_acim_im = vb_get_f16(buf, 100, &i);
+    c->foc_acim_base_erpm = vb_get_f32_auto(buf, &i);
+    c->foc_resc_cc_bw = vb_get_f32_auto(buf, &i);
+    c->foc_resc_rl_frac = vb_get_f16(buf, 10000, &i);
+    return true;
+}
+
+#ifdef RESC_CONF_PROFILE_RESC
+int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c) { return rescp_mcconf_serialize(buf, c); }
+bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c) { return rescp_mcconf_deserialize(buf, len, c); }
+#else
+int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c) { return vesc700_mcconf_serialize(buf, c); }
+bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c) { return vesc700_mcconf_deserialize(buf, len, c); }
+#endif
+
 void vesc_mcconf_defaults(vesc_mcconf_t *c)
 {
     c->pwm_mode = MCCONF_PWM_MODE;
@@ -626,12 +948,264 @@ void vesc_mcconf_defaults(vesc_mcconf_t *c)
     c->bms_vmax_limit_start = MCCONF_BMS_VMAX_LIMIT_START;
     c->bms_vmax_limit_end = MCCONF_BMS_VMAX_LIMIT_END;
     c->bms_fwd_can_mode = MCCONF_BMS_FWD_CAN_MODE;
+#ifndef MCCONF_FOC_MOTOR_KIND
+#define MCCONF_FOC_MOTOR_KIND 0
+#endif
+    c->foc_motor_kind = (uint8_t)(MCCONF_FOC_MOTOR_KIND);
+#ifndef MCCONF_FOC_ACIM_LM
+#define MCCONF_FOC_ACIM_LM 0
+#endif
+    c->foc_acim_lm = (float)(MCCONF_FOC_ACIM_LM);
+#ifndef MCCONF_FOC_ACIM_LR
+#define MCCONF_FOC_ACIM_LR 0
+#endif
+    c->foc_acim_lr = (float)(MCCONF_FOC_ACIM_LR);
+#ifndef MCCONF_FOC_ACIM_RR
+#define MCCONF_FOC_ACIM_RR 0
+#endif
+    c->foc_acim_rr = (float)(MCCONF_FOC_ACIM_RR);
+#ifndef MCCONF_FOC_ACIM_IM
+#define MCCONF_FOC_ACIM_IM 0
+#endif
+    c->foc_acim_im = (float)(MCCONF_FOC_ACIM_IM);
+#ifndef MCCONF_FOC_ACIM_BASE_ERPM
+#define MCCONF_FOC_ACIM_BASE_ERPM 0
+#endif
+    c->foc_acim_base_erpm = (float)(MCCONF_FOC_ACIM_BASE_ERPM);
+#ifndef MCCONF_FOC_RESC_CC_BW
+#define MCCONF_FOC_RESC_CC_BW 1000
+#endif
+    c->foc_resc_cc_bw = (float)(MCCONF_FOC_RESC_CC_BW);
+#ifndef MCCONF_FOC_RESC_RL_FRAC
+#define MCCONF_FOC_RESC_RL_FRAC 0.5
+#endif
+    c->foc_resc_rl_frac = (float)(MCCONF_FOC_RESC_RL_FRAC);
+#ifdef RESC_CONF_PROFILE_RESC
+    /* defauts propres au profil RESC (valeurs du XML RESC) */
+    c->foc_observer_offset = (float)(0);
+    c->foc_cc_decoupling = (uint8_t)(3);
+    c->foc_observer_type = (uint8_t)(0);
+#endif
 }
 
-int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
+const conf_field_t vesc_mcconf_fields[] = {
+    { 0x581A7C75u, (uint16_t)offsetof(vesc_mcconf_t, pwm_mode), 1, "pwm_mode" },
+    { 0xD8EAEAD4u, (uint16_t)offsetof(vesc_mcconf_t, comm_mode), 1, "comm_mode" },
+    { 0x409E7640u, (uint16_t)offsetof(vesc_mcconf_t, motor_type), 1, "motor_type" },
+    { 0xBA2ED604u, (uint16_t)offsetof(vesc_mcconf_t, sensor_mode), 1, "sensor_mode" },
+    { 0x2ADF8C09u, (uint16_t)offsetof(vesc_mcconf_t, l_current_max), 0, "l_current_max" },
+    { 0x16D2B350u, (uint16_t)offsetof(vesc_mcconf_t, l_current_min), 0, "l_current_min" },
+    { 0xCFB53D1Cu, (uint16_t)offsetof(vesc_mcconf_t, l_in_current_max), 0, "l_in_current_max" },
+    { 0xF3B80245u, (uint16_t)offsetof(vesc_mcconf_t, l_in_current_min), 0, "l_in_current_min" },
+    { 0xBB542676u, (uint16_t)offsetof(vesc_mcconf_t, l_in_current_map_start), 0, "l_in_current_map_start" },
+    { 0xBB8138D6u, (uint16_t)offsetof(vesc_mcconf_t, l_in_current_map_filter), 0, "l_in_current_map_filter" },
+    { 0x490B0D57u, (uint16_t)offsetof(vesc_mcconf_t, l_abs_current_max), 0, "l_abs_current_max" },
+    { 0x1F76575Fu, (uint16_t)offsetof(vesc_mcconf_t, l_min_erpm), 0, "l_min_erpm" },
+    { 0xF916F8BEu, (uint16_t)offsetof(vesc_mcconf_t, l_max_erpm), 0, "l_max_erpm" },
+    { 0xB6E24E66u, (uint16_t)offsetof(vesc_mcconf_t, l_erpm_start), 0, "l_erpm_start" },
+    { 0xDB19F477u, (uint16_t)offsetof(vesc_mcconf_t, l_max_erpm_fbrake), 0, "l_max_erpm_fbrake" },
+    { 0x47CF4A6Eu, (uint16_t)offsetof(vesc_mcconf_t, l_max_erpm_fbrake_cc), 0, "l_max_erpm_fbrake_cc" },
+    { 0xEEE7AA48u, (uint16_t)offsetof(vesc_mcconf_t, l_min_vin), 0, "l_min_vin" },
+    { 0xED144A07u, (uint16_t)offsetof(vesc_mcconf_t, l_max_vin), 0, "l_max_vin" },
+    { 0x57289AE2u, (uint16_t)offsetof(vesc_mcconf_t, l_battery_cut_start), 0, "l_battery_cut_start" },
+    { 0x4DC3D561u, (uint16_t)offsetof(vesc_mcconf_t, l_battery_cut_end), 0, "l_battery_cut_end" },
+    { 0x431ABF01u, (uint16_t)offsetof(vesc_mcconf_t, l_battery_regen_cut_start), 0, "l_battery_regen_cut_start" },
+    { 0x37722C0Cu, (uint16_t)offsetof(vesc_mcconf_t, l_battery_regen_cut_end), 0, "l_battery_regen_cut_end" },
+    { 0xF207B663u, (uint16_t)offsetof(vesc_mcconf_t, l_slow_abs_current), 1, "l_slow_abs_current" },
+    { 0x43C03F0Fu, (uint16_t)offsetof(vesc_mcconf_t, l_temp_fet_start), 0, "l_temp_fet_start" },
+    { 0xD7C4FC67u, (uint16_t)offsetof(vesc_mcconf_t, l_temp_fet_end), 0, "l_temp_fet_end" },
+    { 0x65328E88u, (uint16_t)offsetof(vesc_mcconf_t, l_temp_motor_start), 0, "l_temp_motor_start" },
+    { 0xE2B55EDDu, (uint16_t)offsetof(vesc_mcconf_t, l_temp_motor_end), 0, "l_temp_motor_end" },
+    { 0xF34E361Cu, (uint16_t)offsetof(vesc_mcconf_t, l_temp_accel_dec), 0, "l_temp_accel_dec" },
+    { 0xDC3337C6u, (uint16_t)offsetof(vesc_mcconf_t, l_min_duty), 0, "l_min_duty" },
+    { 0x3A539827u, (uint16_t)offsetof(vesc_mcconf_t, l_max_duty), 0, "l_max_duty" },
+    { 0x63563040u, (uint16_t)offsetof(vesc_mcconf_t, l_watt_max), 0, "l_watt_max" },
+    { 0x5F5B0F19u, (uint16_t)offsetof(vesc_mcconf_t, l_watt_min), 0, "l_watt_min" },
+    { 0x7E8AAFBAu, (uint16_t)offsetof(vesc_mcconf_t, l_current_max_scale), 0, "l_current_max_scale" },
+    { 0xA9611DFBu, (uint16_t)offsetof(vesc_mcconf_t, l_current_min_scale), 0, "l_current_min_scale" },
+    { 0x2A9AFEB6u, (uint16_t)offsetof(vesc_mcconf_t, l_duty_start), 0, "l_duty_start" },
+    { 0xFF1F255Fu, (uint16_t)offsetof(vesc_mcconf_t, l_additional_faults), 1, "l_additional_faults" },
+    { 0xF0BBBA37u, (uint16_t)offsetof(vesc_mcconf_t, sl_min_erpm), 0, "sl_min_erpm" },
+    { 0xB7A87BE1u, (uint16_t)offsetof(vesc_mcconf_t, sl_min_erpm_cycle_int_limit), 0, "sl_min_erpm_cycle_int_limit" },
+    { 0x8A1F02B4u, (uint16_t)offsetof(vesc_mcconf_t, sl_max_fullbreak_current_dir_change), 0, "sl_max_fullbreak_current_dir_change" },
+    { 0x6DD6D14Eu, (uint16_t)offsetof(vesc_mcconf_t, sl_cycle_int_limit), 0, "sl_cycle_int_limit" },
+    { 0xFD54BF0Eu, (uint16_t)offsetof(vesc_mcconf_t, sl_phase_advance_at_br), 0, "sl_phase_advance_at_br" },
+    { 0x9552FF36u, (uint16_t)offsetof(vesc_mcconf_t, sl_cycle_int_rpm_br), 0, "sl_cycle_int_rpm_br" },
+    { 0x486F9960u, (uint16_t)offsetof(vesc_mcconf_t, sl_bemf_coupling_k), 0, "sl_bemf_coupling_k" },
+    { 0x2530DEE8u, (uint16_t)offsetof(vesc_mcconf_t, hall_table_0), 0, "hall_table_0" },
+    { 0x5237EE7Eu, (uint16_t)offsetof(vesc_mcconf_t, hall_table_1), 0, "hall_table_1" },
+    { 0xCB3EBFC4u, (uint16_t)offsetof(vesc_mcconf_t, hall_table_2), 0, "hall_table_2" },
+    { 0xBC398F52u, (uint16_t)offsetof(vesc_mcconf_t, hall_table_3), 0, "hall_table_3" },
+    { 0x225D1AF1u, (uint16_t)offsetof(vesc_mcconf_t, hall_table_4), 0, "hall_table_4" },
+    { 0x555A2A67u, (uint16_t)offsetof(vesc_mcconf_t, hall_table_5), 0, "hall_table_5" },
+    { 0xCC537BDDu, (uint16_t)offsetof(vesc_mcconf_t, hall_table_6), 0, "hall_table_6" },
+    { 0xBB544B4Bu, (uint16_t)offsetof(vesc_mcconf_t, hall_table_7), 0, "hall_table_7" },
+    { 0x661F60D4u, (uint16_t)offsetof(vesc_mcconf_t, hall_sl_erpm), 0, "hall_sl_erpm" },
+    { 0x064181FCu, (uint16_t)offsetof(vesc_mcconf_t, foc_current_kp), 0, "foc_current_kp" },
+    { 0x622A293Cu, (uint16_t)offsetof(vesc_mcconf_t, foc_current_ki), 0, "foc_current_ki" },
+    { 0x2F60EB90u, (uint16_t)offsetof(vesc_mcconf_t, foc_f_zv), 0, "foc_f_zv" },
+    { 0xF3769033u, (uint16_t)offsetof(vesc_mcconf_t, foc_dt_us), 0, "foc_dt_us" },
+    { 0x35CC36B9u, (uint16_t)offsetof(vesc_mcconf_t, foc_encoder_inverted), 1, "foc_encoder_inverted" },
+    { 0x8C002E14u, (uint16_t)offsetof(vesc_mcconf_t, foc_encoder_offset), 0, "foc_encoder_offset" },
+    { 0x96C5985Du, (uint16_t)offsetof(vesc_mcconf_t, foc_encoder_ratio), 0, "foc_encoder_ratio" },
+    { 0x4121BD2Cu, (uint16_t)offsetof(vesc_mcconf_t, foc_sensor_mode), 1, "foc_sensor_mode" },
+    { 0xA0AC19D9u, (uint16_t)offsetof(vesc_mcconf_t, foc_pll_kp), 0, "foc_pll_kp" },
+    { 0xC4C7B119u, (uint16_t)offsetof(vesc_mcconf_t, foc_pll_ki), 0, "foc_pll_ki" },
+    { 0x48640F47u, (uint16_t)offsetof(vesc_mcconf_t, foc_motor_l), 0, "foc_motor_l" },
+    { 0xC6BE81A1u, (uint16_t)offsetof(vesc_mcconf_t, foc_motor_ld_lq_diff), 0, "foc_motor_ld_lq_diff" },
+    { 0xB26B3224u, (uint16_t)offsetof(vesc_mcconf_t, foc_motor_r), 0, "foc_motor_r" },
+    { 0x0E55C595u, (uint16_t)offsetof(vesc_mcconf_t, foc_motor_flux_linkage), 0, "foc_motor_flux_linkage" },
+    { 0x5531BB07u, (uint16_t)offsetof(vesc_mcconf_t, foc_observer_gain), 0, "foc_observer_gain" },
+    { 0xF21432FBu, (uint16_t)offsetof(vesc_mcconf_t, foc_observer_gain_slow), 0, "foc_observer_gain_slow" },
+    { 0x0F27EFC2u, (uint16_t)offsetof(vesc_mcconf_t, foc_observer_offset), 0, "foc_observer_offset" },
+    { 0x493C0FC0u, (uint16_t)offsetof(vesc_mcconf_t, foc_duty_dowmramp_kp), 0, "foc_duty_dowmramp_kp" },
+    { 0x2D57A700u, (uint16_t)offsetof(vesc_mcconf_t, foc_duty_dowmramp_ki), 0, "foc_duty_dowmramp_ki" },
+    { 0x6FADB5BCu, (uint16_t)offsetof(vesc_mcconf_t, foc_start_curr_dec), 0, "foc_start_curr_dec" },
+    { 0xABF66B71u, (uint16_t)offsetof(vesc_mcconf_t, foc_start_curr_dec_rpm), 0, "foc_start_curr_dec_rpm" },
+    { 0x6BFD4617u, (uint16_t)offsetof(vesc_mcconf_t, foc_openloop_rpm), 0, "foc_openloop_rpm" },
+    { 0x1D48D82Fu, (uint16_t)offsetof(vesc_mcconf_t, foc_openloop_rpm_low), 0, "foc_openloop_rpm_low" },
+    { 0xE76C8E2Bu, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_hyst), 0, "foc_sl_openloop_hyst" },
+    { 0xF8EBD584u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_time_lock), 0, "foc_sl_openloop_time_lock" },
+    { 0x56553C40u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_time_ramp), 0, "foc_sl_openloop_time_ramp" },
+    { 0x5F74DA51u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_time), 0, "foc_sl_openloop_time" },
+    { 0x2ABCD40Du, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_boost_q), 0, "foc_sl_openloop_boost_q" },
+    { 0x7E33D961u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_openloop_max_q), 0, "foc_sl_openloop_max_q" },
+    { 0x107E7979u, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_0), 0, "foc_hall_table_0" },
+    { 0x677949EFu, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_1), 0, "foc_hall_table_1" },
+    { 0xFE701855u, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_2), 0, "foc_hall_table_2" },
+    { 0x897728C3u, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_3), 0, "foc_hall_table_3" },
+    { 0x1713BD60u, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_4), 0, "foc_hall_table_4" },
+    { 0x60148DF6u, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_5), 0, "foc_hall_table_5" },
+    { 0xF91DDC4Cu, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_6), 0, "foc_hall_table_6" },
+    { 0x8E1AECDAu, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_table_7), 0, "foc_hall_table_7" },
+    { 0x9CF4FF7Bu, (uint16_t)offsetof(vesc_mcconf_t, foc_hall_interp_erpm), 0, "foc_hall_interp_erpm" },
+    { 0x424033B4u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_erpm_start), 0, "foc_sl_erpm_start" },
+    { 0x45A66CF0u, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_erpm), 0, "foc_sl_erpm" },
+    { 0xB92E7991u, (uint16_t)offsetof(vesc_mcconf_t, foc_control_sample_mode), 1, "foc_control_sample_mode" },
+    { 0xF8B87C5Au, (uint16_t)offsetof(vesc_mcconf_t, foc_current_sample_mode), 1, "foc_current_sample_mode" },
+    { 0xBBCF8851u, (uint16_t)offsetof(vesc_mcconf_t, foc_sat_comp_mode), 1, "foc_sat_comp_mode" },
+    { 0x270D2A64u, (uint16_t)offsetof(vesc_mcconf_t, foc_sat_comp), 0, "foc_sat_comp" },
+    { 0xFE87695Au, (uint16_t)offsetof(vesc_mcconf_t, foc_temp_comp), 1, "foc_temp_comp" },
+    { 0xE3E5061Eu, (uint16_t)offsetof(vesc_mcconf_t, foc_temp_comp_base_temp), 0, "foc_temp_comp_base_temp" },
+    { 0x81732CAEu, (uint16_t)offsetof(vesc_mcconf_t, foc_current_filter_const), 0, "foc_current_filter_const" },
+    { 0xDEFB07B3u, (uint16_t)offsetof(vesc_mcconf_t, foc_cc_decoupling), 1, "foc_cc_decoupling" },
+    { 0x097AC12Eu, (uint16_t)offsetof(vesc_mcconf_t, foc_observer_type), 1, "foc_observer_type" },
+    { 0xE76C6592u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_amb_mode), 1, "foc_hfi_amb_mode" },
+    { 0x6F4EAA99u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_amb_current), 0, "foc_hfi_amb_current" },
+    { 0x334CC9B4u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_amb_tres), 0, "foc_hfi_amb_tres" },
+    { 0x9E765B43u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_voltage_start), 0, "foc_hfi_voltage_start" },
+    { 0x948C07A3u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_voltage_run), 0, "foc_hfi_voltage_run" },
+    { 0x598C81EAu, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_voltage_max), 0, "foc_hfi_voltage_max" },
+    { 0x67AC6AE8u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_gain), 0, "foc_hfi_gain" },
+    { 0x44BB4894u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_max_err), 0, "foc_hfi_max_err" },
+    { 0x60B58BD7u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_hyst), 0, "foc_hfi_hyst" },
+    { 0xCA67C53Eu, (uint16_t)offsetof(vesc_mcconf_t, foc_sl_erpm_hfi), 0, "foc_sl_erpm_hfi" },
+    { 0xCC2486D0u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_reset_erpm), 0, "foc_hfi_reset_erpm" },
+    { 0x71D520EFu, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_start_samples), 3, "foc_hfi_start_samples" },
+    { 0x1C6860D7u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_obs_ovr_sec), 0, "foc_hfi_obs_ovr_sec" },
+    { 0x5E5E8712u, (uint16_t)offsetof(vesc_mcconf_t, foc_hfi_samples), 1, "foc_hfi_samples" },
+    { 0xE7B6EA70u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_cal_mode), 1, "foc_offsets_cal_mode" },
+    { 0x615887F0u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_current_0), 0, "foc_offsets_current_0" },
+    { 0x165FB766u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_current_1), 0, "foc_offsets_current_1" },
+    { 0x8F56E6DCu, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_current_2), 0, "foc_offsets_current_2" },
+    { 0x1EA089AEu, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_0), 0, "foc_offsets_voltage_0" },
+    { 0x69A7B938u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_1), 0, "foc_offsets_voltage_1" },
+    { 0xF0AEE882u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_2), 0, "foc_offsets_voltage_2" },
+    { 0x372A41E4u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_undriven_0), 0, "foc_offsets_voltage_undriven_0" },
+    { 0x402D7172u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_undriven_1), 0, "foc_offsets_voltage_undriven_1" },
+    { 0xD92420C8u, (uint16_t)offsetof(vesc_mcconf_t, foc_offsets_voltage_undriven_2), 0, "foc_offsets_voltage_undriven_2" },
+    { 0xECF8730Bu, (uint16_t)offsetof(vesc_mcconf_t, foc_phase_filter_enable), 1, "foc_phase_filter_enable" },
+    { 0xE8BAD793u, (uint16_t)offsetof(vesc_mcconf_t, foc_phase_filter_disable_fault), 1, "foc_phase_filter_disable_fault" },
+    { 0x4BB9DD1Eu, (uint16_t)offsetof(vesc_mcconf_t, foc_phase_filter_max_erpm), 0, "foc_phase_filter_max_erpm" },
+    { 0xDCB6A864u, (uint16_t)offsetof(vesc_mcconf_t, foc_mtpa_mode), 1, "foc_mtpa_mode" },
+    { 0xF329D6F4u, (uint16_t)offsetof(vesc_mcconf_t, foc_fw_current_max), 0, "foc_fw_current_max" },
+    { 0x0A9ADF5Fu, (uint16_t)offsetof(vesc_mcconf_t, foc_fw_duty_start), 0, "foc_fw_duty_start" },
+    { 0xC1364672u, (uint16_t)offsetof(vesc_mcconf_t, foc_fw_ramp_time), 0, "foc_fw_ramp_time" },
+    { 0x754EF1DBu, (uint16_t)offsetof(vesc_mcconf_t, foc_fw_q_current_factor), 0, "foc_fw_q_current_factor" },
+    { 0xC5596695u, (uint16_t)offsetof(vesc_mcconf_t, foc_fw_backoff), 0, "foc_fw_backoff" },
+    { 0xA2038A1Cu, (uint16_t)offsetof(vesc_mcconf_t, foc_speed_soure), 1, "foc_speed_soure" },
+    { 0xC66DF9D2u, (uint16_t)offsetof(vesc_mcconf_t, foc_short_ls_on_zero_duty), 1, "foc_short_ls_on_zero_duty" },
+    { 0x5DB1123Cu, (uint16_t)offsetof(vesc_mcconf_t, foc_overmod_factor), 0, "foc_overmod_factor" },
+    { 0x188FD4CCu, (uint16_t)offsetof(vesc_mcconf_t, foc_mag_vd_max), 0, "foc_mag_vd_max" },
+    { 0x4B60B24Eu, (uint16_t)offsetof(vesc_mcconf_t, sp_pid_loop_rate), 1, "sp_pid_loop_rate" },
+    { 0x08C80230u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_kp), 0, "s_pid_kp" },
+    { 0x6CA3AAF0u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_ki), 0, "s_pid_ki" },
+    { 0x1212D64Du, (uint16_t)offsetof(vesc_mcconf_t, s_pid_kd), 0, "s_pid_kd" },
+    { 0x877C08E3u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_kd_filter), 0, "s_pid_kd_filter" },
+    { 0x89B75B89u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_min_erpm), 0, "s_pid_min_erpm" },
+    { 0xBB51DF83u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_allow_braking), 1, "s_pid_allow_braking" },
+    { 0x943406B9u, (uint16_t)offsetof(vesc_mcconf_t, s_pid_ramp_erpms_s), 0, "s_pid_ramp_erpms_s" },
+    { 0x7B79A93Fu, (uint16_t)offsetof(vesc_mcconf_t, s_pid_speed_source), 1, "s_pid_speed_source" },
+    { 0x864705D3u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_kp), 0, "p_pid_kp" },
+    { 0xE22CAD13u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_ki), 0, "p_pid_ki" },
+    { 0x9C9DD1AEu, (uint16_t)offsetof(vesc_mcconf_t, p_pid_kd), 0, "p_pid_kd" },
+    { 0x0F35E591u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_kd_proc), 0, "p_pid_kd_proc" },
+    { 0x9601629Au, (uint16_t)offsetof(vesc_mcconf_t, p_pid_kd_filter), 0, "p_pid_kd_filter" },
+    { 0x40F24939u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_ang_div), 0, "p_pid_ang_div" },
+    { 0xEC0A1004u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_gain_dec_angle), 0, "p_pid_gain_dec_angle" },
+    { 0xDBA48072u, (uint16_t)offsetof(vesc_mcconf_t, p_pid_offset), 0, "p_pid_offset" },
+    { 0x7E7915C9u, (uint16_t)offsetof(vesc_mcconf_t, cc_startup_boost_duty), 0, "cc_startup_boost_duty" },
+    { 0x335B0474u, (uint16_t)offsetof(vesc_mcconf_t, cc_min_current), 0, "cc_min_current" },
+    { 0xE2C05EF4u, (uint16_t)offsetof(vesc_mcconf_t, cc_gain), 0, "cc_gain" },
+    { 0x1D19E37Bu, (uint16_t)offsetof(vesc_mcconf_t, cc_ramp_step_max), 0, "cc_ramp_step_max" },
+    { 0x8C33D5EAu, (uint16_t)offsetof(vesc_mcconf_t, m_fault_stop_time_ms), 6, "m_fault_stop_time_ms" },
+    { 0x25DE7511u, (uint16_t)offsetof(vesc_mcconf_t, m_duty_ramp_step), 0, "m_duty_ramp_step" },
+    { 0xA5D474C2u, (uint16_t)offsetof(vesc_mcconf_t, m_current_backoff_gain), 0, "m_current_backoff_gain" },
+    { 0x9ACF9042u, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_counts), 5, "m_encoder_counts" },
+    { 0x3AC3695Du, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_sin_amp), 0, "m_encoder_sin_amp" },
+    { 0x133445BDu, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_cos_amp), 0, "m_encoder_cos_amp" },
+    { 0x0C8A83C3u, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_sin_offset), 0, "m_encoder_sin_offset" },
+    { 0xBF805F5Bu, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_cos_offset), 0, "m_encoder_cos_offset" },
+    { 0xFBA80264u, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_sincos_filter_constant), 0, "m_encoder_sincos_filter_constant" },
+    { 0xA62A0594u, (uint16_t)offsetof(vesc_mcconf_t, m_encoder_sincos_phase_correction), 0, "m_encoder_sincos_phase_correction" },
+    { 0x92F7CBFEu, (uint16_t)offsetof(vesc_mcconf_t, m_sensor_port_mode), 1, "m_sensor_port_mode" },
+    { 0xA33E6E19u, (uint16_t)offsetof(vesc_mcconf_t, m_invert_direction), 1, "m_invert_direction" },
+    { 0xB61405BFu, (uint16_t)offsetof(vesc_mcconf_t, m_drv8301_oc_mode), 1, "m_drv8301_oc_mode" },
+    { 0x7014FFD4u, (uint16_t)offsetof(vesc_mcconf_t, m_drv8301_oc_adj), 0, "m_drv8301_oc_adj" },
+    { 0xE4B47975u, (uint16_t)offsetof(vesc_mcconf_t, m_bldc_f_sw_min), 0, "m_bldc_f_sw_min" },
+    { 0xD8B9462Cu, (uint16_t)offsetof(vesc_mcconf_t, m_bldc_f_sw_max), 0, "m_bldc_f_sw_max" },
+    { 0x3F27D1D7u, (uint16_t)offsetof(vesc_mcconf_t, m_dc_f_sw), 0, "m_dc_f_sw" },
+    { 0x2F7BB5F9u, (uint16_t)offsetof(vesc_mcconf_t, m_ntc_motor_beta), 0, "m_ntc_motor_beta" },
+    { 0x0A31D2D4u, (uint16_t)offsetof(vesc_mcconf_t, m_out_aux_mode), 1, "m_out_aux_mode" },
+    { 0x5F0813E1u, (uint16_t)offsetof(vesc_mcconf_t, m_motor_temp_sens_type), 1, "m_motor_temp_sens_type" },
+    { 0x1BF40B83u, (uint16_t)offsetof(vesc_mcconf_t, m_ptc_motor_coeff), 0, "m_ptc_motor_coeff" },
+    { 0xAC4E3308u, (uint16_t)offsetof(vesc_mcconf_t, m_ntcx_ptcx_res), 0, "m_ntcx_ptcx_res" },
+    { 0x04D3802Du, (uint16_t)offsetof(vesc_mcconf_t, m_ntcx_ptcx_temp_base), 0, "m_ntcx_ptcx_temp_base" },
+    { 0xA9860DF4u, (uint16_t)offsetof(vesc_mcconf_t, m_hall_extra_samples), 0, "m_hall_extra_samples" },
+    { 0xBDB5A009u, (uint16_t)offsetof(vesc_mcconf_t, m_batt_filter_const), 0, "m_batt_filter_const" },
+    { 0x13E7AF04u, (uint16_t)offsetof(vesc_mcconf_t, si_motor_poles), 0, "si_motor_poles" },
+    { 0xD3146636u, (uint16_t)offsetof(vesc_mcconf_t, si_gear_ratio), 0, "si_gear_ratio" },
+    { 0xFDFE1B0Au, (uint16_t)offsetof(vesc_mcconf_t, si_wheel_diameter), 0, "si_wheel_diameter" },
+    { 0x1355CEB0u, (uint16_t)offsetof(vesc_mcconf_t, si_battery_type), 1, "si_battery_type" },
+    { 0xDC8D6BA1u, (uint16_t)offsetof(vesc_mcconf_t, si_battery_cells), 0, "si_battery_cells" },
+    { 0x6DB31B1Au, (uint16_t)offsetof(vesc_mcconf_t, si_battery_ah), 0, "si_battery_ah" },
+    { 0xF5E7F161u, (uint16_t)offsetof(vesc_mcconf_t, si_motor_nl_current), 0, "si_motor_nl_current" },
+    { 0x87E2FACAu, (uint16_t)offsetof(vesc_mcconf_t, bms_type), 1, "bms_type" },
+    { 0xBFE012A2u, (uint16_t)offsetof(vesc_mcconf_t, bms_limit_mode), 1, "bms_limit_mode" },
+    { 0xA531FFD5u, (uint16_t)offsetof(vesc_mcconf_t, bms_t_limit_start), 0, "bms_t_limit_start" },
+    { 0x999128ABu, (uint16_t)offsetof(vesc_mcconf_t, bms_t_limit_end), 0, "bms_t_limit_end" },
+    { 0x39638AF9u, (uint16_t)offsetof(vesc_mcconf_t, bms_soc_limit_start), 0, "bms_soc_limit_start" },
+    { 0x34BAF114u, (uint16_t)offsetof(vesc_mcconf_t, bms_soc_limit_end), 0, "bms_soc_limit_end" },
+    { 0x1A65052Fu, (uint16_t)offsetof(vesc_mcconf_t, bms_vmin_limit_start), 0, "bms_vmin_limit_start" },
+    { 0xBC3CC5B8u, (uint16_t)offsetof(vesc_mcconf_t, bms_vmin_limit_end), 0, "bms_vmin_limit_end" },
+    { 0x3DDE621Eu, (uint16_t)offsetof(vesc_mcconf_t, bms_vmax_limit_start), 0, "bms_vmax_limit_start" },
+    { 0xFC73BDCEu, (uint16_t)offsetof(vesc_mcconf_t, bms_vmax_limit_end), 0, "bms_vmax_limit_end" },
+    { 0x7C994A3Fu, (uint16_t)offsetof(vesc_mcconf_t, bms_fwd_can_mode), 1, "bms_fwd_can_mode" },
+    { 0x2CA3D0EFu, (uint16_t)offsetof(vesc_mcconf_t, foc_motor_kind), 1, "foc_motor_kind" },
+    { 0x7986BEE5u, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_lm), 0, "foc_acim_lm" },
+    { 0xF48EB310u, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_lr), 0, "foc_acim_lr" },
+    { 0x20CF8CCFu, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_rr), 0, "foc_acim_rr" },
+    { 0x04F14AA0u, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_im), 0, "foc_acim_im" },
+    { 0x2383936Bu, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_base_erpm), 0, "foc_acim_base_erpm" },
+    { 0xB0F71F09u, (uint16_t)offsetof(vesc_mcconf_t, foc_resc_cc_bw), 0, "foc_resc_cc_bw" },
+    { 0x0C180EA3u, (uint16_t)offsetof(vesc_mcconf_t, foc_resc_rl_frac), 0, "foc_resc_rl_frac" },
+};
+const uint16_t vesc_mcconf_nfields = 210;
+
+int32_t vesc700_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
 {
     int32_t i = 0;
-    vb_put_u32(buf, VESC_APPCONF_SIGNATURE, &i);
+    vb_put_u32(buf, VESC700_APPCONF_SIGNATURE, &i);
     buf[i++] = (uint8_t)c->controller_id;
     vb_put_u32(buf, c->timeout_msec, &i);
     vb_put_f32_auto(buf, c->timeout_brake_current, &i);
@@ -756,11 +1330,11 @@ int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     return i;
 }
 
-bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
+bool vesc700_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
 {
     int32_t i = 0;
-    if (len < VESC_APPCONF_SER_MAX) return false;
-    if (vb_get_u32(buf, &i) != VESC_APPCONF_SIGNATURE) return false;
+    if (len < 284) return false;
+    if (vb_get_u32(buf, &i) != VESC700_APPCONF_SIGNATURE) return false;
     c->controller_id = (float)buf[i++];
     c->timeout_msec = vb_get_u32(buf, &i);
     c->timeout_brake_current = vb_get_f32_auto(buf, &i);
@@ -885,6 +1459,189 @@ bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c
     return true;
 }
 
+int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
+{
+    int32_t i = 0;
+    vb_put_u32(buf, RESCP_APPCONF_SIGNATURE, &i);
+    buf[i++] = (uint8_t)c->controller_id;
+    vb_put_u32(buf, c->timeout_msec, &i);
+    vb_put_f32_auto(buf, c->timeout_brake_current, &i);
+    vb_put_u16(buf, c->can_status_rate_1, &i);
+    vb_put_u16(buf, c->can_status_rate_2, &i);
+    buf[i++] = (uint8_t)c->can_status_msgs_r1;
+    buf[i++] = (uint8_t)c->can_status_msgs_r2;
+    buf[i++] = (uint8_t)c->can_baud_rate;
+    buf[i++] = (uint8_t)c->shutdown_mode;
+    buf[i++] = (uint8_t)c->kill_sw_mode;
+    buf[i++] = (uint8_t)c->app_to_use;
+    buf[i++] = (uint8_t)c->app_ppm_conf_ctrl_type;
+    vb_put_f32_auto(buf, c->app_ppm_conf_pid_max_erpm, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_hyst, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_pulse_start, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_pulse_end, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_pulse_center, &i);
+    buf[i++] = (uint8_t)c->app_ppm_conf_median_filter;
+    buf[i++] = (uint8_t)c->app_ppm_conf_safe_start;
+    vb_put_f32_auto(buf, c->app_ppm_conf_throttle_exp, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_throttle_exp_brake, &i);
+    buf[i++] = (uint8_t)c->app_ppm_conf_throttle_exp_mode;
+    vb_put_f32_auto(buf, c->app_ppm_conf_ramp_time_pos, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_ramp_time_neg, &i);
+    buf[i++] = (uint8_t)c->app_ppm_conf_multi_esc;
+    buf[i++] = (uint8_t)c->app_ppm_conf_tc;
+    vb_put_f32_auto(buf, c->app_ppm_conf_tc_max_diff, &i);
+    vb_put_f16(buf, c->app_ppm_conf_max_erpm_for_dir, 1, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_smart_rev_max_duty, &i);
+    vb_put_f32_auto(buf, c->app_ppm_conf_smart_rev_ramp_time, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_ctrl_type;
+    vb_put_f32_auto(buf, c->app_adc_conf_hyst, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage_start, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage_end, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage_min, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage_max, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage_center, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage2_start, 1000, &i);
+    vb_put_f16(buf, c->app_adc_conf_voltage2_end, 1000, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_use_filter;
+    buf[i++] = (uint8_t)c->app_adc_conf_safe_start;
+    buf[i++] = (uint8_t)c->app_adc_conf_buttons;
+    buf[i++] = (uint8_t)c->app_adc_conf_voltage_inverted;
+    buf[i++] = (uint8_t)c->app_adc_conf_voltage2_inverted;
+    vb_put_f32_auto(buf, c->app_adc_conf_throttle_exp, &i);
+    vb_put_f32_auto(buf, c->app_adc_conf_throttle_exp_brake, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_throttle_exp_mode;
+    vb_put_f32_auto(buf, c->app_adc_conf_ramp_time_pos, &i);
+    vb_put_f32_auto(buf, c->app_adc_conf_ramp_time_neg, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_multi_esc;
+    buf[i++] = (uint8_t)c->app_adc_conf_tc;
+    vb_put_f32_auto(buf, c->app_adc_conf_tc_max_diff, &i);
+    vb_put_u16(buf, c->app_adc_conf_update_rate_hz, &i);
+    vb_put_u32(buf, c->app_uart_baudrate, &i);
+    buf[i++] = (uint8_t)c->app_chuk_conf_ctrl_type;
+    vb_put_f32_auto(buf, c->app_chuk_conf_hyst, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_ramp_time_pos, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_ramp_time_neg, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_stick_erpm_per_s_in_cc, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_throttle_exp, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_throttle_exp_brake, &i);
+    buf[i++] = (uint8_t)c->app_chuk_conf_throttle_exp_mode;
+    buf[i++] = (uint8_t)c->app_chuk_conf_multi_esc;
+    buf[i++] = (uint8_t)c->app_chuk_conf_tc;
+    vb_put_f32_auto(buf, c->app_chuk_conf_tc_max_diff, &i);
+    buf[i++] = (uint8_t)c->app_chuk_conf_use_smart_rev;
+    vb_put_f32_auto(buf, c->app_chuk_conf_smart_rev_max_duty, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_smart_rev_ramp_time, &i);
+    vb_put_f16(buf, c->app_chuk_conf_coast_brake_level, 1000, &i);
+    vb_put_f32_auto(buf, c->app_chuk_conf_coast_brake_ramp_time, &i);
+    buf[i++] = (uint8_t)c->app_pas_conf_ctrl_type;
+    vb_put_f16(buf, c->app_pas_conf_current_scaling, 1000, &i);
+    vb_put_f16(buf, c->app_pas_conf_pedal_rpm_start, 10, &i);
+    vb_put_f16(buf, c->app_pas_conf_pedal_rpm_end, 10, &i);
+    buf[i++] = (uint8_t)c->app_pas_conf_invert_pedal_direction;
+    vb_put_u16(buf, c->app_pas_conf_magnets, &i);
+    buf[i++] = (uint8_t)c->app_pas_conf_use_filter;
+    vb_put_f16(buf, c->app_pas_conf_ramp_time_pos, 100, &i);
+    vb_put_f16(buf, c->app_pas_conf_ramp_time_neg, 100, &i);
+    vb_put_u16(buf, c->app_pas_conf_update_rate_hz, &i);
+    return i;
+}
+
+bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
+{
+    int32_t i = 0;
+    if (len < 196) return false;
+    if (vb_get_u32(buf, &i) != RESCP_APPCONF_SIGNATURE) return false;
+    c->controller_id = (float)buf[i++];
+    c->timeout_msec = vb_get_u32(buf, &i);
+    c->timeout_brake_current = vb_get_f32_auto(buf, &i);
+    c->can_status_rate_1 = vb_get_u16(buf, &i);
+    c->can_status_rate_2 = vb_get_u16(buf, &i);
+    c->can_status_msgs_r1 = (uint8_t)buf[i++];
+    c->can_status_msgs_r2 = (uint8_t)buf[i++];
+    c->can_baud_rate = (uint8_t)buf[i++];
+    c->shutdown_mode = (uint8_t)buf[i++];
+    c->kill_sw_mode = (uint8_t)buf[i++];
+    c->app_to_use = (uint8_t)buf[i++];
+    c->app_ppm_conf_ctrl_type = (uint8_t)buf[i++];
+    c->app_ppm_conf_pid_max_erpm = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_hyst = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_pulse_start = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_pulse_end = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_pulse_center = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_median_filter = (uint8_t)buf[i++];
+    c->app_ppm_conf_safe_start = (uint8_t)buf[i++];
+    c->app_ppm_conf_throttle_exp = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_throttle_exp_brake = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_throttle_exp_mode = (uint8_t)buf[i++];
+    c->app_ppm_conf_ramp_time_pos = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_ramp_time_neg = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_multi_esc = (uint8_t)buf[i++];
+    c->app_ppm_conf_tc = (uint8_t)buf[i++];
+    c->app_ppm_conf_tc_max_diff = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_max_erpm_for_dir = vb_get_f16(buf, 1, &i);
+    c->app_ppm_conf_smart_rev_max_duty = vb_get_f32_auto(buf, &i);
+    c->app_ppm_conf_smart_rev_ramp_time = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_ctrl_type = (uint8_t)buf[i++];
+    c->app_adc_conf_hyst = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_voltage_start = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage_end = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage_min = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage_max = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage_center = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage2_start = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_voltage2_end = vb_get_f16(buf, 1000, &i);
+    c->app_adc_conf_use_filter = (uint8_t)buf[i++];
+    c->app_adc_conf_safe_start = (uint8_t)buf[i++];
+    c->app_adc_conf_buttons = (uint8_t)buf[i++];
+    c->app_adc_conf_voltage_inverted = (uint8_t)buf[i++];
+    c->app_adc_conf_voltage2_inverted = (uint8_t)buf[i++];
+    c->app_adc_conf_throttle_exp = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_throttle_exp_brake = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_throttle_exp_mode = (uint8_t)buf[i++];
+    c->app_adc_conf_ramp_time_pos = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_ramp_time_neg = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_multi_esc = (uint8_t)buf[i++];
+    c->app_adc_conf_tc = (uint8_t)buf[i++];
+    c->app_adc_conf_tc_max_diff = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_update_rate_hz = vb_get_u16(buf, &i);
+    c->app_uart_baudrate = vb_get_u32(buf, &i);
+    c->app_chuk_conf_ctrl_type = (uint8_t)buf[i++];
+    c->app_chuk_conf_hyst = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_ramp_time_pos = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_ramp_time_neg = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_stick_erpm_per_s_in_cc = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_throttle_exp = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_throttle_exp_brake = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_throttle_exp_mode = (uint8_t)buf[i++];
+    c->app_chuk_conf_multi_esc = (uint8_t)buf[i++];
+    c->app_chuk_conf_tc = (uint8_t)buf[i++];
+    c->app_chuk_conf_tc_max_diff = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_use_smart_rev = (uint8_t)buf[i++];
+    c->app_chuk_conf_smart_rev_max_duty = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_smart_rev_ramp_time = vb_get_f32_auto(buf, &i);
+    c->app_chuk_conf_coast_brake_level = vb_get_f16(buf, 1000, &i);
+    c->app_chuk_conf_coast_brake_ramp_time = vb_get_f32_auto(buf, &i);
+    c->app_pas_conf_ctrl_type = (uint8_t)buf[i++];
+    c->app_pas_conf_current_scaling = vb_get_f16(buf, 1000, &i);
+    c->app_pas_conf_pedal_rpm_start = vb_get_f16(buf, 10, &i);
+    c->app_pas_conf_pedal_rpm_end = vb_get_f16(buf, 10, &i);
+    c->app_pas_conf_invert_pedal_direction = (uint8_t)buf[i++];
+    c->app_pas_conf_magnets = vb_get_u16(buf, &i);
+    c->app_pas_conf_use_filter = (uint8_t)buf[i++];
+    c->app_pas_conf_ramp_time_pos = vb_get_f16(buf, 100, &i);
+    c->app_pas_conf_ramp_time_neg = vb_get_f16(buf, 100, &i);
+    c->app_pas_conf_update_rate_hz = vb_get_u16(buf, &i);
+    return true;
+}
+
+#ifdef RESC_CONF_PROFILE_RESC
+int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c) { return rescp_appconf_serialize(buf, c); }
+bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c) { return rescp_appconf_deserialize(buf, len, c); }
+#else
+int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c) { return vesc700_appconf_serialize(buf, c); }
+bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c) { return vesc700_appconf_deserialize(buf, len, c); }
+#endif
+
 void vesc_appconf_defaults(vesc_appconf_t *c)
 {
     c->controller_id = HW_DEFAULT_ID;
@@ -1008,5 +1765,133 @@ void vesc_appconf_defaults(vesc_appconf_t *c)
     c->imu_conf_gyro_offsets_0 = APPCONF_IMU_G_OFFSET_0;
     c->imu_conf_gyro_offsets_1 = APPCONF_IMU_G_OFFSET_1;
     c->imu_conf_gyro_offsets_2 = APPCONF_IMU_G_OFFSET_2;
+#ifdef RESC_CONF_PROFILE_RESC
+    /* defauts propres au profil RESC (valeurs du XML RESC) */
+#endif
 }
+
+const conf_field_t vesc_appconf_fields[] = {
+    { 0xF6D1A74Bu, (uint16_t)offsetof(vesc_appconf_t, controller_id), 0, "controller_id" },
+    { 0x8B4C93F3u, (uint16_t)offsetof(vesc_appconf_t, timeout_msec), 5, "timeout_msec" },
+    { 0xDB17C72Du, (uint16_t)offsetof(vesc_appconf_t, timeout_brake_current), 0, "timeout_brake_current" },
+    { 0x87930126u, (uint16_t)offsetof(vesc_appconf_t, can_status_rate_1), 3, "can_status_rate_1" },
+    { 0x1E9A509Cu, (uint16_t)offsetof(vesc_appconf_t, can_status_rate_2), 3, "can_status_rate_2" },
+    { 0x07B84F2Bu, (uint16_t)offsetof(vesc_appconf_t, can_status_msgs_r1), 1, "can_status_msgs_r1" },
+    { 0x9EB11E91u, (uint16_t)offsetof(vesc_appconf_t, can_status_msgs_r2), 1, "can_status_msgs_r2" },
+    { 0x420DB376u, (uint16_t)offsetof(vesc_appconf_t, can_baud_rate), 1, "can_baud_rate" },
+    { 0xB7941EEDu, (uint16_t)offsetof(vesc_appconf_t, pairing_done), 1, "pairing_done" },
+    { 0xCC497DDAu, (uint16_t)offsetof(vesc_appconf_t, permanent_uart_enabled), 1, "permanent_uart_enabled" },
+    { 0x497BB5F0u, (uint16_t)offsetof(vesc_appconf_t, shutdown_mode), 1, "shutdown_mode" },
+    { 0x28B491E7u, (uint16_t)offsetof(vesc_appconf_t, can_mode), 1, "can_mode" },
+    { 0xDF639B70u, (uint16_t)offsetof(vesc_appconf_t, uavcan_esc_index), 0, "uavcan_esc_index" },
+    { 0x9CC6CBCAu, (uint16_t)offsetof(vesc_appconf_t, uavcan_raw_mode), 1, "uavcan_raw_mode" },
+    { 0xAAD77E5Eu, (uint16_t)offsetof(vesc_appconf_t, uavcan_raw_rpm_max), 0, "uavcan_raw_rpm_max" },
+    { 0x4F57779Fu, (uint16_t)offsetof(vesc_appconf_t, uavcan_status_current_mode), 1, "uavcan_status_current_mode" },
+    { 0xEE010F3Eu, (uint16_t)offsetof(vesc_appconf_t, servo_out_enable), 1, "servo_out_enable" },
+    { 0x336CE692u, (uint16_t)offsetof(vesc_appconf_t, kill_sw_mode), 1, "kill_sw_mode" },
+    { 0x278E69C5u, (uint16_t)offsetof(vesc_appconf_t, app_to_use), 1, "app_to_use" },
+    { 0xF602D149u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_ctrl_type), 1, "app_ppm_conf_ctrl_type" },
+    { 0xE4451595u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_pid_max_erpm), 0, "app_ppm_conf_pid_max_erpm" },
+    { 0xFD621F14u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_hyst), 0, "app_ppm_conf_hyst" },
+    { 0x613B07F1u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_pulse_start), 0, "app_ppm_conf_pulse_start" },
+    { 0x405C25FBu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_pulse_end), 0, "app_ppm_conf_pulse_end" },
+    { 0xF7B3F54Du, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_pulse_center), 0, "app_ppm_conf_pulse_center" },
+    { 0xD3D9FBAFu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_median_filter), 1, "app_ppm_conf_median_filter" },
+    { 0x7E211485u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_safe_start), 1, "app_ppm_conf_safe_start" },
+    { 0x2AA8F275u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_throttle_exp), 0, "app_ppm_conf_throttle_exp" },
+    { 0x4804BC84u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_throttle_exp_brake), 0, "app_ppm_conf_throttle_exp_brake" },
+    { 0x6FB246D3u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_throttle_exp_mode), 1, "app_ppm_conf_throttle_exp_mode" },
+    { 0xE42DBB1Eu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_ramp_time_pos), 0, "app_ppm_conf_ramp_time_pos" },
+    { 0x12A00993u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_ramp_time_neg), 0, "app_ppm_conf_ramp_time_neg" },
+    { 0xA42EA4DBu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_multi_esc), 1, "app_ppm_conf_multi_esc" },
+    { 0x9898A83Bu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_tc), 1, "app_ppm_conf_tc" },
+    { 0xEC152970u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_tc_max_diff), 0, "app_ppm_conf_tc_max_diff" },
+    { 0x94DDA826u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_max_erpm_for_dir), 0, "app_ppm_conf_max_erpm_for_dir" },
+    { 0x92222513u, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_smart_rev_max_duty), 0, "app_ppm_conf_smart_rev_max_duty" },
+    { 0x8F8E990Fu, (uint16_t)offsetof(vesc_appconf_t, app_ppm_conf_smart_rev_ramp_time), 0, "app_ppm_conf_smart_rev_ramp_time" },
+    { 0x732873A9u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_ctrl_type), 1, "app_adc_conf_ctrl_type" },
+    { 0xC99B9DCEu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_hyst), 0, "app_adc_conf_hyst" },
+    { 0x85509522u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_start), 0, "app_adc_conf_voltage_start" },
+    { 0xAD5D6FA3u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_end), 0, "app_adc_conf_voltage_end" },
+    { 0x0CDA41C2u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_min), 0, "app_adc_conf_voltage_min" },
+    { 0x30D77E9Bu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_max), 0, "app_adc_conf_voltage_max" },
+    { 0xE88D1DB1u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_center), 0, "app_adc_conf_voltage_center" },
+    { 0x575D62A3u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage2_start), 0, "app_adc_conf_voltage2_start" },
+    { 0xDF2149A3u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage2_end), 0, "app_adc_conf_voltage2_end" },
+    { 0xB99FDD1Eu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_use_filter), 1, "app_adc_conf_use_filter" },
+    { 0xDEAEDC5Fu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_safe_start), 1, "app_adc_conf_safe_start" },
+    { 0xD729759Du, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_buttons), 1, "app_adc_conf_buttons" },
+    { 0x65D55693u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage_inverted), 1, "app_adc_conf_voltage_inverted" },
+    { 0xA06E2C31u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_voltage2_inverted), 1, "app_adc_conf_voltage2_inverted" },
+    { 0xC4C035EDu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_throttle_exp), 0, "app_adc_conf_throttle_exp" },
+    { 0xBFEA3E27u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_throttle_exp_brake), 0, "app_adc_conf_throttle_exp_brake" },
+    { 0xE367B847u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_throttle_exp_mode), 1, "app_adc_conf_throttle_exp_mode" },
+    { 0x1A17C8AFu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_ramp_time_pos), 0, "app_adc_conf_ramp_time_pos" },
+    { 0xEC9A7A22u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_ramp_time_neg), 0, "app_adc_conf_ramp_time_neg" },
+    { 0x2104063Bu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_multi_esc), 1, "app_adc_conf_multi_esc" },
+    { 0x11674930u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_tc), 1, "app_adc_conf_tc" },
+    { 0x8AB39D72u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_tc_max_diff), 0, "app_adc_conf_tc_max_diff" },
+    { 0xC304E777u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_update_rate_hz), 3, "app_adc_conf_update_rate_hz" },
+    { 0x03D899E4u, (uint16_t)offsetof(vesc_appconf_t, app_uart_baudrate), 5, "app_uart_baudrate" },
+    { 0x23A99F3Fu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_ctrl_type), 1, "app_chuk_conf_ctrl_type" },
+    { 0x0884ED15u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_hyst), 0, "app_chuk_conf_hyst" },
+    { 0x6B37A7EDu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_ramp_time_pos), 0, "app_chuk_conf_ramp_time_pos" },
+    { 0x9DBA1560u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_ramp_time_neg), 0, "app_chuk_conf_ramp_time_neg" },
+    { 0xC1C1C401u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_stick_erpm_per_s_in_cc), 0, "app_chuk_conf_stick_erpm_per_s_in_cc" },
+    { 0x552AFEA9u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_throttle_exp), 0, "app_chuk_conf_throttle_exp" },
+    { 0xF0F5DC0Cu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_throttle_exp_brake), 0, "app_chuk_conf_throttle_exp_brake" },
+    { 0x2377C1E4u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_throttle_exp_mode), 1, "app_chuk_conf_throttle_exp_mode" },
+    { 0x7185EAADu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_multi_esc), 1, "app_chuk_conf_multi_esc" },
+    { 0xCD6BCA3Du, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_tc), 1, "app_chuk_conf_tc" },
+    { 0x04144E3Cu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_tc_max_diff), 0, "app_chuk_conf_tc_max_diff" },
+    { 0xE02DB809u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_use_smart_rev), 1, "app_chuk_conf_use_smart_rev" },
+    { 0x2AD3459Bu, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_smart_rev_max_duty), 0, "app_chuk_conf_smart_rev_max_duty" },
+    { 0x6C55637Du, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_smart_rev_ramp_time), 0, "app_chuk_conf_smart_rev_ramp_time" },
+    { 0x5D3DF28Du, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_coast_brake_level), 0, "app_chuk_conf_coast_brake_level" },
+    { 0x89DE3AB9u, (uint16_t)offsetof(vesc_appconf_t, app_chuk_conf_coast_brake_ramp_time), 0, "app_chuk_conf_coast_brake_ramp_time" },
+    { 0x1F5791CCu, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_speed), 1, "app_nrf_conf_speed" },
+    { 0xBBFB6E9Au, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_power), 1, "app_nrf_conf_power" },
+    { 0x3593427Cu, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_crc_type), 1, "app_nrf_conf_crc_type" },
+    { 0x388B695Cu, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_retry_delay), 1, "app_nrf_conf_retry_delay" },
+    { 0x1DE25387u, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_retries), 0, "app_nrf_conf_retries" },
+    { 0x5A5D3C86u, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_channel), 0, "app_nrf_conf_channel" },
+    { 0x5238774Eu, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_address_0), 0, "app_nrf_conf_address_0" },
+    { 0x253F47D8u, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_address_1), 0, "app_nrf_conf_address_1" },
+    { 0xBC361662u, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_address_2), 0, "app_nrf_conf_address_2" },
+    { 0x46D2BA1Bu, (uint16_t)offsetof(vesc_appconf_t, app_nrf_conf_send_crc_ack), 1, "app_nrf_conf_send_crc_ack" },
+    { 0xA0504B42u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_ctrl_type), 1, "app_pas_conf_ctrl_type" },
+    { 0x536F0646u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_sensor_type), 1, "app_pas_conf_sensor_type" },
+    { 0xAD10FBE5u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_current_scaling), 0, "app_pas_conf_current_scaling" },
+    { 0xF9E77CABu, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_pedal_rpm_start), 0, "app_pas_conf_pedal_rpm_start" },
+    { 0xC03255F3u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_pedal_rpm_end), 0, "app_pas_conf_pedal_rpm_end" },
+    { 0x92B1CC40u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_invert_pedal_direction), 1, "app_pas_conf_invert_pedal_direction" },
+    { 0x01024DB5u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_magnets), 3, "app_pas_conf_magnets" },
+    { 0x8E949ED6u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_use_filter), 1, "app_pas_conf_use_filter" },
+    { 0xC92DCA2Eu, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_ramp_time_pos), 0, "app_pas_conf_ramp_time_pos" },
+    { 0x3FA078A3u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_ramp_time_neg), 0, "app_pas_conf_ramp_time_neg" },
+    { 0x59686EC3u, (uint16_t)offsetof(vesc_appconf_t, app_pas_conf_update_rate_hz), 3, "app_pas_conf_update_rate_hz" },
+    { 0x895DDC00u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_type), 1, "imu_conf_type" },
+    { 0x9249CC82u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_mode), 1, "imu_conf_mode" },
+    { 0x41E89FDDu, (uint16_t)offsetof(vesc_appconf_t, imu_conf_filter), 1, "imu_conf_filter" },
+    { 0x3185F13Cu, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_lowpass_filter_x), 0, "imu_conf_accel_lowpass_filter_x" },
+    { 0x4682C1AAu, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_lowpass_filter_y), 0, "imu_conf_accel_lowpass_filter_y" },
+    { 0xDF8B9010u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_lowpass_filter_z), 0, "imu_conf_accel_lowpass_filter_z" },
+    { 0x4F084E06u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_lowpass_filter), 0, "imu_conf_gyro_lowpass_filter" },
+    { 0x9703453Du, (uint16_t)offsetof(vesc_appconf_t, imu_conf_sample_rate_hz), 3, "imu_conf_sample_rate_hz" },
+    { 0x8F4C4F8Au, (uint16_t)offsetof(vesc_appconf_t, imu_conf_use_magnetometer), 1, "imu_conf_use_magnetometer" },
+    { 0xB73ACA98u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_confidence_decay), 0, "imu_conf_accel_confidence_decay" },
+    { 0xFFCBCC41u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_mahony_kp), 0, "imu_conf_mahony_kp" },
+    { 0x9BA06481u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_mahony_ki), 0, "imu_conf_mahony_ki" },
+    { 0x78C7D5D6u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_madgwick_beta), 0, "imu_conf_madgwick_beta" },
+    { 0x8336A445u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_rot_roll), 0, "imu_conf_rot_roll" },
+    { 0x5D5867E7u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_rot_pitch), 0, "imu_conf_rot_pitch" },
+    { 0xF2F8F9DEu, (uint16_t)offsetof(vesc_appconf_t, imu_conf_rot_yaw), 0, "imu_conf_rot_yaw" },
+    { 0x31F3BBD7u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_offsets_0), 0, "imu_conf_accel_offsets_0" },
+    { 0x46F48B41u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_offsets_1), 0, "imu_conf_accel_offsets_1" },
+    { 0xDFFDDAFBu, (uint16_t)offsetof(vesc_appconf_t, imu_conf_accel_offsets_2), 0, "imu_conf_accel_offsets_2" },
+    { 0x96001835u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_0), 0, "imu_conf_gyro_offsets_0" },
+    { 0xE10728A3u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_1), 0, "imu_conf_gyro_offsets_1" },
+    { 0x780E7919u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_2), 0, "imu_conf_gyro_offsets_2" },
+};
+const uint16_t vesc_appconf_nfields = 121;
 

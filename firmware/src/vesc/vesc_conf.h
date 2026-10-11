@@ -1,11 +1,21 @@
-/* GENERE par tools/vesc_compat/gen_conf.py depuis bldc release_7_00 - ne pas editer. */
+/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */
 #ifndef VESC_CONF_H
 #define VESC_CONF_H
+
 #include <stdint.h>
 #include <stdbool.h>
 
-#define VESC_MCCONF_SIGNATURE   1470992211u
-#define VESC_APPCONF_SIGNATURE  2384027283u
+/* Champ de configuration : crc32 du nom, decalage, type (0 float, 1 u8, 2 i8, 3 u16, 4 i16, 5 u32, 6 i32) */
+typedef struct {
+    uint32_t hash;
+    uint16_t offset;
+    uint8_t  ctype;
+    const char *name;
+} conf_field_t;
+
+/* Profils de configuration : VESC700 (defaut, VESC Tool officiel) ou RESC (RESC Tool).
+ * Les structures internes contiennent les champs des deux profils ; chaque profil
+ * ne serialise que les siens. Les champs hors profil gardent leur valeur interne. */
 
 typedef struct {
     uint8_t   pwm_mode;
@@ -210,12 +220,36 @@ typedef struct {
     float     bms_vmax_limit_start;
     float     bms_vmax_limit_end;
     uint8_t   bms_fwd_can_mode;
+    uint8_t   foc_motor_kind;
+    float     foc_acim_lm;
+    float     foc_acim_lr;
+    float     foc_acim_rr;
+    float     foc_acim_im;
+    float     foc_acim_base_erpm;
+    float     foc_resc_cc_bw;
+    float     foc_resc_rl_frac;
 } vesc_mcconf_t;
 
+#define VESC700_MCCONF_SIGNATURE 1470992211u
+#define RESCP_MCCONF_SIGNATURE   412248605u
+#define VESC700_MCCONF_SER_SIZE 488
+#define RESCP_MCCONF_SER_SIZE   381
+#ifdef RESC_CONF_PROFILE_RESC
+#define VESC_MCCONF_SIGNATURE RESCP_MCCONF_SIGNATURE
+#else
+#define VESC_MCCONF_SIGNATURE VESC700_MCCONF_SIGNATURE
+#endif
+#define VESC_MCCONF_SER_MAX 488
+
+int32_t vesc700_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c);
+bool    vesc700_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c);
+int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c);
+bool    rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c);
 int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c);
 bool    vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c);
 void    vesc_mcconf_defaults(vesc_mcconf_t *c);
-#define VESC_MCCONF_SER_MAX  488
+extern const conf_field_t vesc_mcconf_fields[];
+extern const uint16_t vesc_mcconf_nfields;
 
 typedef struct {
     float     controller_id;
@@ -341,9 +375,29 @@ typedef struct {
     float     imu_conf_gyro_offsets_2;
 } vesc_appconf_t;
 
+#define VESC700_APPCONF_SIGNATURE 2384027283u
+#define RESCP_APPCONF_SIGNATURE   3198912063u
+#define VESC700_APPCONF_SER_SIZE 284
+#define RESCP_APPCONF_SER_SIZE   196
+#ifdef RESC_CONF_PROFILE_RESC
+#define VESC_APPCONF_SIGNATURE RESCP_APPCONF_SIGNATURE
+#else
+#define VESC_APPCONF_SIGNATURE VESC700_APPCONF_SIGNATURE
+#endif
+#define VESC_APPCONF_SER_MAX 284
+
+int32_t vesc700_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c);
+bool    vesc700_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c);
+int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c);
+bool    rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c);
 int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c);
 bool    vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c);
 void    vesc_appconf_defaults(vesc_appconf_t *c);
-#define VESC_APPCONF_SER_MAX  284
+extern const conf_field_t vesc_appconf_fields[];
+extern const uint16_t vesc_appconf_nfields;
+
+/* XML compresses du profil compile (commande 250) : u32 taille XML + flux zlib */
+extern const uint8_t conf_xml_mc[], conf_xml_app[];
+extern const uint32_t conf_xml_mc_len, conf_xml_app_len;
 
 #endif

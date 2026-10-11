@@ -15,6 +15,7 @@
 #include "systime.h"
 #include "wdg.h"
 #include "board.h"
+#include "apps.h"
 #include "flash.h"
 
 #define P commands_printf
@@ -51,6 +52,8 @@ static void cmd_status(void)
       (double)t->id, (double)t->iq, (double)s->i_in);
     P("T_FET=%.1f C  T_mot=%.1f C  flux=%.2f  limitation=%.2f  moteur %s", (double)s->tfet, (double)s->tmot,
       (double)t->flux_ratio, (double)s->i_scale_lim, resc_motor_configured() ? "identifie" : "NON IDENTIFIE");
+    static const char *const ld[4] = { "vide (defauts)", "OK", "MIGREE depuis l'ancien format", "ILLISIBLE (defauts)" };
+    P("Configuration en flash : moteur %s, application %s", ld[resc_conf_load_status(false)], ld[resc_conf_load_status(true)]);
 }
 
 static void cmd_rt(void)
@@ -76,84 +79,71 @@ static void cmd_conf(void)
       (double)(p->st_omega * 60.0f / 6.2831853f), (double)p->st_t_ramp, (double)p->vbus_trip_min, (double)p->vbus_trip_max);
 }
 
-/* ------------------------------------------------ parametres accessibles au terminal */
-typedef struct { const char *name; float *f; uint8_t *u8; uint32_t *u32; const char *unit; } param_t;
+/* ------------------------------------------------ parametres accessibles au terminal
+ * Tous les champs de configuration (moteur puis application), par leur nom C :
+ * nom du XML avec '.' et '__' remplaces par '_' (ex. app_ppm_conf_ctrl_type).
+ * 'list' : parametres principaux ; 'list <debut>' : champs dont le nom commence ainsi. */
+static const char *const MAIN_PARAMS[] = {
+    "l_current_max", "l_current_min", "l_in_current_max", "l_in_current_min", "l_abs_current_max",
+    "l_min_vin", "l_max_vin", "l_max_erpm", "foc_motor_kind", "foc_motor_r", "foc_motor_l", "foc_motor_ld_lq_diff",
+    "foc_motor_flux_linkage", "foc_current_kp", "foc_current_ki", "foc_observer_gain", "foc_observer_type",
+    "foc_f_zv", "foc_openloop_rpm", "foc_sl_erpm", "foc_sensor_mode", "m_encoder_counts", "si_motor_poles",
+    "foc_acim_lm", "foc_acim_lr", "foc_acim_rr", "foc_acim_im", "controller_id", "timeout_msec", "app_to_use",
+};
 
-static const param_t *params(int *n)
+static void show_field(bool app, const conf_field_t *f)
 {
-    static param_t t[24];
-    static int cnt;
-    if (!cnt) {
-        vesc_mcconf_t *m = &g_mcconf;
-        vesc_appconf_t *a = &g_appconf;
-        param_t p[] = {
-            { "l_current_max", &m->l_current_max, 0, 0, "A" },
-            { "l_current_min", &m->l_current_min, 0, 0, "A" },
-            { "l_in_current_max", &m->l_in_current_max, 0, 0, "A" },
-            { "l_in_current_min", &m->l_in_current_min, 0, 0, "A" },
-            { "l_abs_current_max", &m->l_abs_current_max, 0, 0, "A" },
-            { "l_min_vin", &m->l_min_vin, 0, 0, "V" },
-            { "l_max_vin", &m->l_max_vin, 0, 0, "V" },
-            { "l_max_erpm", &m->l_max_erpm, 0, 0, "ERPM" },
-            { "foc_motor_r", &m->foc_motor_r, 0, 0, "Ohm" },
-            { "foc_motor_l", &m->foc_motor_l, 0, 0, "H" },
-            { "foc_motor_ld_lq_diff", &m->foc_motor_ld_lq_diff, 0, 0, "H" },
-            { "foc_motor_flux_linkage", &m->foc_motor_flux_linkage, 0, 0, "Wb" },
-            { "foc_current_kp", &m->foc_current_kp, 0, 0, "V/A" },
-            { "foc_current_ki", &m->foc_current_ki, 0, 0, "V/As" },
-            { "foc_observer_gain", &m->foc_observer_gain, 0, 0, "" },
-            { "foc_f_zv", &m->foc_f_zv, 0, 0, "Hz (= 2 f_PWM)" },
-            { "foc_openloop_rpm", &m->foc_openloop_rpm, 0, 0, "ERPM" },
-            { "foc_sl_erpm", &m->foc_sl_erpm, 0, 0, "ERPM" },
-            { "foc_sensor_mode", 0, &m->foc_sensor_mode, 0, "0 sensorless, 1 codeur, 2 Hall" },
-            { "m_encoder_counts", 0, 0, &m->m_encoder_counts, "fronts/tour" },
-            { "si_motor_poles", &m->si_motor_poles, 0, 0, "poles" },
-            { "controller_id", &a->controller_id, 0, 0, "" },
-            { "timeout_msec", 0, 0, &a->timeout_msec, "ms" },
-        };
-        cnt = (int)(sizeof(p) / sizeof(p[0]));
-        for (int i = 0; i < cnt; i++) t[i] = p[i];
-    }
-    *n = cnt;
-    return t;
+    P("  %-34s = %.7g", f->name, (double)resc_conf_field_get(app, f));
 }
 
-static void show_param(const param_t *p)
+static bool find(const char *name, bool *app, const conf_field_t **f)
 {
-    if (p->f) P("  %-24s = %.6g %s", p->name, (double)*p->f, p->unit);
-    else if (p->u8) P("  %-24s = %u %s", p->name, (unsigned)*p->u8, p->unit);
-    else P("  %-24s = %lu %s", p->name, (unsigned long)*p->u32, p->unit);
+    *f = resc_conf_field(false, name);
+    *app = false;
+    if (!*f) { *f = resc_conf_field(true, name); *app = true; }
+    return *f != NULL;
 }
 
 static void cmd_get_set(int argc, char **argv)
 {
-    int n;
-    const param_t *t = params(&n);
-    if (!strcmp(argv[0], "list")) { for (int i = 0; i < n; i++) show_param(&t[i]); return; }
-    if (argc < 2) { P("Usage : get <nom> | set <nom> <valeur>"); return; }
-    for (int i = 0; i < n; i++) {
-        if (strcmp(argv[1], t[i].name)) continue;
-        if (!strcmp(argv[0], "set")) {
-            if (argc < 3) { P("Valeur manquante"); return; }
-            if (foc_state() == FOC_ST_RUN || foc_state() == FOC_ST_START) { P("Refuse : moteur en marche"); return; }
-            double v = atof(argv[2]);
-            if (t[i].f) *t[i].f = (float)v;
-            else if (t[i].u8) *t[i].u8 = (uint8_t)v;
-            else *t[i].u32 = (uint32_t)v;
-            resc_conf_clamp_mc(&g_mcconf);
-            resc_conf_clamp_app(&g_appconf);
-            resc_conf_apply();
+    bool app;
+    const conf_field_t *f;
+    if (!strcmp(argv[0], "list")) {
+        if (argc < 2) {
+            for (unsigned i = 0; i < sizeof(MAIN_PARAMS) / sizeof(MAIN_PARAMS[0]); i++)
+                if (find(MAIN_PARAMS[i], &app, &f)) show_field(app, f);
+            P("('list <debut de nom>' pour les autres champs, 'list all' pour tous)");
+            return;
         }
-        show_param(&t[i]);
+        bool all = !strcmp(argv[1], "all");
+        size_t k = strlen(argv[1]);
+        for (int t = 0; t < 2; t++) {
+            const conf_field_t *tab = t ? vesc_appconf_fields : vesc_mcconf_fields;
+            uint16_t n = t ? vesc_appconf_nfields : vesc_mcconf_nfields;
+            for (uint16_t i = 0; i < n; i++)
+                if (all || !strncmp(tab[i].name, argv[1], k)) show_field(t != 0, &tab[i]);
+        }
         return;
     }
-    P("Parametre inconnu : %s (taper list)", argv[1]);
+    if (argc < 2) { P("Usage : get <nom> | set <nom> <valeur>"); return; }
+    if (!find(argv[1], &app, &f)) { P("Parametre inconnu : %s (taper list)", argv[1]); return; }
+    if (!strcmp(argv[0], "set")) {
+        if (argc < 3) { P("Valeur manquante"); return; }
+        if (foc_state() == FOC_ST_RUN || foc_state() == FOC_ST_START) { P("Refuse : moteur en marche"); return; }
+        resc_conf_field_set(app, f, (float)atof(argv[2]));
+        resc_conf_clamp_mc(&g_mcconf);
+        resc_conf_clamp_app(&g_appconf);
+        resc_conf_apply();
+        if (app) apps_configure();
+        P("(applique ; 'store' pour sauvegarder)");
+    }
+    show_field(app, f);
 }
 
 /* Gains a partir de R, L, lambda, sur demande : bande passante de courant en rad/s */
 static void cmd_foc_gains(int argc, char **argv)
 {
-    float bw = argc >= 2 ? (float)atof(argv[1]) : 1000.0f;
+    float bw = argc >= 2 ? (float)atof(argv[1]) : g_mcconf.foc_resc_cc_bw;
     vesc_mcconf_t *m = &g_mcconf;
     if (!(m->foc_motor_r > 0.0f && m->foc_motor_l > 0.0f && m->foc_motor_flux_linkage > 0.0f)) {
         P("R, L et flux doivent etre mesures ou saisis d'abord");
