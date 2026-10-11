@@ -149,7 +149,9 @@ MC_ADD = [
         enums=["Permanent magnet (PMSM / BLDC)", "Induction (ACIM)"],
         description=html("Permanent magnet motor, or induction motor (no magnet): rotor flux oriented control "
                          "with slip from the rotor time constant. For induction motors set the parameters of the "
-                         "Induction Motor section (detect_acim in the terminal).")),
+                         "Induction Motor section: run the R/L detection, then detect_acim in the terminal "
+                         "(DC current step, the motor does not turn), then set the magnetizing current. "
+                         "Angle source: encoder (indirect FOC) or sensorless (magnetization, frequency ramp, observer).")),
      "FOC", "General", "Motor Kind"),
     ("foc_acim_lm", "foc_motor_l", dict(
         longName="Magnetizing Inductance", cDefine="MCCONF_FOC_ACIM_LM", valDouble="0", maxDouble="1",
@@ -157,8 +159,9 @@ MC_ADD = [
      "FOC", "General", "Induction Motor"),
     ("foc_acim_lr", "foc_motor_l", dict(
         longName="Rotor Inductance", cDefine="MCCONF_FOC_ACIM_LR", valDouble="0", maxDouble="1",
-        description=html("Induction motor: rotor inductance Lr = Lm + rotor leakage. Foc Motor L is the stator "
-                         "inductance Ls = Lm + stator leakage; the current loop uses sigma Ls = Ls - Lm^2/Lr.")),
+        description=html("Induction motor: rotor inductance Lr = Lm + rotor leakage. For an induction motor, "
+                         "Motor Inductance (L) is the transient inductance sigma Ls measured by the R/L detection "
+                         "(used by the current loop).")),
      "FOC", "General", None),
     ("foc_acim_rr", "foc_motor_r", dict(
         longName="Rotor Resistance", cDefine="MCCONF_FOC_ACIM_RR", valDouble="0",

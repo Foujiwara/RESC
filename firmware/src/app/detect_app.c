@@ -28,7 +28,7 @@
 #include "hw_config.h"
 #include "fmath.h"
 
-typedef enum { DA_IDLE = 0, DA_OFFSETS, DA_RL, DA_LAMBDA, DA_HALL, DA_ENCODER } da_state_t;
+typedef enum { DA_IDLE = 0, DA_OFFSETS, DA_RL, DA_LAMBDA, DA_HALL, DA_ENCODER, DA_ACIM } da_state_t;
 
 static da_state_t s_st;
 static const comm_iface_t *s_reply;
@@ -96,6 +96,27 @@ bool detect_app_start_rl(const comm_iface_t *reply, float cur)
     return true;
 }
 
+/* ---------------------------------------------------------- induction */
+bool detect_app_start_acim(const comm_iface_t *reply, float cur)
+{
+    if (s_st != DA_IDLE) return false;
+    s_reply = reply;
+    if (!(g_mcconf.foc_motor_r > 0.0f && g_mcconf.foc_motor_l > 0.0f)) {
+        commands_printf("Mesurer R et L d'abord (detect_rl)");
+        return false;
+    }
+    foc_det_t d = { 0 };
+    d.kind = FOC_DET_ACIM;
+    d.i_test = fm_sat(cur > 0.5f ? cur : fm_sat(g_mcconf.foc_resc_rl_frac, 0.1f, 1.0f) * i_cap(), 1.0f, i_cap());
+    d.r_known = g_mcconf.foc_motor_r;
+    d.l_known = g_mcconf.foc_motor_l;
+    if (!launch(&d)) return false;
+    s_st = DA_ACIM;
+    commands_printf("Moteur a induction : echelon de courant continu %.1f A -> %.1f A (environ 5 s, le moteur ne tourne pas)...",
+                    (double)(0.5f * d.i_test), (double)d.i_test);
+    return true;
+}
+
 /* ---------------------------------------------------------------- flux */
 static void send_lambda(float lam)
 {
@@ -113,6 +134,11 @@ bool detect_app_start_lambda(const comm_iface_t *reply, float cur, float erpm_s,
 {
     if (s_st != DA_IDLE) return false;
     s_reply = reply;
+    if (g_mcconf.foc_motor_kind == 1) {
+        commands_printf("Moteur a induction : pas de flux d'aimant a mesurer (detect_acim)");
+        send_lambda(0);
+        return false;
+    }
     if (r <= 0.0f) r = g_mcconf.foc_motor_r;
     if (l <= 0.0f) l = g_mcconf.foc_motor_l;
     foc_det_t d = { 0 };
@@ -200,6 +226,7 @@ static const char *err_text(int e)
     case -7: return "etats Hall invalides ou manquants (cablage, alimentation des sondes ?)";
     case -8: return "le codeur ne compte pas ou rapport incoherent";
     case -9: return "moteur en rotation";
+    case -10: return "reponse de flux rotorique non mesurable (courant trop faible, moteur a aimants ?)";
     default: return e > 0 ? "defaut pendant la mesure" : "echec";
     }
 }
@@ -296,6 +323,24 @@ void detect_app_poll(uint32_t now_ms)
         send_hall(tab, d->error == 0);
         break;
     }
+
+    case DA_ACIM:
+        if (!d->error) {
+            g_mcconf.foc_acim_lm = d->acim_lm;
+            g_mcconf.foc_acim_lr = d->acim_lr;
+            g_mcconf.foc_acim_rr = d->acim_rr;
+            if (!(g_mcconf.foc_acim_im > 0.1f)) g_mcconf.foc_acim_im = 0.3f * i_cap();
+            g_mcconf.foc_motor_kind = 1;
+            resc_conf_derive_observer_gain(&g_mcconf);
+            resc_conf_apply();
+            resc_conf_store_mc();
+            commands_printf("Lm=%.3f mH  Lr=%.3f mH  Rr=%.2f mOhm  Tr=%.1f ms  (Lm^2/Lr=%.3f mH)", (double)(d->acim_lm * 1e3f),
+                            (double)(d->acim_lr * 1e3f), (double)(d->acim_rr * 1e3f), (double)(d->acim_tr * 1e3f),
+                            (double)(d->acim_k * 1e3f));
+            commands_printf("Courant magnetisant foc_acim_im = %.1f A (a ajuster : courant a vide du moteur). Sauvegarde.",
+                            (double)g_mcconf.foc_acim_im);
+        }
+        break;
 
     case DA_ENCODER:
         if (d->error) send_enc(1001.0f, 0.0f, false);

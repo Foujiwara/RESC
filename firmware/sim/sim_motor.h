@@ -24,6 +24,12 @@ typedef struct {
     bool   pf_on;             /* filtre RC des tensions de phase commute */
     double pf_tau;            /* s */
     double vph_f[3];          /* tensions de phase filtrees */
+    /* moteur asynchrone (acim = true) : r = Rs, ld = lq = sigma Ls (inductance transitoire) */
+    bool   acim;
+    double lm, lr, rr;        /* inductance magnetisante, rotorique, resistance rotorique ramenee */
+    double ia_s, ib_s;        /* courant statorique alpha/beta */
+    double pra, prb;          /* flux rotorique alpha/beta */
+    double ea_s, eb_s;        /* (Lm/Lr) d(psi_r)/dt, pour les tensions pont coupe */
     double f_pwm;
     double i_lsb;             /* A par LSB (signe = polarite de l'ampli) */
     double v_lsb, vph_lsb;    /* V par LSB */

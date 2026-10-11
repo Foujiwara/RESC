@@ -8,6 +8,7 @@
  *   -> machine d'etats (demarrage, marche, identification) -> boucle de courant
  *   -> limitation de tension -> Park inverse avec angle predit -> SVPWM.
  */
+#include <math.h>
 #include <string.h>
 #include "foc.h"
 #include "observer.h"
@@ -16,7 +17,7 @@
 #include "platform.h"
 
 /* ------------------------------------------------------------------ etat */
-typedef enum { ST_ALIGN = 0, ST_RAMP, ST_FORCED, ST_HFI } start_sub_t;   /* ST_FORCED : boucle ouverte commandee */
+typedef enum { ST_ALIGN = 0, ST_RAMP, ST_FORCED, ST_HFI, ST_MAG } start_sub_t;   /* ST_MAG : magnetisation (induction) */   /* ST_FORCED : boucle ouverte commandee */
 
 typedef enum {
     DS_IDLE = 0,
@@ -25,6 +26,7 @@ typedef enum {
     DS_LAM_ALIGN, DS_LAM_RAMP, DS_LAM_HOLD, DS_LAM_COAST,
     DS_OFF_OFF, DS_OFF_ON,
     DS_SEN_ALIGN, DS_SEN_RUN,
+    DS_AC_PRE, DS_AC_STEP,
     DS_END
 } det_step_t;
 
@@ -73,6 +75,14 @@ typedef struct {
     float pf_err, pf_bad_t, pf_t;   /* filtres de phase */
     bool  pf_on, pf_use;
     float hall_mix;              /* melange Hall -> observateur (0..1) */
+
+    /* moteur a induction */
+    float psir;                  /* flux rotorique (modele en courant, Wb) */
+    float ws;                    /* glissement (rad/s el.) */
+    float slip_acc;              /* angle de glissement accumule (codeur) */
+    float ac_t_mag;              /* s : magnetisation avant couple */
+    float ac_vinf, ac_i0;        /* identification : tension finale, courant du palier bas */
+    uint16_t ac_n;
 
     /* injection haute frequence */
     bool  hfi_on;                /* injection active */
@@ -138,6 +148,8 @@ typedef struct {
 } foc_t;
 
 static CCMBSS foc_t S;
+#define AC_N   600                 /* identification induction : vd toutes les 2 ms pendant 1.2 s */
+static float s_acbuf[AC_N];
 foc_cmd_t   g_foc_cmd;
 foc_telem_t g_foc_telem;
 
@@ -177,8 +189,19 @@ static void apply_params(const foc_params_t *p)
     S.lam_eff = S.obs.lambda;
 }
 
+static bool acim(void) { return S.p.motor_kind == 1; }
+/* parametres d'induction utilisables (evite 0/0 tant qu'ils ne sont pas saisis) */
+static bool acim_ok(void)
+{
+    return S.p.acim_lm > 1e-7f && S.p.acim_lr > S.p.acim_lm && S.p.acim_rr > 1e-6f && S.p.acim_im > 0.1f;
+}
+static float acim_tr(void) { return S.p.acim_lr / fm_max(S.p.acim_rr, 1e-6f); }
+
 static bool motor_params_ok(void)
 {
+    if (acim())
+        return S.p.r > 1e-5f && S.p.ld > 1e-8f && S.p.acim_lm > 1e-7f && S.p.acim_lr > S.p.acim_lm &&
+               S.p.acim_rr > 1e-5f && S.p.acim_im > 0.1f;
     return S.p.r > 1e-5f && S.p.ld > 1e-8f && S.p.lq > 1e-8f && S.p.lambda > 1e-6f;
 }
 
@@ -222,6 +245,13 @@ RAMFUNC static void motor_comp(void)
     S.oc.ld = S.p.ld * ksl;
     S.oc.lq = S.p.lq * ksl;
     S.oc.lambda = fm_max(S.p.lambda * fm_sat(kl, 0.5f, 1.2f), 1e-6f);
+    if (acim() && acim_ok()) {
+        /* flux actif d'un moteur asynchrone : (Lm/Lr) psi_r, module donne par le modele en courant */
+        float nom = S.p.acim_lm * S.p.acim_lm / S.p.acim_lr * S.p.acim_im;
+        S.oc.lambda = fm_max(S.p.acim_lm / S.p.acim_lr * S.psir, 0.05f * nom);
+        S.oc.lambda_adapt = false;
+        if (S.oc.kind != OBS_FLUX_PROJ) S.oc.kind = OBS_FLUX_NL;
+    }
     float gmax = 0.2f / (S.oc.lambda * S.oc.lambda * S.dt);
     S.oc.gamma = S.p.obs_gamma < gmax ? S.p.obs_gamma : gmax;
 }
@@ -283,7 +313,7 @@ bool foc_calibrated(void) { return S.calibrated; }
 bool foc_detect_start(const foc_det_t *req)
 {
     if (S.st != FOC_ST_IDLE || !S.calibrated || S.det.busy || req->kind == FOC_DET_NONE) return false;
-    if (req->kind == FOC_DET_LAMBDA && !(req->r_known > 1e-5f && req->l_known > 1e-8f)) return false;
+    if ((req->kind == FOC_DET_LAMBDA || req->kind == FOC_DET_ACIM) && !(req->r_known > 1e-5f && req->l_known > 1e-8f)) return false;
     foc_det_t d = *req;
     d.busy = true;
     d.done = false;
@@ -605,7 +635,7 @@ RAMFUNC static void enter_start(bool from_run)
         S.sub = ST_RAMP;
         S.ol_iq = (float)S.dir * fm_max(S.p.st_i, fm_abs(S.iq_ref));
         /* Le PI tourne sans anticipation en I/f : il porte toute la tension */
-        S.id_ref = 0.0f;
+        S.id_ref = acim() ? S.p.acim_im : 0.0f;
         S.iq_ref = S.ol_iq;
         pi_preload(S.ol_omega, false);
     } else {
@@ -616,6 +646,22 @@ RAMFUNC static void enter_start(bool from_run)
         S.id_ref = S.iq_ref = 0.0f;
         S.int_d = S.int_q = 0.0f;
     }
+    S.lock_t = 0.0f;
+    set_state(FOC_ST_START);
+}
+
+/* Induction : magnetisation (courant d jusqu'au courant magnetisant, ~3 Tr) avant tout couple.
+ * Avec codeur, le champ suit le rotor (aucun couple de freinage) ; sans capteur, il reste fixe. */
+RAMFUNC static void enter_acim_start(void)
+{
+    S.id_ref = S.iq_ref = 0.0f;
+    S.int_d = S.int_q = 0.0f;
+    S.ol_theta = S.theta;
+    S.ol_omega = 0.0f;
+    S.ol_iq = 0.0f;
+    S.slip_acc = 0.0f;
+    S.ac_t_mag = fm_sat(3.0f * acim_tr(), 0.05f, 3.0f);
+    S.sub = ST_MAG;
     S.lock_t = 0.0f;
     set_state(FOC_ST_START);
 }
@@ -650,6 +696,11 @@ RAMFUNC static void handoff_to_run(void)
     float imag = fm_sqrt(S.id_ref * S.id_ref + S.iq_ref * S.iq_ref);
     S.id_ref = 0.0f;
     S.iq_ref = (float)S.dir * imag;
+    if (acim()) {
+        /* induction : le flux reste sur d, le couple sur q */
+        S.id_ref = S.p.acim_im;
+        S.iq_ref = S.ol_iq;
+    }
     pi_preload(S.obs.omega, true);
     S.slew = S.p.st_i * 5.0f;      /* rejoint doucement la consigne (200 ms) */
     S.w_pll_theta = S.obs.theta;
@@ -702,11 +753,12 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             S.ds = DS_OFF_OFF;
             for (int x = 0; x < 3; x++) S.acc3[x] = S.accv[x] = 0.0f;
             break;
+        case FOC_DET_ACIM:    S.ds = DS_AC_PRE; break;
         default:              S.ds = DS_SEN_ALIGN; break;
         }
         /* R/L : vecteur sur l'axe beta -> phase A sans courant, B et C a +-0.87 I.
          * Une phase a courant nul a une erreur de temps mort nulle et constante. */
-        S.ol_theta = (S.det.kind == FOC_DET_RL) ? 0.5f * FM_PI : 0.0f;
+        S.ol_theta = (S.det.kind == FOC_DET_RL || S.det.kind == FOC_DET_ACIM) ? 0.5f * FM_PI : 0.0f;
         S.ol_omega = 0.0f;
         break;
 
@@ -764,6 +816,66 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             S.inj_phase = 0;
             S.i_prev = S.id;
             S.ds = DS_L_D;
+        }
+        break;
+    }
+
+    /* --- Induction : echelon de courant continu (pas de couple, champ fixe).
+     *     Palier I/2 pendant 2 s (flux rotorique etabli), echelon a I. Apres la pointe inductive
+     *     (~ms), vd(t) = vinf + K dI / Tr e^(-t/Tr), K = Lm^2 / Lr (flux rotorique qui s'etablit).
+     *     vd est enregistre toutes les 2 ms pendant 1.2 s, vinf moyenne entre 1.8 et 2.5 s.
+     *     Tr : regression de ln(vd - vinf) entre 80 % et 10 % de l'amplitude a 6 ms ;
+     *     K : amplitude extrapolee a t = 0. Lr = Lm + Llr, avec Llr ~ sigma Ls / 2. */
+    case DS_AC_PRE:
+        S.id_ref += fm_sat_sym(0.5f * I - S.id_ref, I * dt / 0.1f);
+        if (S.dst >= 2.0f) {
+            S.ac_i0 = S.id;
+            S.ds = DS_AC_STEP;
+            S.dst = 0.0f;
+            S.ac_n = 0;
+            S.acc_v = S.acc_i = S.acc_n = 0.0f;
+            S.acc3[0] = S.acc3[1] = 0.0f;
+        }
+        break;
+    case DS_AC_STEP: {
+        S.id_ref = I;
+        /* moyenne de vd sur chaque tranche de 2 ms */
+        S.acc3[0] += S.vd;
+        S.acc3[1] += 1.0f;
+        if (S.dst >= 0.002f * (float)(S.ac_n + 1) && S.ac_n < AC_N) {
+            s_acbuf[S.ac_n++] = S.acc3[0] / S.acc3[1];
+            S.acc3[0] = S.acc3[1] = 0.0f;
+        }
+        if (S.dst > 1.8f) { S.acc_v += S.vd; S.acc_i += S.id; S.acc_n += 1.0f; }
+        if (S.dst >= 2.5f) {
+            float vinf = S.acc_v / S.acc_n, i1 = S.acc_i / S.acc_n;
+            float di = i1 - S.ac_i0;
+            int kref = 3;                                   /* tranche centree sur 7 ms */
+            float aref = s_acbuf[kref] - vinf;
+            float sx = 0, sy = 0, sxx = 0, sxy = 0, n = 0;
+            for (int k = kref; k < S.ac_n; k++) {
+                float a = s_acbuf[k] - vinf;
+                if (a > 0.8f * aref) continue;
+                if (a < 0.1f * aref) break;
+                float t = 0.002f * ((float)k + 0.5f), y = logf(a);
+                sx += t; sy += y; sxx += t * t; sxy += t * y; n += 1.0f;
+            }
+            float den = n * sxx - sx * sx;
+            float slope = (n >= 4.0f && den > 0.0f) ? (n * sxy - sx * sy) / den : 0.0f;
+            float tr = slope < 0.0f ? -1.0f / slope : -1.0f;
+            float a0 = (n >= 4.0f && tr > 0.0f) ? expf((sy - slope * sx) / n) : 0.0f;   /* amplitude a t = 0 */
+            float k = (di > 0.1f * I && tr > 0.0f) ? a0 * tr / di : -1.0f;
+            if (!(aref > 0.0f && k > 1e-7f && tr > 2e-3f && tr < 2.0f)) { det_finish(-10); return; }
+            float sls = S.det.l_known;
+            float llr = 0.5f * sls;
+            float lm = 0.5f * (k + fm_sqrt(k * k + 4.0f * k * llr));
+            S.det.acim_k = k;
+            S.det.acim_tr = tr;
+            S.det.acim_lm = lm;
+            S.det.acim_lr = lm + llr;
+            S.det.acim_rr = (lm + llr) / tr;
+            S.ds = DS_END;
+            S.dst = 0.0f;
         }
         break;
     }
@@ -1136,6 +1248,17 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.pf_bad_t = 0.0f;
         }
 
+        if (acim() && acim_ok()) {
+            /* modele en courant : d(psi_r)/dt = (Lm id - psi_r) / Tr ; glissement Lm iq / (Tr psi_r) */
+            float tr = acim_tr();
+            float idm = S.br_p1 ? S.id : 0.0f;
+            S.psir += (S.p.acim_lm * idm - S.psir) * fm_min(dt / tr, 1.0f);
+            if (S.psir < 0.0f) S.psir = 0.0f;
+            float pmin = 0.1f * S.p.acim_lm * S.p.acim_im;
+            S.ws = S.br_p1 ? S.p.acim_lm * S.iq / (tr * fm_max(S.psir, pmin)) : 0.0f;
+            g_foc_telem.acim_psir = S.psir;
+            g_foc_telem.acim_slip = S.ws;
+        }
         motor_comp();
         S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* lambda reestime seulement en marche observee */
         float va, vb;
@@ -1192,9 +1315,12 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         }
         if (g_foc_cmd.run && g_foc_cmd.openloop && S.vbus > S.p.vbus_trip_min) {
             enter_forced();
+        } else if (g_foc_cmd.run && acim() && motor_params_ok() && S.vbus > S.p.vbus_trip_min) {
+            S.dir = g_foc_cmd.dir >= 0 ? 1 : -1;
+            if (g_foc_cmd.allow_start || S.p.sensor_mode == FOC_SENSOR_ENCODER) enter_acim_start();
         } else if (g_foc_cmd.run && motor_params_ok() && S.vbus > S.p.vbus_trip_min) {
             S.dir = g_foc_cmd.dir >= 0 ? 1 : -1;
-            bool obs_fast = fm_abs(S.obs.omega) > 0.8f * S.p.st_omega && flux_ratio > 0.7f && flux_ratio < 1.4f;
+            bool obs_fast = !acim() && fm_abs(S.obs.omega) > 0.8f * S.p.st_omega && flux_ratio > 0.7f && flux_ratio < 1.4f;
             if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
@@ -1369,6 +1495,47 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         }
     }
 
+    if (S.st == FOC_ST_START && S.sub == ST_MAG) {
+        S.br = true;
+        S.id_ref = S.p.acim_im * fm_min(S.st_time / (0.3f * S.ac_t_mag), 1.0f);
+        S.iq_ref = 0.0f;
+        if (S.p.sensor_mode == FOC_SENSOR_ENCODER && S.p.enc.cpr >= 4) {
+            S.theta = S.enc.theta + S.slip_acc;
+            S.omega = S.enc.omega;
+        } else {
+            S.theta = S.ol_theta;
+            S.omega = 0.0f;
+        }
+        if (S.st_time >= S.ac_t_mag) {
+            S.dir = g_foc_cmd.dir >= 0 ? 1 : -1;
+            if (S.p.sensor_mode == FOC_SENSOR_ENCODER && S.p.enc.cpr >= 4) {
+                S.use_obs = false;
+                S.slew = S.p.i_slew;
+                S.slew_t = 0.0f;
+                S.low_t = S.flux_bad_t = 0.0f;
+                set_state(FOC_ST_RUN);
+            } else {
+                /* sans capteur : rampe de frequence a courant impose, puis observateur */
+                S.ol_theta = S.theta;
+                S.ol_omega = 0.0f;
+                S.ol_iq = (float)S.dir * S.p.st_i;
+                S.sub = ST_RAMP;
+                S.lock_t = 0.0f;
+                S.st_time = 0.0f;
+            }
+        }
+        float sn, cs;
+        fm_sincos(S.theta, &sn, &cs);
+        S.id = cs * S.i_a + sn * S.i_b;
+        S.iq = -sn * S.i_a + cs * S.i_b;
+        if (S.st == FOC_ST_START && S.sub == ST_MAG) {
+            current_loop(S.p.kp, S.p.ki, 0.0f, 0.0f, vmax);
+            theta_out = S.theta + S.omega * S.p.delay_comp * dt;
+            modulate(theta_out);
+            goto output;
+        }
+    }
+
     if (S.st == FOC_ST_START && S.sub != ST_HFI) {
         S.br = true;
         if (S.sub == ST_ALIGN) {
@@ -1399,7 +1566,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.ol_theta = fm_wrap_pi(S.ol_theta + S.ol_omega * dt);
         S.theta = S.ol_theta;
         S.omega = S.ol_omega;
-        S.id_ref = 0.0f;
+        S.id_ref = acim() ? S.p.acim_im : 0.0f;
         S.iq_ref = S.ol_iq;
         if (S.lock_t >= fm_max(S.p.st_t_hold, 0.05f)) {
             /* calcul des courants dans le repere boucle ouverte, puis relais */
@@ -1453,7 +1620,13 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         } else {
             S.use_obs = S.p.sensor_mode != FOC_SENSOR_ENCODER;
         }
-        if (S.use_hfi) {
+        if (acim() && S.p.sensor_mode == FOC_SENSOR_ENCODER && S.p.enc.cpr >= 4) {
+            /* commande vectorielle indirecte : angle rotor (codeur) + glissement integre */
+            S.use_obs = false;
+            S.slip_acc = fm_wrap_pi(S.slip_acc + S.ws * dt);
+            S.theta = fm_wrap_pi(S.enc.theta + S.slip_acc);
+            S.omega = S.enc.omega + S.ws;
+        } else if (S.use_hfi) {
             S.theta = S.hfi_theta;
             S.omega = S.hfi_omega;
             S.hfi_on = true;
@@ -1493,7 +1666,17 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.fw_id = 0.0f;
         }
         float id_cmd = g_foc_cmd.id_ref + S.fw_id;
-        if (S.p.mtpa_mode && S.oc.lq > 1.02f * S.oc.ld) {
+        if (acim()) {
+            /* flux nominal jusqu'a la vitesse de base, puis en 1/vitesse ; le module total
+             * du courant reste dans la limite de la couche de controle */
+            float wr = fm_abs(S.omega - S.ws);
+            float kf = (S.p.acim_base_omega > 1.0f && wr > S.p.acim_base_omega) ? S.p.acim_base_omega / wr : 1.0f;
+            id_cmd = S.p.acim_im * kf;
+            float lim = fm_max(fm_abs(g_foc_cmd.i_hi), fm_abs(g_foc_cmd.i_lo));
+            float iq_lim = fm_sqrt(fm_max(lim * lim - id_cmd * id_cmd, 0.0f));
+            if (lim > 0.0f) iq_cmd = fm_sat_sym(iq_cmd, iq_lim);
+            S.fw_id = 0.0f;
+        } else if (S.p.mtpa_mode && S.oc.lq > 1.02f * S.oc.ld) {
             float dl = S.oc.lq - S.oc.ld;
             float iqm = S.p.mtpa_mode == 1 ? iq_cmd : S.iq_lpf;
             float lam = S.lam_eff;
