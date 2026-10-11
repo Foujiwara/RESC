@@ -93,6 +93,27 @@ int main(void)
           RESCP_MCCONF_SIGNATURE != VESC700_MCCONF_SIGNATURE && RESCP_APPCONF_SIGNATURE != VESC700_APPCONF_SIGNATURE);
     check("une configuration 7.00 n'est pas lue comme RESC", !rescp_mcconf_deserialize(a, n1, &m2));
 
+#ifdef RESC_CONF_PROFILE_RESC
+    printf("== Profil RESC : listes reduites (position affichee <-> valeur interne)\n");
+    {
+        vesc_mcconf_defaults(&m1);
+        m1.foc_hfi_amb_mode = 2;          /* double impulsion : 2e choix affiche */
+        m1.m_out_aux_mode = 5;            /* 'On when running' : 5e choix affiche (4 'Unused' retire) */
+        m1.l_additional_faults = 0x0B;    /* glissement, survitesse, survitesse absolue : bits 0, 1, 2 affiches */
+        m1.sp_pid_loop_rate = 5;          /* 1000 Hz */
+        rescp_mcconf_serialize(a, &m1);
+        memset(&m2, 0, sizeof m2);
+        rescp_mcconf_deserialize(a, RESCP_MCCONF_SER_SIZE, &m2);
+        check("valeurs internes retrouvees apres aller-retour",
+              m2.foc_hfi_amb_mode == 2 && m2.m_out_aux_mode == 5 && m2.l_additional_faults == 0x0B && m2.sp_pid_loop_rate == 5);
+        /* position ecrite par l'outil -> valeur interne */
+        const conf_field_t *f = 0;
+        for (int k = 0; k < vesc_mcconf_nfields; k++) if (!strcmp(vesc_mcconf_fields[k].name, "m_out_aux_mode")) f = &vesc_mcconf_fields[k];
+        (void)f;
+        check("motor_type garde sa liste complete (FOC = 2 pour RESC Tool)", m2.motor_type == 2);
+    }
+#endif
+
     printf("== Commande 250\n");
     for (int conf = 0; conf < 2; conf++) {
         uint8_t req[9], out[512];

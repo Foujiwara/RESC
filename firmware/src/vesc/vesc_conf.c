@@ -4,6 +4,21 @@
 #include "vesc_buffer.h"
 #include "vesc_compat_defaults.h"
 
+/* Profil RESC : listes reduites aux choix pris en charge. Position affichee <-> valeur interne
+ * (valeur du format 7.00) ; pour les champs de bits, bit affiche <-> bit interne. */
+static uint8_t map_out(uint8_t v, const uint8_t *k, uint8_t n) { for (uint8_t j = 0; j < n; j++) if (k[j] == v) return j; return 0; }
+static uint8_t map_in(uint8_t j, const uint8_t *k, uint8_t n) { return j < n ? k[j] : k[0]; }
+static uint8_t map_bits_out(uint8_t v, const uint8_t *k, uint8_t n) { uint8_t o = 0; for (uint8_t j = 0; j < n; j++) if (v & (1u << k[j])) o |= (uint8_t)(1u << j); return o; }
+static uint8_t map_bits_in(uint8_t o, const uint8_t *k, uint8_t n) { uint8_t v = 0; for (uint8_t j = 0; j < n; j++) if (o & (1u << j)) v |= (uint8_t)(1u << k[j]); return v; }
+static const uint8_t KEEP_APP_ADC_CONF_BUTTONS[] = { 0, 1, 2 };
+static const uint8_t KEEP_CAN_STATUS_MSGS_R1[] = { 0, 1, 2, 3, 4, 5 };
+static const uint8_t KEEP_CAN_STATUS_MSGS_R2[] = { 0, 1, 2, 3, 4, 5 };
+static const uint8_t KEEP_FOC_HFI_AMB_MODE[] = { 1, 2 };
+static const uint8_t KEEP_FOC_OFFSETS_CAL_MODE[] = { 0 };
+static const uint8_t KEEP_L_ADDITIONAL_FAULTS[] = { 0, 1, 3 };
+static const uint8_t KEEP_M_OUT_AUX_MODE[] = { 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12 };
+static const uint8_t KEEP_SP_PID_LOOP_RATE[] = { 0, 1, 2, 3, 4, 5 };
+
 int32_t vesc700_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 {
     int32_t i = 0;
@@ -455,7 +470,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->l_current_max_scale, 10000, &i);
     vb_put_f16(buf, c->l_current_min_scale, 10000, &i);
     vb_put_f16(buf, c->l_duty_start, 10000, &i);
-    buf[i++] = (uint8_t)c->l_additional_faults;
+    buf[i++] = map_bits_out((uint8_t)c->l_additional_faults, KEEP_L_ADDITIONAL_FAULTS, 3);
     vb_put_f32_auto(buf, c->foc_current_kp, &i);
     vb_put_f32_auto(buf, c->foc_current_ki, &i);
     vb_put_f32_auto(buf, c->foc_f_zv, &i);
@@ -502,7 +517,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->foc_temp_comp_base_temp, 100, &i);
     buf[i++] = (uint8_t)c->foc_cc_decoupling;
     buf[i++] = (uint8_t)c->foc_observer_type;
-    buf[i++] = (uint8_t)c->foc_hfi_amb_mode;
+    buf[i++] = map_out((uint8_t)c->foc_hfi_amb_mode, KEEP_FOC_HFI_AMB_MODE, 2);
     vb_put_f16(buf, c->foc_hfi_amb_current, 10, &i);
     buf[i++] = (uint8_t)c->foc_hfi_amb_tres;
     vb_put_f16(buf, c->foc_hfi_voltage_start, 10, &i);
@@ -514,7 +529,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f32_auto(buf, c->foc_sl_erpm_hfi, &i);
     vb_put_u16(buf, c->foc_hfi_start_samples, &i);
     buf[i++] = (uint8_t)c->foc_hfi_samples;
-    buf[i++] = (uint8_t)c->foc_offsets_cal_mode;
+    buf[i++] = map_bits_out((uint8_t)c->foc_offsets_cal_mode, KEEP_FOC_OFFSETS_CAL_MODE, 1);
     vb_put_f32_auto(buf, c->foc_offsets_current_0, &i);
     vb_put_f32_auto(buf, c->foc_offsets_current_1, &i);
     vb_put_f32_auto(buf, c->foc_offsets_current_2, &i);
@@ -533,7 +548,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->foc_fw_ramp_time, 1000, &i);
     vb_put_f16(buf, c->foc_fw_q_current_factor, 10000, &i);
     buf[i++] = (uint8_t)c->foc_speed_soure;
-    buf[i++] = (uint8_t)c->sp_pid_loop_rate;
+    buf[i++] = map_out((uint8_t)c->sp_pid_loop_rate, KEEP_SP_PID_LOOP_RATE, 6);
     vb_put_f32_auto(buf, c->s_pid_kp, &i);
     vb_put_f32_auto(buf, c->s_pid_ki, &i);
     vb_put_f32_auto(buf, c->s_pid_kd, &i);
@@ -554,7 +569,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_u32(buf, c->m_encoder_counts, &i);
     buf[i++] = (uint8_t)c->m_invert_direction;
     vb_put_f32_auto(buf, c->m_ntc_motor_beta, &i);
-    buf[i++] = (uint8_t)c->m_out_aux_mode;
+    buf[i++] = map_out((uint8_t)c->m_out_aux_mode, KEEP_M_OUT_AUX_MODE, 12);
     buf[i++] = (uint8_t)c->m_motor_temp_sens_type;
     vb_put_f32_auto(buf, c->m_ptc_motor_coeff, &i);
     vb_put_f16(buf, c->m_ntcx_ptcx_res, 0.1, &i);
@@ -612,7 +627,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->l_current_max_scale = vb_get_f16(buf, 10000, &i);
     c->l_current_min_scale = vb_get_f16(buf, 10000, &i);
     c->l_duty_start = vb_get_f16(buf, 10000, &i);
-    c->l_additional_faults = (uint8_t)buf[i++];
+    c->l_additional_faults = (uint8_t)map_bits_in(buf[i++], KEEP_L_ADDITIONAL_FAULTS, 3);
     c->foc_current_kp = vb_get_f32_auto(buf, &i);
     c->foc_current_ki = vb_get_f32_auto(buf, &i);
     c->foc_f_zv = vb_get_f32_auto(buf, &i);
@@ -659,7 +674,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_temp_comp_base_temp = vb_get_f16(buf, 100, &i);
     c->foc_cc_decoupling = (uint8_t)buf[i++];
     c->foc_observer_type = (uint8_t)buf[i++];
-    c->foc_hfi_amb_mode = (uint8_t)buf[i++];
+    c->foc_hfi_amb_mode = (uint8_t)map_in(buf[i++], KEEP_FOC_HFI_AMB_MODE, 2);
     c->foc_hfi_amb_current = vb_get_f16(buf, 10, &i);
     c->foc_hfi_amb_tres = (float)buf[i++];
     c->foc_hfi_voltage_start = vb_get_f16(buf, 10, &i);
@@ -671,7 +686,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_sl_erpm_hfi = vb_get_f32_auto(buf, &i);
     c->foc_hfi_start_samples = vb_get_u16(buf, &i);
     c->foc_hfi_samples = (uint8_t)buf[i++];
-    c->foc_offsets_cal_mode = (uint8_t)buf[i++];
+    c->foc_offsets_cal_mode = (uint8_t)map_bits_in(buf[i++], KEEP_FOC_OFFSETS_CAL_MODE, 1);
     c->foc_offsets_current_0 = vb_get_f32_auto(buf, &i);
     c->foc_offsets_current_1 = vb_get_f32_auto(buf, &i);
     c->foc_offsets_current_2 = vb_get_f32_auto(buf, &i);
@@ -690,7 +705,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_fw_ramp_time = vb_get_f16(buf, 1000, &i);
     c->foc_fw_q_current_factor = vb_get_f16(buf, 10000, &i);
     c->foc_speed_soure = (uint8_t)buf[i++];
-    c->sp_pid_loop_rate = (uint8_t)buf[i++];
+    c->sp_pid_loop_rate = (uint8_t)map_in(buf[i++], KEEP_SP_PID_LOOP_RATE, 6);
     c->s_pid_kp = vb_get_f32_auto(buf, &i);
     c->s_pid_ki = vb_get_f32_auto(buf, &i);
     c->s_pid_kd = vb_get_f32_auto(buf, &i);
@@ -711,7 +726,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->m_encoder_counts = vb_get_u32(buf, &i);
     c->m_invert_direction = (uint8_t)buf[i++];
     c->m_ntc_motor_beta = vb_get_f32_auto(buf, &i);
-    c->m_out_aux_mode = (uint8_t)buf[i++];
+    c->m_out_aux_mode = (uint8_t)map_in(buf[i++], KEEP_M_OUT_AUX_MODE, 12);
     c->m_motor_temp_sens_type = (uint8_t)buf[i++];
     c->m_ptc_motor_coeff = vb_get_f32_auto(buf, &i);
     c->m_ntcx_ptcx_res = vb_get_f16(buf, 0.1, &i);
@@ -1468,8 +1483,8 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     vb_put_f32_auto(buf, c->timeout_brake_current, &i);
     vb_put_u16(buf, c->can_status_rate_1, &i);
     vb_put_u16(buf, c->can_status_rate_2, &i);
-    buf[i++] = (uint8_t)c->can_status_msgs_r1;
-    buf[i++] = (uint8_t)c->can_status_msgs_r2;
+    buf[i++] = map_bits_out((uint8_t)c->can_status_msgs_r1, KEEP_CAN_STATUS_MSGS_R1, 6);
+    buf[i++] = map_bits_out((uint8_t)c->can_status_msgs_r2, KEEP_CAN_STATUS_MSGS_R2, 6);
     buf[i++] = (uint8_t)c->can_baud_rate;
     buf[i++] = (uint8_t)c->shutdown_mode;
     buf[i++] = (uint8_t)c->kill_sw_mode;
@@ -1504,7 +1519,7 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     vb_put_f16(buf, c->app_adc_conf_voltage2_end, 1000, &i);
     buf[i++] = (uint8_t)c->app_adc_conf_use_filter;
     buf[i++] = (uint8_t)c->app_adc_conf_safe_start;
-    buf[i++] = (uint8_t)c->app_adc_conf_buttons;
+    buf[i++] = map_bits_out((uint8_t)c->app_adc_conf_buttons, KEEP_APP_ADC_CONF_BUTTONS, 3);
     buf[i++] = (uint8_t)c->app_adc_conf_voltage_inverted;
     buf[i++] = (uint8_t)c->app_adc_conf_voltage2_inverted;
     vb_put_f32_auto(buf, c->app_adc_conf_throttle_exp, &i);
@@ -1556,8 +1571,8 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->timeout_brake_current = vb_get_f32_auto(buf, &i);
     c->can_status_rate_1 = vb_get_u16(buf, &i);
     c->can_status_rate_2 = vb_get_u16(buf, &i);
-    c->can_status_msgs_r1 = (uint8_t)buf[i++];
-    c->can_status_msgs_r2 = (uint8_t)buf[i++];
+    c->can_status_msgs_r1 = (uint8_t)map_bits_in(buf[i++], KEEP_CAN_STATUS_MSGS_R1, 6);
+    c->can_status_msgs_r2 = (uint8_t)map_bits_in(buf[i++], KEEP_CAN_STATUS_MSGS_R2, 6);
     c->can_baud_rate = (uint8_t)buf[i++];
     c->shutdown_mode = (uint8_t)buf[i++];
     c->kill_sw_mode = (uint8_t)buf[i++];
@@ -1592,7 +1607,7 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->app_adc_conf_voltage2_end = vb_get_f16(buf, 1000, &i);
     c->app_adc_conf_use_filter = (uint8_t)buf[i++];
     c->app_adc_conf_safe_start = (uint8_t)buf[i++];
-    c->app_adc_conf_buttons = (uint8_t)buf[i++];
+    c->app_adc_conf_buttons = (uint8_t)map_bits_in(buf[i++], KEEP_APP_ADC_CONF_BUTTONS, 3);
     c->app_adc_conf_voltage_inverted = (uint8_t)buf[i++];
     c->app_adc_conf_voltage2_inverted = (uint8_t)buf[i++];
     c->app_adc_conf_throttle_exp = vb_get_f32_auto(buf, &i);

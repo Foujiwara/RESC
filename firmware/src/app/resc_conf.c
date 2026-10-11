@@ -153,6 +153,15 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
     sanitize_mc(c);
     const float imax = (float)HWLIM_I_MOTOR_A, iin = (float)HWLIM_I_INPUT_A, iabs = (float)HWLIM_I_ABS_TRIP_A;
     c->motor_type = MOTOR_TYPE_FOC;
+    /* choix non pris en charge par RESC : ramenes sur un choix valide */
+    if (c->foc_sensor_mode >= 5 && c->foc_sensor_mode <= 8) c->foc_sensor_mode = 3;   /* variantes HFI -> HFI */
+    if (c->foc_sensor_mode == 9) c->foc_sensor_mode = 1;                              /* codeur AB -> codeur */
+    if (c->foc_sensor_mode > 9) c->foc_sensor_mode = 0;
+    if (c->foc_hfi_amb_mode == 0 || c->foc_hfi_amb_mode > 2) c->foc_hfi_amb_mode = 2; /* six vecteurs -> double */
+    if (c->sp_pid_loop_rate > 5) c->sp_pid_loop_rate = 5;                              /* 1 kHz au plus */
+    if (c->m_out_aux_mode == 4 || c->m_out_aux_mode > 12) c->m_out_aux_mode = 0;
+    c->l_additional_faults &= 0x0Bu;                                                   /* glissement, survitesses */
+    c->foc_offsets_cal_mode &= 0x01u;
     c->l_current_max = fm_sat(c->l_current_max, 0.0f, imax);
     c->l_current_min = fm_sat(c->l_current_min, -imax, 0.0f);
     c->l_in_current_max = fm_sat(c->l_in_current_max, 0.0f, iin);
@@ -172,6 +181,12 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
 
 void resc_conf_clamp_app(vesc_appconf_t *c)
 {
+    /* apps sans materiel (Nunchuk I2C, NRF24, app personnalisee) : UART (la manette passe par paquets) */
+    if (c->app_to_use >= 6 && c->app_to_use <= 8) c->app_to_use = 3;
+    if (c->app_to_use > 10) c->app_to_use = 0;
+    c->can_status_msgs_r1 &= 0x3Fu;
+    c->can_status_msgs_r2 &= 0x3Fu;
+    c->app_adc_conf_buttons &= 0x07u;
     if (!isfinite(c->controller_id)) c->controller_id = -1.0f;
     if (!isfinite(c->timeout_brake_current) || c->timeout_brake_current < 0.0f) c->timeout_brake_current = 0.0f;
     if (c->controller_id < 0.0f || c->controller_id > 253.0f) c->controller_id = (float)plat_default_controller_id();

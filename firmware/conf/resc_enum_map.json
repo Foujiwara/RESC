@@ -1,0 +1,81 @@
+{
+ "l_additional_faults": {
+  "bits": true,
+  "keep": [
+   0,
+   1,
+   3
+  ]
+ },
+ "sp_pid_loop_rate": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5
+  ]
+ },
+ "foc_hfi_amb_mode": {
+  "bits": false,
+  "keep": [
+   1,
+   2
+  ]
+ },
+ "foc_offsets_cal_mode": {
+  "bits": true,
+  "keep": [
+   0
+  ]
+ },
+ "m_out_aux_mode": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   2,
+   3,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12
+  ]
+ },
+ "can_status_msgs_r1": {
+  "bits": true,
+  "keep": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5
+  ]
+ },
+ "can_status_msgs_r2": {
+  "bits": true,
+  "keep": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5
+  ]
+ },
+ "app_adc_conf_buttons": {
+  "bits": true,
+  "keep": [
+   0,
+   1,
+   2
+  ]
+ }
+}

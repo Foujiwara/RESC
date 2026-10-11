@@ -55,7 +55,7 @@ def set_text(e, tag, val):
     x.text = val
 
 
-def patch(root, dflt, lim):
+def patch(root, dflt, lim, emap):
     params = root.find("Params")
     n = 0
     for s in root.find("SerOrder"):
@@ -65,6 +65,13 @@ def patch(root, dflt, lim):
         if v is None or name in SKIP:
             continue
         t = int(e.findtext("type"))
+        m = emap.get(flat(name))
+        if m:
+            iv = int(round(v))
+            if m["bits"]:
+                v = sum(1 << j for j, k in enumerate(m["keep"]) if iv & (1 << k))
+            else:
+                v = m["keep"].index(iv) if iv in m["keep"] else 0
         if t == 1:
             set_text(e, "valDouble", num(v))
         else:
@@ -117,7 +124,8 @@ def main():
     for k, f in files.items():
         root = ET.parse(os.path.join(CONF, f)).getroot()
         sig0 = signature(root)
-        n = patch(root, data[k], data["limits"])
+        emap = json.load(open(os.path.join(CONF, "resc_enum_map.json"))) if prof == "resc" else {}
+        n = patch(root, data[k], data["limits"], emap)
         if signature(root) != sig0:
             raise SystemExit("signature modifiee : interdit")
         ET.indent(root, space="    ")
