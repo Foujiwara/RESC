@@ -29,6 +29,7 @@
 #include "commands.h"
 #include "can_vesc.h"
 #include "fault_codes.h"
+#include "apps.h"
 #include "vesc_defaults.h"
 
 /* ------------------------------------------------------------ interfaces */
@@ -124,7 +125,7 @@ static void update_temps(void)
 
 /* ------------------------------------------------------------ bouton (cartes a alimentation maintenue) */
 #if BOARD_PWR_KEY_PIN != HW_PIN_NONE
-static uint32_t s_key_ms;
+static uint32_t s_key_ms, s_rel_ms;
 static void power_key_tick(void)
 {
     /* Le niveau bas du bouton (~1 V) n'est pas toujours lu comme 0 : on tire la ligne a 0
@@ -141,7 +142,18 @@ static void power_key_tick(void)
         gpio_write(BOARD_PWR_KEY_PIN, false);      /* pre-tire a 0 */
         phase = 0;
         s_key_ms = pressed ? s_key_ms + 20u : 0u;
-        if (s_key_ms > 2000u && foc_state() != FOC_ST_RUN && foc_state() != FOC_ST_START) board_power_off();
+        s_rel_ms = pressed ? 0u : s_rel_ms + 20u;
+        /* shutdown_mode : 0 interrupteur (coupe des que relache), 1 jamais coupe par le firmware,
+         * 2 appui long, 3..9 appui long ou inactivite (10 s, 1 min, 5, 10, 30 min, 1 h, 5 h) */
+        static const uint32_t idle_s[10] = { 0, 0, 0, 10, 60, 300, 600, 1800, 3600, 18000 };
+        uint8_t mode = g_appconf.shutdown_mode;
+        uint32_t now = systime_ms();
+        bool stopped = foc_state() != FOC_ST_RUN && foc_state() != FOC_ST_START && foc_state() != FOC_ST_DETECT;
+        bool off = false;
+        if (mode == 0) off = s_rel_ms > 500u;
+        else if (mode >= 2) off = s_key_ms > 2000u;
+        if (mode >= 3 && mode <= 9 && now - apps_last_activity_ms() > idle_s[mode] * 1000u) off = true;
+        if (off && stopped) board_power_off();
     }
 }
 #endif
@@ -181,6 +193,7 @@ void app_tick_1khz(void)
 {
     uint32_t now = systime_ms();
     ctrl_set_power_allowed(resc_power_allowed() && resc_motor_configured());
+    apps_tick_1khz(now);
     ctrl_update(now, 0.001f);
     if ((now & 15u) == 0) update_temps();
     if ((now & 63u) == 0) aux_tick(now);
@@ -234,6 +247,8 @@ int main(void)
     packet_dec_init(&s_dec_u2, &IF_UART2);
     usb_cdc_init();
     can_vesc_init();
+    apps_configure();
+    apps_note_activity(systime_ms());
     wdg_init();
     if (wdg_was_reset()) foc_raise_fault(RESC_FAULT_WATCHDOG_RESET);
 

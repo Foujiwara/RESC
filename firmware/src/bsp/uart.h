@@ -8,6 +8,7 @@
 typedef struct uart_s uart_t;
 
 uart_t *uart_open(int inst, uint8_t tx_pin, uint8_t rx_pin, uint32_t baud);
+void uart_attach_pins(int inst, uint8_t tx_pin, uint8_t rx_pin);
 void uart_set_baud(uart_t *u, uint32_t baud);
 int  uart_getc(uart_t *u);                       /* -1 si vide */
 uint32_t uart_write(uart_t *u, const uint8_t *d, uint32_t n);

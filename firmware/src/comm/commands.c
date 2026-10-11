@@ -18,6 +18,7 @@
 #include "board.h"
 #include "flash.h"
 #include "systime.h"
+#include "apps.h"
 
 volatile bool g_req_reboot, g_req_bootloader;
 
@@ -137,6 +138,16 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     uint8_t *b = s_tx;
 
     switch (id) {
+    case COMM_SET_DUTY: case COMM_SET_CURRENT: case COMM_SET_CURRENT_BRAKE: case COMM_SET_RPM:
+    case COMM_SET_HANDBRAKE: case COMM_SET_CURRENT_REL: case COMM_SET_POS: case COMM_ALIVE:
+    case COMM_SET_CHUCK_DATA:
+        apps_note_activity(systime_ms());       /* arret automatique : activite */
+        break;
+    default:
+        break;
+    }
+
+    switch (id) {
     case COMM_FW_VERSION: {
         b[o++] = COMM_FW_VERSION;
         b[o++] = RESC_FW_MAJOR;
@@ -241,6 +252,7 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
         resc_conf_clamp_app(&tmp);
         g_appconf = tmp;
         resc_conf_apply();
+        apps_configure();
         if (id == COMM_SET_APPCONF) resc_conf_store_app();
         b[o++] = id;
         reply(src, b, 1);
@@ -341,18 +353,31 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
 
     case COMM_GET_DECODED_PPM: {
         b[o++] = id;
-        vb_put_i32(b, 0, &o);
-        vb_put_i32(b, 0, &o);
+        vb_put_i32(b, (int32_t)(apps_ppm_decoded() * 1e6f), &o);
+        vb_put_i32(b, (int32_t)(apps_ppm_pulse_ms() * 1e6f), &o);
         reply(src, b, (uint32_t)o);
         break;
     }
     case COMM_GET_DECODED_ADC: {
         b[o++] = id;
-        for (int k = 0; k < 4; k++) vb_put_i32(b, 0, &o);
+        vb_put_i32(b, (int32_t)(apps_adc_decoded(1) * 1e6f), &o);
+        vb_put_i32(b, (int32_t)(apps_adc_voltage(1) * 1e6f), &o);
+        vb_put_i32(b, (int32_t)(apps_adc_decoded(2) * 1e6f), &o);
+        vb_put_i32(b, (int32_t)(apps_adc_voltage(2) * 1e6f), &o);
         reply(src, b, (uint32_t)o);
         break;
     }
+    case COMM_GET_DECODED_CHUK: {
+        b[o++] = id;
+        vb_put_i32(b, (int32_t)(apps_chuk_decoded() * 1e6f), &o);
+        reply(src, b, (uint32_t)o);
+        break;
+    }
+    case COMM_SET_CHUCK_DATA:
+        apps_set_chuck(d, n, systime_ms());
+        break;
     case COMM_APP_DISABLE_OUTPUT:
+        if (n >= 4) apps_disable_output(vb_get_i32(d, &i), systime_ms());
         break;
 
     default:
