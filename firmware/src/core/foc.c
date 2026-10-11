@@ -66,7 +66,7 @@ typedef struct {
     bool  dr_on;                 /* duty : regulateur de descente actif */
     float dr_int;
     float duty_abs;              /* modulation appliquee (0..1, Vbus/sqrt3 = 1) */
-    float i_abs_f;               /* module du courant filtre (limite lente) */
+    float i_abs_f;               /* module du courant filtre (frein) */
     float slip_t;                /* duree d'ecart codeur / observateur */
     float fw_id;                 /* defluxage */
     float iq_lpf;                /* iq mesure filtre (MTPA) */
@@ -668,6 +668,12 @@ RAMFUNC static void enter_hfi_start(void)
 }
 
 /* ---------------------------------------------- demarrage I/f et relais */
+/* Courant de demarrage : la consigne, bornee par st_i (boost) et st_i_max */
+RAMFUNC static inline float st_cur(float cmd)
+{
+    return fm_min(fm_max(S.p.st_i, fm_abs(cmd)), S.p.st_i_max);
+}
+
 RAMFUNC static void enter_start(bool from_run)
 {
     if (from_run) {
@@ -675,7 +681,7 @@ RAMFUNC static void enter_start(bool from_run)
         S.ol_theta = S.obs.theta;
         S.ol_omega = S.obs.omega;
         S.sub = ST_RAMP;
-        S.ol_iq = (float)S.dir * fm_max(S.p.st_i, fm_abs(S.iq_ref));
+        S.ol_iq = (float)S.dir * st_cur(S.iq_ref);
         /* Le PI tourne sans anticipation en I/f : il porte toute la tension */
         S.id_ref = acim() ? S.p.acim_im : 0.0f;
         S.iq_ref = S.ol_iq;
@@ -766,7 +772,7 @@ RAMFUNC static void handoff_to_run(void)
         S.iq_ref = S.ol_iq;
     }
     pi_preload(S.obs.omega, true);
-    S.slew = S.p.st_i * 5.0f;      /* rejoint doucement la consigne (200 ms) */
+    S.slew = fm_max(imag, 2.0f) * 5.0f;   /* rejoint doucement la consigne (200 ms) */
     S.w_pll_theta = S.obs.theta;
     S.w_pll_omega = S.obs.omega;
     S.slew_t = 0.3f;
@@ -1289,12 +1295,10 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     }
 
     /* ---- 4. Protections rapides */
-    if (!S.p.i_abs_slow) {
-        for (int x = 0; x < 3; x++) {
-            if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
-                trip(RESC_FAULT_ABS_OVER_CURRENT);
-                break;
-            }
+    for (int x = 0; x < 3; x++) {
+        if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
+            trip(RESC_FAULT_ABS_OVER_CURRENT);
+            break;
         }
     }
     if (S.vbus > S.p.vbus_trip_max) trip(RESC_FAULT_OVER_VOLTAGE);
@@ -1304,7 +1308,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     {
         float imag = fm_sqrt(S.i_a * S.i_a + S.i_b * S.i_b);
         FM_LPF(S.i_abs_f, imag, 0.2f);                /* ~0.3 ms a 15 kHz */
-        if ((S.p.i_abs_slow ? S.i_abs_f : imag) > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
+        if (imag > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
         if (imag > g_foc_telem.i_phase_max) g_foc_telem.i_phase_max = imag;
     }
 
@@ -1575,7 +1579,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 S.hfi_on = false;
                 S.ol_theta = S.hfi_theta;
                 S.ol_omega = 0.0f;
-                S.ol_iq = (float)S.dir * S.p.st_i;
+                S.ol_iq = (float)S.dir * st_cur(g_foc_cmd.iq_ref);
                 S.sub = ST_RAMP;
                 S.lock_t = 0.0f;
                 S.int_d = S.int_q = 0.0f;
@@ -1625,7 +1629,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 /* sans capteur : rampe de frequence a courant impose, puis observateur */
                 S.ol_theta = S.theta;
                 S.ol_omega = 0.0f;
-                S.ol_iq = (float)S.dir * S.p.st_i;
+                S.ol_iq = (float)S.dir * st_cur(g_foc_cmd.iq_ref);
                 S.sub = ST_RAMP;
                 S.lock_t = 0.0f;
                 S.st_time = 0.0f;
@@ -1645,7 +1649,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     if (S.st == FOC_ST_START && S.sub != ST_HFI) {
         S.br = true;
         if (S.sub == ST_ALIGN) {
-            S.ol_iq = (float)S.dir * S.p.st_i * fm_min(S.st_time / fm_max(S.p.st_t_align * 0.5f, 1e-3f), 1.0f);
+            S.ol_iq = (float)S.dir * st_cur(g_foc_cmd.iq_ref) * fm_min(S.st_time / fm_max(S.p.st_t_align * 0.5f, 1e-3f), 1.0f);
             if (S.st_time >= S.p.st_t_align) S.sub = ST_RAMP;
         } else {
             float acc = S.p.st_omega / fm_max(S.p.st_t_ramp, 0.05f);
@@ -1660,7 +1664,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             if (S.oc.kind != OBS_RESC_BEMF && S.oc.kind != OBS_RESC_BEMF_LAMBDA && flux_ratio > 0.6f && flux_ratio < 1.5f &&
                 S.obs.omega * (float)S.dir > S.ol_omega * (float)S.dir)
                 S.ol_omega += (S.obs.omega - S.ol_omega) * fm_min(200.0f * dt, 1.0f);
-            S.ol_iq = (float)S.dir * fm_max(S.p.st_i, fm_abs(g_foc_cmd.iq_ref));
+            S.ol_iq = (float)S.dir * st_cur(g_foc_cmd.iq_ref);
             /* Relais vers l'observateur quand il est accroche */
             float w = S.ol_omega;
             bool fast = fm_abs(w) >= 0.9f * w_ho;
@@ -1848,7 +1852,10 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         if (S.slew_t > 0.0f) S.slew_t -= dt; else S.slew = S.p.i_slew;
         float step = S.slew * dt;
         S.id_ref += fm_sat_sym(id_cmd - S.id_ref, step);
-        S.iq_ref += fm_sat_sym(iq_cmd - S.iq_ref, step);
+        /* la rampe douce apres le relais ne limite que la montee : une baisse de consigne (meme sens)
+         * suit a la vitesse normale, sinon le moteur depasse la vitesse voulue (limite de duty hybride) */
+        bool dec = iq_cmd * S.iq_ref >= 0.0f && fm_abs(iq_cmd) < fm_abs(S.iq_ref);
+        S.iq_ref += fm_sat_sym(iq_cmd - S.iq_ref, dec ? fm_max(step, S.p.i_slew * dt) : step);
 
         ff_terms(S.omega, S.id_ref, S.iq_ref, &vd_ff, &vq_ff);
 

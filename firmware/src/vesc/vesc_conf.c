@@ -463,7 +463,6 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->l_battery_cut_end, 10, &i);
     vb_put_f16(buf, c->l_battery_regen_cut_start, 10, &i);
     vb_put_f16(buf, c->l_battery_regen_cut_end, 10, &i);
-    buf[i++] = (uint8_t)c->l_slow_abs_current;
     buf[i++] = (uint8_t)c->l_temp_fet_start;
     buf[i++] = (uint8_t)c->l_temp_fet_end;
     buf[i++] = (uint8_t)c->l_temp_motor_start;
@@ -631,7 +630,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < 438) return false;
+    if (len < 437) return false;
     if (vb_get_u32(buf, &i) != g_rescp_mcconf_sig) return false;
     c->motor_type = (uint8_t)buf[i++];
     c->l_current_max = vb_get_f32_auto(buf, &i);
@@ -650,7 +649,6 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->l_battery_cut_end = vb_get_f16(buf, 10, &i);
     c->l_battery_regen_cut_start = vb_get_f16(buf, 10, &i);
     c->l_battery_regen_cut_end = vb_get_f16(buf, 10, &i);
-    c->l_slow_abs_current = (uint8_t)buf[i++];
     c->l_temp_fet_start = (float)buf[i++];
     c->l_temp_fet_end = (float)buf[i++];
     c->l_temp_motor_start = (float)buf[i++];
@@ -1646,13 +1644,20 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_0, &i);
     vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_1, &i);
     vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_2, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_resc_smart_rev;
+    vb_put_f16(buf, c->app_adc_conf_resc_smart_rev_erpm, 1, &i);
+    vb_put_f32_auto(buf, c->app_adc_conf_resc_smart_rev_max_duty, &i);
+    vb_put_f32_auto(buf, c->app_adc_conf_resc_smart_rev_ramp_time, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_resc_hybrid;
+    vb_put_f32_auto(buf, c->app_adc_conf_resc_hybrid_duty, &i);
+    vb_put_f32_auto(buf, c->app_adc_conf_resc_hybrid_band, &i);
     return i;
 }
 
 bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
 {
     int32_t i = 0;
-    if (len < 264) return false;
+    if (len < 284) return false;
     if (vb_get_u32(buf, &i) != g_rescp_appconf_sig) return false;
     c->controller_id = (float)buf[i++];
     c->timeout_msec = vb_get_u32(buf, &i);
@@ -1758,6 +1763,13 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->imu_conf_gyro_offsets_0 = vb_get_f32_auto(buf, &i);
     c->imu_conf_gyro_offsets_1 = vb_get_f32_auto(buf, &i);
     c->imu_conf_gyro_offsets_2 = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_resc_smart_rev = (uint8_t)buf[i++];
+    c->app_adc_conf_resc_smart_rev_erpm = vb_get_f16(buf, 1, &i);
+    c->app_adc_conf_resc_smart_rev_max_duty = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_resc_smart_rev_ramp_time = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_resc_hybrid = (uint8_t)buf[i++];
+    c->app_adc_conf_resc_hybrid_duty = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_resc_hybrid_band = vb_get_f32_auto(buf, &i);
     return true;
 }
 
@@ -1892,6 +1904,34 @@ void vesc_appconf_defaults(vesc_appconf_t *c)
     c->imu_conf_gyro_offsets_0 = APPCONF_IMU_G_OFFSET_0;
     c->imu_conf_gyro_offsets_1 = APPCONF_IMU_G_OFFSET_1;
     c->imu_conf_gyro_offsets_2 = APPCONF_IMU_G_OFFSET_2;
+#ifndef APPCONF_ADC_RESC_SMART_REV
+#define APPCONF_ADC_RESC_SMART_REV 0
+#endif
+    c->app_adc_conf_resc_smart_rev = (uint8_t)(APPCONF_ADC_RESC_SMART_REV);
+#ifndef APPCONF_ADC_RESC_SMART_REV_ERPM
+#define APPCONF_ADC_RESC_SMART_REV_ERPM 1000
+#endif
+    c->app_adc_conf_resc_smart_rev_erpm = (float)(APPCONF_ADC_RESC_SMART_REV_ERPM);
+#ifndef APPCONF_ADC_RESC_SMART_REV_MAX_DUTY
+#define APPCONF_ADC_RESC_SMART_REV_MAX_DUTY 0.07
+#endif
+    c->app_adc_conf_resc_smart_rev_max_duty = (float)(APPCONF_ADC_RESC_SMART_REV_MAX_DUTY);
+#ifndef APPCONF_ADC_RESC_SMART_REV_RAMP_TIME
+#define APPCONF_ADC_RESC_SMART_REV_RAMP_TIME 3
+#endif
+    c->app_adc_conf_resc_smart_rev_ramp_time = (float)(APPCONF_ADC_RESC_SMART_REV_RAMP_TIME);
+#ifndef APPCONF_ADC_RESC_HYBRID
+#define APPCONF_ADC_RESC_HYBRID 0
+#endif
+    c->app_adc_conf_resc_hybrid = (uint8_t)(APPCONF_ADC_RESC_HYBRID);
+#ifndef APPCONF_ADC_RESC_HYBRID_DUTY
+#define APPCONF_ADC_RESC_HYBRID_DUTY 1
+#endif
+    c->app_adc_conf_resc_hybrid_duty = (float)(APPCONF_ADC_RESC_HYBRID_DUTY);
+#ifndef APPCONF_ADC_RESC_HYBRID_BAND
+#define APPCONF_ADC_RESC_HYBRID_BAND 0.15
+#endif
+    c->app_adc_conf_resc_hybrid_band = (float)(APPCONF_ADC_RESC_HYBRID_BAND);
 #ifdef RESC_CONF_PROFILE_RESC
     /* defauts propres au profil RESC (valeurs du XML RESC) */
 #endif
@@ -2019,20 +2059,27 @@ const conf_field_t vesc_appconf_fields[] = {
     { 0x96001835u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_0), 0, "imu_conf_gyro_offsets_0" },
     { 0xE10728A3u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_1), 0, "imu_conf_gyro_offsets_1" },
     { 0x780E7919u, (uint16_t)offsetof(vesc_appconf_t, imu_conf_gyro_offsets_2), 0, "imu_conf_gyro_offsets_2" },
+    { 0x40ED7B66u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_smart_rev), 1, "app_adc_conf_resc_smart_rev" },
+    { 0xC0DFD99Du, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_smart_rev_erpm), 0, "app_adc_conf_resc_smart_rev_erpm" },
+    { 0x4767B852u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_smart_rev_max_duty), 0, "app_adc_conf_resc_smart_rev_max_duty" },
+    { 0x8E80AD94u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_smart_rev_ramp_time), 0, "app_adc_conf_resc_smart_rev_ramp_time" },
+    { 0xF7D22C6Du, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid), 1, "app_adc_conf_resc_hybrid" },
+    { 0xA62325DCu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid_duty), 0, "app_adc_conf_resc_hybrid_duty" },
+    { 0x4B4CE7AEu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid_band), 0, "app_adc_conf_resc_hybrid_band" },
 };
-const uint16_t vesc_appconf_nfields = 121;
+const uint16_t vesc_appconf_nfields = 128;
 
 
 /* choix dependant de la carte (mcconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3988168616u;
+__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3387911185u;
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 2 };
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode_n = 3;
-__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 1, 2, 3, 4, 7, 8, 10, 13, 15, 16 };
-__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 10;
+__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16 };
+__attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 16;
 
 /* choix dependant de la carte (appconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 3809187766u;
+__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 3017840187u;
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type[] = { 0, 1, 4 };
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type_n = 3;

@@ -47,6 +47,8 @@ void ctrl_set_duty(float d) { rec("duty", d); }
 void ctrl_set_rpm(float e) { rec("rpm", e); }
 void ctrl_set_pos(float p) { rec("pos", p); }
 void ctrl_release(void) { rec("release", 0); }
+static float hyb_lim, hyb_band;
+void ctrl_set_current_hybrid(float a, float lim, float band) { rec("hyb", a); hyb_lim = lim; hyb_band = band; }
 const ctrl_limits_t *ctrl_limits(void) { return &L; }
 
 static can_peer_t peers[2];
@@ -139,6 +141,43 @@ int main(void)
     g_appconf.app_adc_conf_ctrl_type = 3; in_adc[1] = 3.0f; in_rev = true; tick(20);
     check("bouton marche arriere : courant negatif", !strcmp(last_kind, "cur_rel") && last_val < -0.95f);
     in_rev = false;
+    in_adc[1] = 1.0f; n_cmd = 0; tick(50);
+    check("gaz relache : un seul courant nul, puis silence (frein a main de l'outil possible)",
+          n_cmd == 1 && !strcmp(last_kind, "cur_rel") && fabsf(last_val) < 1e-3f);
+    in_adc[1] = 2.0f; n_cmd = 0; tick(20);
+    check("gaz repris : commandes de nouveau envoyees", n_cmd >= 5 && last_val > 0.4f);
+    in_adc[1] = 1.0f; tick(20);
+
+    printf("== ADC, marche arriere intelligente (RESC)\n");
+    g_appconf.app_adc_conf_ctrl_type = 3; g_appconf.app_adc_conf_resc_smart_rev = 1;
+    g_appconf.app_adc_conf_resc_smart_rev_erpm = 1000; g_appconf.app_adc_conf_resc_smart_rev_max_duty = 0.1f;
+    g_appconf.app_adc_conf_resc_smart_rev_ramp_time = 1.0f;
+    in_rev = true; in_adc[1] = 3.0f; set_erpm(3000); tick(20);
+    check("marche arriere demandee en roulant : frein", !strcmp(last_kind, "brake_rel") && last_val > 0.95f);
+    set_erpm(500); tick(500);
+    check("sous le seuil : recul a rapport cyclique rampe (~ -0.05 apres 0.5 s)",
+          !strcmp(last_kind, "duty") && last_val < -0.04f && last_val > -0.06f);
+    tick(1000);
+    check("recul plafonne a Smart Reverse Max Duty", !strcmp(last_kind, "duty") && fabsf(last_val + 0.1f) < 1e-3f);
+    in_rev = false; tick(20);
+    check("gaz en avant : courant de nouveau", !strcmp(last_kind, "cur_rel") && last_val > 0.95f);
+    g_appconf.app_adc_conf_resc_smart_rev = 0; set_erpm(0);
+    in_adc[1] = 1.0f; tick(20);
+
+    printf("== ADC, commande hybride courant / rapport cyclique (RESC)\n");
+    g_appconf.app_adc_conf_ctrl_type = 1; g_appconf.app_adc_conf_resc_hybrid = 1;
+    g_appconf.app_adc_conf_resc_hybrid_duty = 1.0f; g_appconf.app_adc_conf_resc_hybrid_band = 0.2f;
+    in_adc[1] = 2.0f; tick(20);
+    check("mi-gaz : courant ~0.47 x 40 A, limite de duty ~0.47 x 0.95, bande 0.2",
+          !strcmp(last_kind, "hyb") && fabsf(last_val - 0.4737f * 40.0f) < 0.8f && fabsf(hyb_lim - 0.4737f * 0.95f) < 0.02f &&
+          fabsf(hyb_band - 0.2f) < 1e-4f);
+    g_appconf.app_adc_conf_resc_hybrid_duty = 0.5f; in_adc[1] = 3.0f; tick(20);
+    check("plein gaz, Duty Limit 50 % : limite 0.475", !strcmp(last_kind, "hyb") && fabsf(hyb_lim - 0.475f) < 0.01f);
+    in_adc[2] = 3.0f; g_appconf.app_adc_conf_ctrl_type = 8; tick(20);
+    check("frein ADC2 : non concerne par la limite", !strcmp(last_kind, "brake_rel"));
+    in_adc[2] = 1.0f; g_appconf.app_adc_conf_ctrl_type = 1;
+    g_appconf.app_adc_conf_resc_hybrid = 0; g_foc_telem.duty = 0.0f;
+    in_adc[1] = 1.0f; tick(20);
 
     printf("== VESC Remote (manette)\n");
     g_appconf.app_to_use = APP_UART;

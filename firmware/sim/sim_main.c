@@ -103,7 +103,7 @@ int main(void)
     p.obs_gain_slow = 0.05f;               /* defaut de la reference */
     p.i_abs_trip = 120;
     p.vbus_trip_max = 90; p.vbus_trip_min = 10;
-    p.st_i = 15; p.st_t_align = 0.3f; p.st_t_ramp = 1.0f;
+    p.st_i = 15; p.st_i_max = 60; p.st_t_align = 0.3f; p.st_t_ramp = 1.0f;
     p.st_omega = 1500 * 2 * 3.14159f / 60; p.st_omega_exit = 700 * 2 * 3.14159f / 60; p.st_timeout = 4;
     p.i_slew = 2000;
     if (getenv("SIM_CS")) p.cs_mode = (uint8_t)atoi(getenv("SIM_CS"));

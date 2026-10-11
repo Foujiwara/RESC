@@ -370,14 +370,6 @@ p, li { white-space: pre-wrap; }
             <suffix> V</suffix>
             <vTx>7</vTx>
         </l_battery_regen_cut_end>
-        <l_slow_abs_current>
-            <longName>Slow ABS Current Limit</longName>
-            <type>5</type>
-            <transmittable>1</transmittable>
-            <description>&lt;p&gt;Absolute current limit on the filtered current magnitude instead of each sample (the hardware analog watchdog is then set 50 % higher).&lt;/p&gt;</description>
-            <cDefine>MCCONF_L_SLOW_ABS_OVERCURRENT</cDefine>
-            <valInt>0</valInt>
-        </l_slow_abs_current>
         <l_temp_fet_start>
             <longName>MOSFET Temp Cutoff Start</longName>
             <type>2</type>
@@ -2926,20 +2918,26 @@ p, li { white-space: pre-wrap; }
             <longName>Sensor Port Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Encoder type used when the angle source (FOC, General) is Encoder.&lt;/p&gt;&lt;p&gt;&lt;b&gt;ABI&lt;/b&gt;: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. &lt;b&gt;AS5047&lt;/b&gt;, &lt;b&gt;AMT22&lt;/b&gt;: SPI on the Hall port (H1 SCK, H2 MISO, H3 CS). &lt;b&gt;TLE5012&lt;/b&gt;: SSC on the Hall port (H1 SCK, H2 data, H3 CS). &lt;b&gt;MT6816&lt;/b&gt;, &lt;b&gt;AS5X47U&lt;/b&gt;, &lt;b&gt;MA782&lt;/b&gt;: SPI1 on the COMM port (SCK, MISO, MOSI, NSS = CS). &lt;b&gt;AD2S1205&lt;/b&gt;: resolver converter, SPI on the COMM port pins. &lt;b&gt;Sin/Cos&lt;/b&gt;: analog sine on ADC1 and cosine on ADC2. &lt;b&gt;PWM&lt;/b&gt;: PWM output of the encoder on the servo input.&lt;/p&gt;&lt;p&gt;Absolute encoders are read every PWM period; an invalid sample (parity, CRC, magnet, signal level) keeps the previous angle. Then run the encoder detection (ratio, direction, offset).&lt;/p&gt;</description>
+            <description>&lt;p&gt;Encoder type used when the angle source (FOC, General) is Encoder.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Hall Sensors&lt;/b&gt;: the sensor port carries Hall sensors (angle source Hall Sensors); no encoder. &lt;b&gt;ABI&lt;/b&gt;: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. &lt;b&gt;PWM + ABI&lt;/b&gt;: ABI counts, re-synchronised on the absolute PWM position (servo input). &lt;b&gt;TS5700N8501&lt;/b&gt;: Tamagawa RS485 at 2.5 Mbit/s: RX of the COMM UART, TX driven by software, transceiver direction on the ADC1 pin (the COMM UART is then reserved). &lt;b&gt;BISSC&lt;/b&gt;: BiSS-C 22 bits on SPI1 (COMM port). &lt;b&gt;TLE5012 SSC HW&lt;/b&gt;: SSC on the COMM port pins (SCK, data on MOSI, CS on NSS). &lt;b&gt;AS5047&lt;/b&gt;, &lt;b&gt;AMT22&lt;/b&gt;: SPI on the Hall port (H1 SCK, H2 MISO, H3 CS). &lt;b&gt;TLE5012&lt;/b&gt;: SSC on the Hall port (H1 SCK, H2 data, H3 CS). &lt;b&gt;MT6816&lt;/b&gt;, &lt;b&gt;AS5X47U&lt;/b&gt;, &lt;b&gt;MA782&lt;/b&gt;: SPI1 on the COMM port (SCK, MISO, MOSI, NSS = CS). &lt;b&gt;AD2S1205&lt;/b&gt;: resolver converter, SPI on the COMM port pins. &lt;b&gt;Sin/Cos&lt;/b&gt;: analog sine on ADC1 and cosine on ADC2. &lt;b&gt;PWM&lt;/b&gt;: PWM output of the encoder on the servo input.&lt;/p&gt;&lt;p&gt;Absolute encoders are read every PWM period; an invalid sample (parity, CRC, magnet, signal level) keeps the previous angle. Then run the encoder detection (ratio, direction, offset).&lt;/p&gt;</description>
             <cDefine>MCCONF_M_SENSOR_PORT_MODE</cDefine>
             <valInt>0</valInt>
+            <enumNames>Hall Sensors</enumNames>
             <enumNames>ABI Encoder</enumNames>
             <enumNames>AS5047 Encoder</enumNames>
             <enumNames>AD2S1205 Resolver</enumNames>
             <enumNames>Sin/Cos Encoder</enumNames>
+            <enumNames>TS5700N8501 Encoder</enumNames>
+            <enumNames>TS5700N8501 Encoder (Multiturn)</enumNames>
             <enumNames>MT6816 Encoder (SPI)</enumNames>
             <enumNames>AS5X47U Encoder (SPI)</enumNames>
+            <enumNames>BISSC Encoder (SPI)</enumNames>
             <enumNames>TLE5012 Encoder (SSC SW)</enumNames>
+            <enumNames>TLE5012 Encoder (SSC HW)</enumNames>
             <enumNames>PWM</enumNames>
+            <enumNames>PWM + ABI</enumNames>
             <enumNames>MA782</enumNames>
             <enumNames>AMT22 (SW SPI)</enumNames>
-            <maxInt>9</maxInt>
+            <maxInt>15</maxInt>
         </m_sensor_port_mode>
         <m_invert_direction>
             <longName>Invert Motor Direction</longName>
@@ -3695,7 +3693,6 @@ p, li { white-space: pre-wrap; }
         <ser>l_battery_cut_end</ser>
         <ser>l_battery_regen_cut_start</ser>
         <ser>l_battery_regen_cut_end</ser>
-        <ser>l_slow_abs_current</ser>
         <ser>l_temp_fet_start</ser>
         <ser>l_temp_fet_end</ser>
         <ser>l_temp_motor_start</ser>
@@ -3890,7 +3887,6 @@ p, li { white-space: pre-wrap; }
                     <param>l_current_max</param>
                     <param>l_current_min</param>
                     <param>l_abs_current_max</param>
-                    <param>l_slow_abs_current</param>
                     <param>l_current_max_scale</param>
                     <param>l_current_min_scale</param>
                     <param>::sep::Battery</param>

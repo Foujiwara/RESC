@@ -48,6 +48,7 @@ static struct {
     uint32_t disable_until;
     uint32_t last_activity;
     uint32_t last_fault_seen;
+    bool out_idle;          /* derniere sortie nulle deja envoyee : l'app laisse la main */
     /* PPM */
     float ppm_ms, ppm_dec;
     float med[5];
@@ -61,6 +62,7 @@ static struct {
     chain_t ch_adc;
     bool cc_on;
     float cc_erpm;
+    float adc_sduty;        /* marche arriere intelligente : rapport cyclique rampe */
     /* manette */
     uint8_t js_x, js_y;
     bool bt_c, bt_z, rev_state, has_rev_state;
@@ -139,6 +141,14 @@ static void output(out_kind_t k, float v, bool multi, bool tc, float tc_max)
     const can_peer_t *peers = can_vesc_peers(&np);
     uint32_t now = s_now;
     float wmin = fm_abs(erpm_now());
+    /* Sortie nulle (ni gaz ni frein) : envoyee une seule fois, puis plus rien, pour que les commandes
+     * de l'outil ou du CAN (courant, frein a main, ...) ne soient pas ecrasees a chaque cycle */
+    if ((k == OUT_CUR_REL || k == OUT_BRAKE_REL || k == OUT_NONE) && fm_abs(v) < 0.001f) {
+        if (A.out_idle) return;
+        A.out_idle = true;
+    } else {
+        A.out_idle = false;
+    }
     if (multi && tc && k == OUT_CUR_REL && v > 0.0f) {
         for (int i = 0; i < np; i++)
             if (now - peers[i].ms < 100u && fm_abs(peers[i].erpm) < wmin) wmin = fm_abs(peers[i].erpm);
@@ -187,7 +197,7 @@ void apps_configure(void)
     if (A.pas_on) u = IN_UART_PAS;
     bool servo = A.ppm_on;
     /* codeur PWM sur l'entree servo (m_sensor_port_mode) : la broche lui appartient */
-    bool enc_pwm = g_mcconf.foc_sensor_mode == 1 && g_mcconf.m_sensor_port_mode == 13;
+    bool enc_pwm = g_mcconf.foc_sensor_mode == 1 && (g_mcconf.m_sensor_port_mode == 13 || g_mcconf.m_sensor_port_mode == 14);
     /* sortie servo (servo_out_enable) : sans application PPM et broche libre */
     bool servo_out = g_appconf.servo_out_enable && !servo && !enc_pwm;
     inputs_init(servo && !enc_pwm, u, enc_pwm || servo_out);
@@ -284,6 +294,7 @@ static void app_ppm(uint32_t now, float dt)
             float tgt = v * fm_sat(c->app_ppm_conf_smart_rev_max_duty, 0.0f, 1.0f);
             float tr = fm_max(c->app_ppm_conf_smart_rev_ramp_time, 0.01f);
             A.smart_duty += fm_sat_sym(tgt - A.smart_duty, dt / tr);
+            A.out_idle = false;
             ctrl_set_duty(A.smart_duty);
         }
         break;
@@ -296,6 +307,49 @@ static void app_ppm(uint32_t now, float dt)
 }
 
 /* ------------------------------------------------------------------- ADC */
+/* Courant relatif c (signe = sens) des types courant de l'ADC, avec les options RESC :
+ * marche arriere intelligente (types 2 a 5) et commande hybride courant / rapport cyclique (1 a 8). */
+static void adc_drive(float c, uint8_t type, bool multi, bool tc, float tcm, float step)
+{
+    const vesc_appconf_t *a = &g_appconf;
+    const ctrl_limits_t *l = ctrl_limits();
+    if (a->app_adc_conf_resc_smart_rev && type >= 2 && type <= 5 && c < 0.0f) {
+        if (erpm_now() > a->app_adc_conf_resc_smart_rev_erpm) {
+            /* encore en marche avant : frein proportionnel a la demande */
+            A.adc_sduty = 0.0f;
+            output(OUT_BRAKE_REL, c, multi, tc, tcm);
+        } else {
+            /* recul a rapport cyclique limite, atteint par une rampe */
+            float dmax = fm_sat(a->app_adc_conf_resc_smart_rev_max_duty, 0.0f, 1.0f);
+            float tr = fm_max(a->app_adc_conf_resc_smart_rev_ramp_time, 0.01f);
+            A.adc_sduty += fm_sat_sym(c * dmax - A.adc_sduty, dmax * step / tr);   /* 0 -> dmax en tr */
+            A.out_idle = false;
+            ctrl_set_duty(A.adc_sduty);
+        }
+        return;
+    }
+    A.adc_sduty = 0.0f;
+    if (a->app_adc_conf_resc_hybrid && type >= 1 && type <= 8 && fm_abs(c) > 0.001f) {
+        /* limite de rapport cyclique proportionnelle aux gaz ; le courant decroit lineairement sur
+         * la bande sous la limite et s'annule a la limite (pas de coupure brutale). Regulation dans
+         * ctrl (1 kHz, pont maintenu) ; les autres controleurs recoivent le courant deja reduit. */
+        float lim = fm_abs(c) * fm_sat(a->app_adc_conf_resc_hybrid_duty, 0.0f, 1.0f) * l->duty_max;
+        float bf = fm_sat(a->app_adc_conf_resc_hybrid_band, 0.01f, 1.0f);
+        A.out_idle = false;
+        ctrl_set_current_hybrid(c >= 0.0f ? c * l->i_max : -c * l->i_min, lim, bf);
+        if (multi) {
+            float d = g_foc_telem.duty * (c > 0.0f ? 1.0f : -1.0f);
+            float cr = c * fm_sat((lim - d) / fm_max(bf * lim, 0.002f), 0.0f, 1.0f);
+            int np = 0;
+            const can_peer_t *peers = can_vesc_peers(&np);
+            for (int i = 0; i < np; i++)
+                if (s_now - peers[i].ms < 100u) can_vesc_send_current_rel(peers[i].id, cr);
+        }
+        return;
+    }
+    output(OUT_CUR_REL, c, multi, tc, tcm);
+}
+
 static void app_adc(uint32_t now, float dt)
 {
     const vesc_appconf_t *c = &g_appconf;
@@ -354,14 +408,14 @@ static void app_adc(uint32_t now, float dt)
     A.cc_on = false;
 
     switch (type) {
-    case 1:  output(OUT_CUR_REL, v, multi, tc, tcm); break;
-    case 2:  output(OUT_CUR_REL, v, multi, tc, tcm); break;
-    case 3:  output(OUT_CUR_REL, v * dir, multi, tc, tcm); break;
-    case 4:  if (br > 0.0f) output(OUT_BRAKE_REL, br, multi, tc, tcm); else output(OUT_CUR_REL, v * dir, multi, tc, tcm); break;
-    case 5:  if (v >= 0.0f) output(OUT_CUR_REL, v * dir, multi, tc, tcm); else output(OUT_BRAKE_REL, v, multi, tc, tcm); break;
-    case 6:  if (v >= 0.0f) output(OUT_CUR_REL, v, multi, tc, tcm); else output(OUT_BRAKE_REL, v, multi, tc, tcm); break;
-    case 7:  if (rev) output(OUT_BRAKE_REL, v, multi, tc, tcm); else output(OUT_CUR_REL, v, multi, tc, tcm); break;
-    case 8:  if (br > 0.0f) output(OUT_BRAKE_REL, br, multi, tc, tcm); else output(OUT_CUR_REL, v, multi, tc, tcm); break;
+    case 1:  adc_drive(v, type, multi, tc, tcm, step); break;
+    case 2:  adc_drive(v, type, multi, tc, tcm, step); break;
+    case 3:  adc_drive(v * dir, type, multi, tc, tcm, step); break;
+    case 4:  if (br > 0.0f) output(OUT_BRAKE_REL, br, multi, tc, tcm); else adc_drive(v * dir, type, multi, tc, tcm, step); break;
+    case 5:  if (v >= 0.0f) adc_drive(v * dir, type, multi, tc, tcm, step); else output(OUT_BRAKE_REL, v, multi, tc, tcm); break;
+    case 6:  if (v >= 0.0f) adc_drive(v, type, multi, tc, tcm, step); else output(OUT_BRAKE_REL, v, multi, tc, tcm); break;
+    case 7:  if (rev) output(OUT_BRAKE_REL, v, multi, tc, tcm); else adc_drive(v, type, multi, tc, tcm, step); break;
+    case 8:  if (br > 0.0f) output(OUT_BRAKE_REL, br, multi, tc, tcm); else adc_drive(v, type, multi, tc, tcm, step); break;
     case 9:  output(OUT_DUTY, v, multi, tc, tcm); break;
     case 10: output(OUT_DUTY, v, multi, tc, tcm); break;
     case 11: output(OUT_DUTY, v * dir, multi, tc, tcm); break;
@@ -415,6 +469,7 @@ static void app_chuk(uint32_t now, float dt)
                 float tgt = -v * fm_sat(c->app_chuk_conf_smart_rev_max_duty, 0.0f, 1.0f);
                 float tr = fm_max(c->app_chuk_conf_smart_rev_ramp_time, 0.01f);
                 A.smart_duty += fm_sat_sym(tgt - A.smart_duty, dt / tr);
+                A.out_idle = false;
                 ctrl_set_duty(A.smart_duty);
             } else {
                 output(OUT_CUR_REL, -v, multi, tc, tcm);
@@ -501,6 +556,7 @@ void apps_tick_1khz(uint32_t now)
     bool disabled = A.disable_forever || (int32_t)(A.disable_until - now) > 0;
     if (killed || disabled) {
         A.ch_ppm.safe_ok = A.ch_adc.safe_ok = false;
+        A.out_idle = true;
         return;
     }
 
@@ -512,8 +568,9 @@ void apps_tick_1khz(uint32_t now)
         if (A.adc_on) {
             /* ADC + PAS : la poignee prime sur l'assistance */
             app_adc(now, dt);
-            if (A.ch_adc.val < 0.02f && p > 0.0f) { ctrl_set_current_rel(p); A.last_activity = now; }
+            if (A.ch_adc.val < 0.02f && p > 0.0f) { A.out_idle = false; ctrl_set_current_rel(p); A.last_activity = now; }
         } else if (p > 0.0f || fm_abs(A.pas_rpm) > 1.0f) {
+            A.out_idle = false;
             ctrl_set_current_rel(p);
             A.last_activity = now;
         }

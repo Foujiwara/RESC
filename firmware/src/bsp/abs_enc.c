@@ -14,10 +14,13 @@
 #include "platform.h"
 #include "inputs.h"
 #include "abs_enc_proto.h"
+#include "uart.h"
+#include "resc_conf.h"
 
 enum {
     PM_AS5047 = 2, PM_AD2S1205 = 3, PM_SINCOS = 4, PM_MT6816 = 7, PM_AS5X47U = 8,
-    PM_TLE5012 = 10, PM_PWM = 13, PM_MA782 = 15, PM_AMT22 = 16
+    PM_TLE5012 = 10, PM_PWM = 13, PM_MA782 = 15, PM_AMT22 = 16,
+    PM_TS5700 = 5, PM_TS5700_MT = 6, PM_BISSC = 9, PM_TLE5012_HW = 11, PM_PWM_ABI = 14
 };
 
 static uint8_t s_mode;
@@ -26,6 +29,21 @@ static float s_err_rate;
 static abs_enc_sincos_t s_sc;
 static float s_sin_f, s_cos_f;
 static uint8_t s_cs, s_sck, s_miso, s_mosi;     /* broches du SPI logiciel */
+/* BiSS-C : 8 octets recus par interruption de SPI1 */
+static volatile uint8_t s_bx[8];
+static volatile uint8_t s_bn;
+static volatile bool s_bdone, s_bbusy;
+static uint8_t s_crc6[64];
+/* TS5700N8501 */
+static uart_t *s_ts_u;
+static uint8_t s_ts_de;
+static uint32_t s_ts_t;
+static bool s_ts_wait;
+/* PWM + ABI */
+static TIM_TypeDef *s_abi;
+
+void abs_enc_set_abi_timer(void *tim) { s_abi = (TIM_TypeDef *)tim; }
+bool abs_enc_uart_owned(void) { return s_mode == PM_TS5700 || s_mode == PM_TS5700_MT; }
 
 uint32_t abs_enc_errors(void) { return s_err; }
 float abs_enc_error_rate(void) { return s_err_rate; }
@@ -95,6 +113,13 @@ static void spi1_init(uint32_t cr1)
 /* ---------------------------------------------------------------- configuration */
 void abs_enc_config(uint8_t m, const abs_enc_sincos_t *sc)
 {
+    if (abs_enc_uart_owned() && s_ts_u) {
+        /* fin du TS5700N8501 : UART rendu au port COMM a la vitesse des applications */
+        uart_set_baud(s_ts_u, g_appconf.app_uart_baudrate ? g_appconf.app_uart_baudrate : 115200u);
+        uart_attach_pins(BOARD_UART_INST, BOARD_UART_TX_PIN, BOARD_UART_RX_PIN);
+        gpio_cfg(s_ts_de, GPIO_MODE_AN, false, 0, GPIO_PUPD_NONE, 0);
+    }
+    NVIC_DisableIRQ(SPI1_IRQn);
     s_mode = abs_enc_supported(m) ? m : 0;
     if (sc) s_sc = *sc;
     s_err = 0;
@@ -106,6 +131,37 @@ void abs_enc_config(uint8_t m, const abs_enc_sincos_t *sc)
         gpio_out(s_cs, true);
         gpio_out(s_sck, false);
         gpio_cfg(s_miso, GPIO_MODE_IN, false, 3, GPIO_PUPD_UP, 0);
+        break;
+    case PM_TLE5012_HW:
+        /* SSC sur les broches du port COMM : donnees sur MOSI */
+        s_cs = BOARD_SPI_NSS_PIN; s_sck = BOARD_SPI_SCK_PIN; s_miso = BOARD_SPI_MOSI_PIN;
+        gpio_out(s_cs, true);
+        gpio_out(s_sck, false);
+        gpio_cfg(s_miso, GPIO_MODE_IN, false, 3, GPIO_PUPD_UP, 0);
+        break;
+    case PM_BISSC:      /* mode 3, 8 bits, APB2/32 ; reception par interruption */
+        for (int i = 0; i < 64; i++) {
+            int c = i;
+            for (int j = 0; j < 6; j++) c = (c & 0x20) ? ((c << 1) ^ 0x43) : (c << 1);
+            s_crc6[i] = (uint8_t)(c & 0x3F);
+        }
+        spi1_init(SPI_CR1_CPOL | SPI_CR1_CPHA | (4u << SPI_CR1_BR_Pos));
+        SPI1->CR2 = SPI_CR2_RXNEIE;
+        s_bdone = s_bbusy = false;
+        NVIC_SetPriority(SPI1_IRQn, PRIO_ADC_FOC + 1);
+        NVIC_EnableIRQ(SPI1_IRQn);
+        break;
+    case PM_TS5700: case PM_TS5700_MT:
+        /* RS485 a 2.5 Mbit/s : reception par l'UART du port COMM, emission logicielle sur TX,
+         * sens (DE) sur la broche de l'entree ADC 1 */
+        s_ts_u = uart_get(BOARD_UART_INST);
+        s_ts_de = BOARD_ADC_EXT1_CH != HW_ADC_CH_NONE ? adc_ch_pin(BOARD_ADC_EXT1_CH) : HW_PIN_NONE;
+        if (!s_ts_u || s_ts_de == HW_PIN_NONE) { s_mode = 0; break; }
+        uart_set_baud(s_ts_u, 2500000u);
+        uart_attach_pins(BOARD_UART_INST, HW_PIN_NONE, BOARD_UART_RX_PIN);
+        gpio_out(BOARD_UART_TX_PIN, true);
+        gpio_out(s_ts_de, false);
+        s_ts_wait = false;
         break;
     case PM_AD2S1205:
         s_cs = BOARD_SPI_NSS_PIN; s_sck = BOARD_SPI_SCK_PIN; s_miso = BOARD_SPI_MISO_PIN;
@@ -122,7 +178,7 @@ void abs_enc_config(uint8_t m, const abs_enc_sincos_t *sc)
     case PM_MA782:       /* mode 0, 16 bits, APB2/32 */
         spi1_init(SPI_CR1_DFF | (4u << SPI_CR1_BR_Pos));
         break;
-    case PM_PWM:
+    case PM_PWM: case PM_PWM_ABI:
 #if BOARD_SERVO_PIN != HW_PIN_NONE && BOARD_ENC_TIM != 4
         RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
         __DSB();
@@ -181,6 +237,7 @@ RAMFUNC bool abs_enc_sample(uint32_t *counts)
         if (abs_amt22_ok(p)) good(p & 0x3FFFu); else bad();
     } break;
 
+    case PM_TLE5012_HW:
     case PM_TLE5012: {
         /* lecture de AVAL (adresse 0x02) avec mot de securite ; CRC8 (0x1D, graine 0xFF) */
         uint16_t cmd = (uint16_t)((1u << 15) | (0x02u << 4) | 1u);
@@ -265,9 +322,121 @@ RAMFUNC bool abs_enc_sample(uint32_t *counts)
         }
         break;
 
+    case PM_PWM_ABI:
+        /* ABI incremental ; chaque periode PWM recale le compteur sur la position absolue */
+        if (!s_abi) return false;
+        if (TIM4->SR & TIM_SR_CC1IF) {
+            uint32_t per = TIM4->CCR1, w = TIM4->CCR2;
+            if (per > 10u) s_abi->CNT = (uint32_t)((float)(w < per ? w : per) / (float)per * (float)(s_abi->ARR + 1u)) % (s_abi->ARR + 1u);
+        }
+        *counts = s_abi->CNT;
+        return true;
+
+    case PM_BISSC:
+        if (s_bdone) {
+            /* trame alignee sur le premier 1 (debut), 2 bits retires, position 22 bits, erreur,
+             * avertissement, CRC6 inverse */
+            uint64_t v = 0;
+            for (int k = 0; k < 8; k++) v = v << 8 | s_bx[k];
+            s_bdone = false;
+            if (v) {
+                v <<= __builtin_clzll(v);
+                v &= 0x3FFFFFFFFFFFFFFFull;
+                int nb = 64 - (v ? __builtin_clzll(v) : 64);
+                if (nb >= 22 + 10) v >>= (unsigned)(nb - (22 + 10));
+                uint8_t crc_rx = (uint8_t)(v & 0x3Fu);
+                uint32_t d = (uint32_t)(v >> 6) & ((1u << 24) - 1u);
+                uint8_t c = (uint8_t)((d >> 30) & 0x03u);
+                for (int sh = 18; sh >= 0; sh -= 6) c = s_crc6[((d >> sh) & 0x3Fu) ^ c];
+                c = (uint8_t)(0x3Fu & ~c);
+                uint32_t pos = (d >> 2) & ((1u << 22) - 1u);
+                if (c == crc_rx) good(pos >> 8); else bad();
+            } else {
+                bad();
+            }
+        }
+        if (!s_bbusy) {
+            /* trame suivante : 8 octets, l'interruption enchaine */
+            s_bn = 0;
+            s_bbusy = true;
+            gpio_write(BOARD_SPI_NSS_PIN, false);
+            (void)SPI1->DR;
+            SPI1->DR = 0xFF;
+        }
+        break;
+
+    case PM_TS5700: case PM_TS5700_MT:
+        break;      /* echanges dans abs_enc_poll() */
+
     default:
         return false;
     }
     *counts = s_last;
     return true;
+}
+
+/* BiSS-C : un octet recu, le suivant est demande ; fin de trame apres 8 octets */
+RAMFUNC void SPI1_IRQHandler(void)
+{
+    if (!(SPI1->SR & SPI_SR_RXNE)) return;
+    uint8_t b = (uint8_t)SPI1->DR;
+    if (!s_bbusy) return;
+    s_bx[s_bn++] = b;
+    if (s_bn < 8) {
+        SPI1->DR = 0xFF;
+    } else {
+        gpio_write(BOARD_SPI_NSS_PIN, true);
+        s_bbusy = false;
+        s_bdone = true;
+    }
+}
+
+/* TS5700N8501 : un octet a 2.5 Mbit/s, poids fort en tete comme le pilote VESC, emission
+ * logicielle cadencee sur le compteur de cycles, sens (DE) pilote autour */
+static void ts_send(uint8_t b)
+{
+    const uint32_t bit = 168000000u / 2500000u;      /* 67 cycles */
+    __disable_irq();
+    gpio_write(s_ts_de, true);
+    uint32_t t = DWT->CYCCNT + bit;
+    while ((int32_t)(DWT->CYCCNT - t) < 0) { }
+    gpio_write(BOARD_UART_TX_PIN, false);            /* depart */
+    t += bit;
+    for (int i = 0; i < 8; i++) {
+        while ((int32_t)(DWT->CYCCNT - t) < 0) { }
+        gpio_write(BOARD_UART_TX_PIN, (b & (0x80u >> i)) != 0);
+        t += bit;
+    }
+    while ((int32_t)(DWT->CYCCNT - t) < 0) { }
+    gpio_write(BOARD_UART_TX_PIN, true);             /* arret */
+    t += bit;
+    while ((int32_t)(DWT->CYCCNT - t) < 0) { }
+    gpio_write(s_ts_de, false);                      /* reception : la reponse part apres ~3 us */
+    __enable_irq();
+}
+
+void abs_enc_poll(uint32_t now_us)
+{
+    if (!abs_enc_uart_owned() || !s_ts_u) return;
+    if (s_ts_wait) {
+        if (now_us - s_ts_t < 600u) return;          /* 11 octets en 44 us, marge */
+        uint8_t rep[11];
+        int n = 0, c;
+        while ((c = uart_getc(s_ts_u)) >= 0) if (n < 11) rep[n++] = (uint8_t)c;
+        uint8_t x = 0;
+        for (int i = 0; i < n - 1; i++) x ^= rep[i];
+        if (n == 11 && x == rep[10]) {
+            uint32_t pos = (uint32_t)rep[2] | (uint32_t)rep[3] << 8 | (uint32_t)rep[4] << 16;   /* 17 bits */
+            good(pos >> 3);
+        } else {
+            bad();
+        }
+        s_ts_wait = false;
+    }
+    if (now_us - s_ts_t >= 1000u) {
+        while (uart_getc(s_ts_u) >= 0) { }
+        ts_send(0x58);                               /* lecture de la position (0b01011000) */
+        s_ts_t = now_us;
+        s_ts_wait = true;
+    }
 }

@@ -16,7 +16,7 @@ int main(void){
     p.f_pwm=15000;p.i_scale=M.i_lsb;p.v_scale=M.v_lsb;p.vph_scale=M.vph_lsb;p.cs_lowside=true;
     p.r=0.06;p.ld=90e-6;p.lq=110e-6;p.lambda=0.018;p.kp=0.1;p.ki=60;p.obs_gamma=1e3/(0.018*0.018);
     p.pll_kp=2000;p.pll_ki=30000;p.dt_comp=400e-9;p.m_max=0.95;p.t_win=3e-6;p.delay_comp=1;
-    p.i_abs_trip=120;p.vbus_trip_max=90;p.vbus_trip_min=10;p.st_i=15;p.st_t_align=0.3;p.st_t_ramp=1;
+    p.i_abs_trip=120;p.vbus_trip_max=90;p.vbus_trip_min=10;p.st_i=15;p.st_i_max=60;p.st_t_align=0.3;p.st_t_ramp=1;
     p.st_omega=1500*2*M_PI/60;p.st_omega_exit=700*2*M_PI/60;p.st_timeout=4;p.i_slew=2000;
     foc_init(&p);
     for(int k=0;k<6000;k++){foc_isr(&ADC,&OUT);sim_step(&M,&OUT,&ADC);}

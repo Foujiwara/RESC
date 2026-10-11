@@ -39,6 +39,8 @@ MC_REMOVE = [
     "m_dc_f_sw", "l_max_erpm_fbrake", "l_max_erpm_fbrake_cc",
     # entrees et capteurs absents ou non pris en charge
     "m_drv8301_oc_mode", "m_drv8301_oc_adj",
+    # limite lente du courant absolu (non reprise : la limite reste echantillon par echantillon)
+    "l_slow_abs_current",
 ] + ["hall_table__%d" % k for k in range(8)] + [
 ]
 APP_REMOVE = [
@@ -178,7 +180,13 @@ MC_EDIT = {
         "relayed to it.")),
     "m_sensor_port_mode": dict(description=html(
         "Encoder type used when the angle source (FOC, General) is Encoder.",
+        "<b>Hall Sensors</b>: the sensor port carries Hall sensors (angle source Hall Sensors); no encoder. "
         "<b>ABI</b>: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. "
+        "<b>PWM + ABI</b>: ABI counts, re-synchronised on the absolute PWM position (servo input). "
+        "<b>TS5700N8501</b>: Tamagawa RS485 at 2.5 Mbit/s: RX of the COMM UART, TX driven by software, "
+        "transceiver direction on the ADC1 pin (the COMM UART is then reserved). "
+        "<b>BISSC</b>: BiSS-C 22 bits on SPI1 (COMM port). <b>TLE5012 SSC HW</b>: SSC on the COMM port pins "
+        "(SCK, data on MOSI, CS on NSS). "
         "<b>AS5047</b>, <b>AMT22</b>: SPI on the Hall port (H1 SCK, H2 MISO, H3 CS). "
         "<b>TLE5012</b>: SSC on the Hall port (H1 SCK, H2 data, H3 CS). "
         "<b>MT6816</b>, <b>AS5X47U</b>, <b>MA782</b>: SPI1 on the COMM port (SCK, MISO, MOSI, NSS = CS). "
@@ -189,9 +197,6 @@ MC_EDIT = {
         "level) keeps the previous angle. Then run the encoder detection (ratio, direction, offset).")),
     "m_encoder_sincos_phase_correction": dict(description=html(
         "Sin/Cos encoder: phase error between the two signals (degrees).")),
-    "l_slow_abs_current": dict(description=html(
-        "Absolute current limit on the filtered current magnitude instead of each sample (the hardware "
-        "analog watchdog is then set 50 % higher).")),
 }
 APP_EDIT = {
     "imu_conf.type": dict(description=html(
@@ -246,9 +251,11 @@ ENUM_KEEP = {
     "foc_hfi_amb_mode": [(1, "Id Single Pulse"), (2, "Id Double Pulse")],
     "foc_offsets_cal_mode": [(0, "Calibrate on Boot")],
     "bms.limit_mode": [(0, "Overtemp"), (1, "SOC"), (2, "VCell Min"), (3, "VCell Max")],
-    "m_sensor_port_mode": [(1, "ABI Encoder"), (2, "AS5047 Encoder"), (3, "AD2S1205 Resolver"),
-                           (4, "Sin/Cos Encoder"), (7, "MT6816 Encoder (SPI)"), (8, "AS5X47U Encoder (SPI)"),
-                           (10, "TLE5012 Encoder (SSC SW)"), (13, "PWM"), (15, "MA782"), (16, "AMT22 (SW SPI)")],
+    "m_sensor_port_mode": [(0, "Hall Sensors"), (1, "ABI Encoder"), (2, "AS5047 Encoder"), (3, "AD2S1205 Resolver"),
+                           (4, "Sin/Cos Encoder"), (5, "TS5700N8501 Encoder"), (6, "TS5700N8501 Encoder (Multiturn)"),
+                           (7, "MT6816 Encoder (SPI)"), (8, "AS5X47U Encoder (SPI)"), (9, "BISSC Encoder (SPI)"),
+                           (10, "TLE5012 Encoder (SSC SW)"), (11, "TLE5012 Encoder (SSC HW)"), (13, "PWM"),
+                           (14, "PWM + ABI"), (15, "MA782"), (16, "AMT22 (SW SPI)")],
     "foc_control_sample_mode": [(0, "V0 Only"), (2, "V0 and V7 Interpolation"), (1, "V0 and V7")],
     "foc_current_sample_mode": [(0, "Longest Zero Time"), (1, "All Sensors Combined"), (2, "High Current")],
     "m_out_aux_mode": [(0, "Off"), (1, "On after 2 seconds"), (2, "On after 5 seconds"), (3, "On after 10 seconds"),
@@ -343,6 +350,53 @@ MC_ADD = [
         description=html("Highest current step of the resistance measurement, as a fraction of Motor Current "
                          "Max. Steps at 1/2, 3/4 and 1 of it; R is the slope dV/dI.")),
      "FOC", "Advanced", None),
+]
+
+# App ADC : marche arriere intelligente et commande hybride courant / rapport cyclique
+_SR = ("Applies to the reverse current control types (Reverse Center, Reverse Button, Reverse ADC2 Brake "
+       "Button, Reverse Button Brake Center).")
+APP_ADD = [
+    ("app_adc_conf.resc_smart_rev", "app_adc_conf.use_filter", dict(
+        longName="Smart Reverse", cDefine="APPCONF_ADC_RESC_SMART_REV", valInt="0",
+        description=html("Reverse request while rolling forward: brake (current proportional to the request). "
+                         "Below Smart Reverse Brake Above ERPM: reverse at a limited duty cycle, reached with "
+                         "a ramp, like the PPM Smart Reverse.", _SR)),
+     "ADC", "General", "Smart Reverse"),
+    ("app_adc_conf.resc_smart_rev_erpm", "app_ppm_conf.max_erpm_for_dir", dict(
+        longName="Smart Reverse Brake Above ERPM", cDefine="APPCONF_ADC_RESC_SMART_REV_ERPM", valDouble="1000",
+        description=html("Forward speed above which a reverse request brakes. Below it, the motor reverses.")),
+     "ADC", "General", None),
+    ("app_adc_conf.resc_smart_rev_max_duty", "app_ppm_conf.smart_rev_max_duty", dict(
+        longName="Smart Reverse Max Duty Cycle", cDefine="APPCONF_ADC_RESC_SMART_REV_MAX_DUTY", valDouble="0.07",
+        description=html("Duty cycle in reverse at full request.")),
+     "ADC", "General", None),
+    ("app_adc_conf.resc_smart_rev_ramp_time", "app_ppm_conf.smart_rev_ramp_time", dict(
+        longName="Smart Reverse Ramp Time", cDefine="APPCONF_ADC_RESC_SMART_REV_RAMP_TIME", valDouble="3",
+        description=html("Time to go from 0 to Smart Reverse Max Duty Cycle.")),
+     "ADC", "General", None),
+    ("app_adc_conf.resc_hybrid", "app_adc_conf.use_filter", dict(
+        longName="Hybrid Current / Duty Control", cDefine="APPCONF_ADC_RESC_HYBRID", valInt="0",
+        description=html("Current control with a duty cycle limit proportional to the throttle: half throttle "
+                         "gives half torque and, without load, about half speed (in current control alone, a few "
+                         "percent of throttle bring an unloaded motor to full speed).",
+                         "Duty limit = throttle x Duty Limit at Full Throttle x Maximum Duty Cycle. The current "
+                         "is reduced linearly over the Current Taper Band below the limit and reaches zero at the "
+                         "limit, so the speed settles without a sudden cut. Braking is not affected.",
+                         "Applies to the current control types.")),
+     "ADC", "General", "Hybrid Current / Duty"),
+    ("app_adc_conf.resc_hybrid_duty", "app_ppm_conf.smart_rev_max_duty", dict(
+        longName="Duty Limit at Full Throttle", cDefine="APPCONF_ADC_RESC_HYBRID_DUTY", valDouble="1",
+        minDouble="0.05",
+        description=html("Duty cycle limit at full throttle, as a fraction of Maximum Duty Cycle (Motor, "
+                         "General). Lower it to cap the top speed.")),
+     "ADC", "General", None),
+    ("app_adc_conf.resc_hybrid_band", "app_ppm_conf.smart_rev_max_duty", dict(
+        longName="Current Taper Band", cDefine="APPCONF_ADC_RESC_HYBRID_BAND", valDouble="0.15",
+        minDouble="0.02", maxDouble="0.6",
+        description=html("Part of the duty cycle limit over which the current decreases to zero. Wider: "
+                         "softer approach of the limit, the speed settles a little lower under load. "
+                         "Narrower: firmer, the current is held closer to the limit.")),
+     "ADC", "General", None),
 ]
 
 
@@ -506,6 +560,7 @@ def main():
     put_first(mc, MC_FIRST)
     remove(app, APP_REMOVE)
     edit(app, APP_EDIT)
+    add(app, APP_ADD)
     remove(mc, MC_HIDE, hide_only=True)
     drop_unserialized(mc)
     drop_unserialized(app)

@@ -82,7 +82,7 @@ static void cmd_conf(void)
       (double)p->pll_kp, (double)p->pll_ki);
     P("Limites effectives : I=%.1f/%.1f A  Ibat=%.1f/%.1f A  Iabs=%.1f A  (plafond carte %.0f %%)", (double)l->i_min,
       (double)l->i_max, (double)l->i_in_min, (double)l->i_in_max, (double)p->i_abs_trip, (double)(resc_current_cap_frac() * 100.0f));
-    P("Demarrage : I=%.1f A, %.0f ERPM, rampe %.2f s ; Vbus %.1f-%.1f V", (double)p->st_i,
+    P("Demarrage : I=consigne (%.1f-%.1f A), %.0f ERPM, rampe %.2f s ; Vbus %.1f-%.1f V", (double)p->st_i, (double)p->st_i_max,
       (double)(p->st_omega * 60.0f / 6.2831853f), (double)p->st_t_ramp, (double)p->vbus_trip_min, (double)p->vbus_trip_max);
 }
 

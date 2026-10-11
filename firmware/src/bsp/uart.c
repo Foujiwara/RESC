@@ -69,6 +69,8 @@ uart_t *uart_open(int inst, uint8_t tx, uint8_t rx, uint32_t baud)
     return u;
 }
 
+uart_t *uart_get(int inst) { return (inst >= 1 && inst <= 6) ? s_by_inst[inst] : 0; }
+
 /* Rebranche les broches d'un UART deja ouvert (apres usage en entrees par les applications) */
 void uart_attach_pins(int inst, uint8_t tx, uint8_t rx)
 {

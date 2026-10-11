@@ -2,7 +2,8 @@
  * conf_desc.c — Commande COMM_RESC_GET_CONF_XML (250) : description XML de la configuration.
  *
  *   requete : [250][conf u8][len i32][offset i32]          (gros-boutiste)
- *             conf : 0 = mcconf, 1 = appconf, 2 = info
+ *             conf : 0 = mcconf, 1 = appconf, 2 = info ; bit 7 (0x80 | conf) : variante complete
+ *             (reponse avec le meme octet)
  *   reponse : [250][conf u8][total i32][offset i32][donnees offset .. offset+n-1]
  *             n = min(len, 400, total - offset), 0 si offset hors limites ou len <= 0
  *             total = taille du XML compresse (qCompress : u32 taille + zlib) ; 0 si non fourni
@@ -14,6 +15,10 @@
  * configuration en cours : RESC Tool n'affiche que ce qui sert (type de moteur, capteur, options).
  * La taille et l'adler32 des onglets sont recalcules a chaque demande a l'offset 0 (debut du
  * telechargement) ; les morceaux suivants regenerent seulement la portion de texte demandee.
+ *
+ * Variante complete (bit 7, RESC Tool qui evalue les conditions) : tous les onglets, chacun avec
+ * son attribut visibleIf s'il en a un, puis une section <Pages>. Seules les conditions qui ne
+ * dependent que de la carte sont evaluees ici. <Params> et <SerOrder> sont identiques.
  */
 #include <string.h>
 #include "conf_desc.h"
@@ -31,13 +36,13 @@ typedef struct {
     uint32_t text_len;
     uint32_t adler;
 } layout_t;
-static layout_t s_lay[2];
+static layout_t s_lay[2][2];      /* [conf][variante complete] */
 
 void conf_desc_source(const vesc_mcconf_t *mc, const vesc_appconf_t *app)
 {
     s_mc = mc;
     s_app = app;
-    s_lay[0].valid = s_lay[1].valid = false;
+    s_lay[0][0].valid = s_lay[1][0].valid = s_lay[0][1].valid = s_lay[1][1].valid = false;
 }
 
 /* ---------------------------------------------------------------- texte des onglets */
@@ -65,51 +70,77 @@ static void put(sink_t *s, const char *t)
 
 static bool is_sep(const conf_grp_t *e) { return strncmp(e->text, "::sep::", 7) == 0; }
 
-static bool shown(const conf_desc_t *d, const conf_grp_t *e)
+/* full : variante complete, seules les conditions de la carte sont evaluees */
+static bool shown(const conf_desc_t *d, const conf_grp_t *e, bool full)
 {
     if (e->kind != 'P' || is_sep(e)) return false;
+    if (full) return e->vif != CONF_VIF_BOARD || d->vis(e->cond, s_mc, s_app);
     return e->cond == 0 || !s_mc || !s_app || d->vis(e->cond, s_mc, s_app);
 }
 
 /* un parametre visible avant la fin de l'onglet (ou avant le prochain separateur si stop_sep) */
-static bool any_shown(const conf_desc_t *d, const conf_grp_t *e, bool stop_sep, bool stop_sub)
+static bool any_shown(const conf_desc_t *d, const conf_grp_t *e, bool stop_sep, bool stop_sub, bool full)
 {
     for (; e->kind == 'P' || (!stop_sub && e->kind == 'S'); e++) {
         if (e->kind == 'P' && stop_sep && is_sep(e)) return false;
-        if (shown(d, e)) return true;
+        if (shown(d, e, full)) return true;
     }
     return false;
 }
 
-static void gen(const conf_desc_t *d, sink_t *s)
+/* ouverture d'un element avec son attribut visibleIf (variante complete) */
+static void open_tag(const conf_desc_t *d, sink_t *s, const char *tag, const conf_grp_t *e, bool full)
+{
+    put(s, "<");
+    put(s, tag);
+    if (full && e->vif != 0 && e->vif != CONF_VIF_BOARD) {
+        put(s, " visibleIf=\"");
+        put(s, d->vif[e->vif]);
+        put(s, "\"");
+    }
+    put(s, ">");
+}
+
+static void gen(const conf_desc_t *d, sink_t *s, bool full)
 {
     put(s, "<Grouping>");
     const conf_grp_t *e = d->grp;
     while (e->kind == 'G') {
-        bool gvis = any_shown(d, e + 1, false, false);
-        if (gvis) { put(s, "<group><groupName>"); put(s, e->text); put(s, "</groupName>"); }
+        bool gvis = any_shown(d, e + 1, false, false, full);
+        if (gvis) { open_tag(d, s, "group", e, full); put(s, "<groupName>"); put(s, e->text); put(s, "</groupName>"); }
         e++;
         while (e->kind == 'S') {
-            bool svis = any_shown(d, e + 1, false, true);
-            if (svis) { put(s, "<subgroup><subgroupName>"); put(s, e->text); put(s, "</subgroupName><subgroupParams>"); }
+            bool svis = any_shown(d, e + 1, false, true, full);
+            if (svis) {
+                open_tag(d, s, "subgroup", e, full);
+                put(s, "<subgroupName>"); put(s, e->text); put(s, "</subgroupName><subgroupParams>");
+            }
             e++;
             for (; e->kind == 'P'; e++) {
                 if (!svis) continue;
-                if (is_sep(e) ? any_shown(d, e + 1, true, true) : shown(d, e)) {
-                    put(s, "<param>"); put(s, e->text); put(s, "</param>");
+                if (is_sep(e) ? any_shown(d, e + 1, true, true, full) : shown(d, e, full)) {
+                    open_tag(d, s, "param", e, full); put(s, e->text); put(s, "</param>");
                 }
             }
             if (svis) put(s, "</subgroupParams></subgroup>");
         }
         if (gvis) put(s, "</group>");
     }
-    put(s, "</Grouping>\n</ConfigParams>\n");
+    put(s, "</Grouping>\n");
+    if (full && d->pages[0].name) {
+        put(s, "<Pages>");
+        for (const conf_page_t *p = d->pages; p->name; p++) {
+            put(s, "<page name=\""); put(s, p->name); put(s, "\" visibleIf=\""); put(s, p->vif); put(s, "\"/>");
+        }
+        put(s, "</Pages>\n");
+    }
+    put(s, "</ConfigParams>\n");
 }
 
-static void layout(const conf_desc_t *d, layout_t *l)
+static void layout(const conf_desc_t *d, layout_t *l, bool full)
 {
     sink_t s = { 0, 0, 0, 0, d->adler & 0xFFFFu, d->adler >> 16, true };
-    gen(d, &s);
+    gen(d, &s, full);
     l->text_len = s.pos;
     l->adler = (s.b << 16) | s.a;
     l->valid = true;
@@ -122,7 +153,7 @@ static uint32_t total_len(const conf_desc_t *d, const layout_t *l)
 }
 
 /* octets [off, off + k) du flux complet */
-static void stream_copy(const conf_desc_t *d, const layout_t *l, uint32_t off, uint32_t k, uint8_t *out)
+static void stream_copy(const conf_desc_t *d, const layout_t *l, bool full, uint32_t off, uint32_t k, uint8_t *out)
 {
     uint32_t raw = d->raw_len + l->text_len;
     uint32_t st0 = 4u + d->z_len;                         /* debut des blocs non compresses */
@@ -138,7 +169,7 @@ static void stream_copy(const conf_desc_t *d, const layout_t *l, uint32_t off, u
         t1 = t0 + (b - a);
         if (t1 > l->text_len) t1 = l->text_len;
         sink_t s = { 0, t0, t1, txt, 0, 0, false };
-        gen(d, &s);
+        gen(d, &s, full);
     }
     for (uint32_t i = 0; i < k; i++) {
         uint32_t p = off + i;
@@ -172,23 +203,25 @@ int32_t conf_desc_reply(const uint8_t *d, uint32_t n, uint8_t *out)
         return o;
     }
     int32_t i = 0;
-    uint8_t conf = vb_get_u8(d, &i);
+    uint8_t cb = vb_get_u8(d, &i);
+    uint8_t conf = cb & 0x7Fu;
+    bool full = (cb & 0x80u) != 0;
     int32_t len = vb_get_i32(d, &i);
     int32_t off = vb_get_i32(d, &i);
     const conf_desc_t *desc = conf == 0 ? &conf_desc_mc : conf == 1 ? &conf_desc_app : 0;
     int32_t total = 0;
+    layout_t *l = desc ? &s_lay[conf][full] : 0;
     if (desc) {
-        layout_t *l = &s_lay[conf];
-        if (off == 0 || !l->valid) layout(desc, l);
+        if (off == 0 || !l->valid) layout(desc, l, full);
         total = (int32_t)total_len(desc, l);
     }
-    out[o++] = conf;
+    out[o++] = cb;
     vb_put_i32(out, total, &o);
     vb_put_i32(out, off, &o);
     if (desc && len > 0 && off >= 0 && off < total) {
         int32_t k = len < CHUNK_MAX ? len : CHUNK_MAX;
         if (k > total - off) k = total - off;
-        stream_copy(desc, &s_lay[conf], (uint32_t)off, (uint32_t)k, out + o);
+        stream_copy(desc, l, full, (uint32_t)off, (uint32_t)k, out + o);
         o += k;
     }
     return o;

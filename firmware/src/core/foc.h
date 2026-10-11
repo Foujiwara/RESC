@@ -82,12 +82,12 @@ typedef struct {
     float delay_comp;     /* retard compense, en periodes PWM */
     /* Protections rapides (dans l'ISR) */
     float i_abs_trip;     /* A crete */
-    bool  i_abs_slow;
-    bool  enc_slip_fault; /* defaut si la vitesse du codeur s'ecarte de celle de l'observateur */     /* limite sur le module filtre (l_slow_abs_current) au lieu de chaque echantillon */
+    bool  enc_slip_fault; /* defaut si la vitesse du codeur s'ecarte de celle de l'observateur */
     float vbus_trip_max;  /* V */
     float vbus_trip_min;  /* V (pont actif seulement) */
     /* Demarrage sensorless (I/f) */
-    float st_i;           /* A */
+    float st_i;           /* A : courant de demarrage minimal (foc_sl_openloop_boost_q) */
+    float st_i_max;       /* A : courant de demarrage maximal (foc_sl_openloop_max_q) */
     float st_t_align;     /* s */
     float st_t_ramp;      /* s, 0 -> vitesse de relais */
     float st_omega;       /* rad/s el., vitesse de relais vers l'observateur */

@@ -211,6 +211,25 @@
          * sur les graines 1 a 6 (SIM_SEED) ; le demarrage aboutit dans tous les cas */
         check("VSS : recul au demarrage limite (> -350 ERPM)", ERPM(wmin) > -350);
     }
+    printf("== 20b. VSS a 3 A (boost 0,5 A) : le courant de demarrage suit la consigne\n");
+    g_foc_cmd.run = 0; run(0.02);
+    p.st_i = 0.5f;
+    foc_set_params(&p);
+    {
+        STOP_AT(4.2);
+        g_foc_telem.i_phase_max = 0;
+        START(3);
+        double iqm = 0;
+        for (int j = 0; j < 300; j++) {
+            run(0.005);
+            if (foc_state() == FOC_ST_START && fabs(g_foc_telem.iq) > iqm) iqm = fabs(g_foc_telem.iq);
+        }
+        report("VSS 3 A");
+        printf("  iq max pendant le demarrage %.1f A, courant de phase max %.1f A\n", iqm, g_foc_telem.i_phase_max);
+        check("VSS 3 A : courant de demarrage <= 4,5 A (pas d'echelon a 30 % du courant max)",
+              iqm < 4.5);   /* le courant de phase max comprend les impulsions de levee d'ambiguite (30 A) */
+    }
+    p.st_i = p0.st_i;
     M.ld_sat = 0;
     p = p0;
     g_foc_cmd.run = 0; run(0.02);

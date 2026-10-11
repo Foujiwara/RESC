@@ -85,6 +85,14 @@ __attribute__((unused)) static int has(const uint8_t *b, int32_t n, const char *
     return 0;
 }
 
+/* recherche litterale (variante complete : attributs visibleIf) */
+static int has_raw(const uint8_t *b, int32_t n, const char *pat)
+{
+    size_t m = strlen(pat);
+    for (int32_t i = 0; i + (int32_t)m <= n; i++) if (!memcmp(b + i, pat, m)) return 1;
+    return 0;
+}
+
 int main(void)
 {
     static uint8_t a[1024], b[1024];
@@ -170,6 +178,16 @@ int main(void)
         snprintf(t, sizeof t, "conf %d : %d octets reconstitues par morceaux <= 400", conf, (int)got);
         check(t, ok && got == total && total > 1000);
     }
+#ifndef RESC_CONF_PROFILE_RESC
+    {
+        /* profil VESC700 : onglets fixes, la variante complete est la meme description */
+        static uint8_t b0[64 * 1024], b1[64 * 1024];
+        int ok0, ok1;
+        int32_t t0, t1, g0 = fetch250(0, b0, &t0, &ok0), g1 = fetch250(0x80, b1, &t1, &ok1);
+        check("VESC700, 0x80 : meme octet en reponse, meme description, sans visibleIf ni <Pages>",
+              ok0 && ok1 && g0 == g1 && !memcmp(b0, b1, (size_t)g0));
+    }
+#endif
 #ifdef RESC_CONF_PROFILE_RESC
     printf("== Commande 250 : onglets selon la configuration\n");
     {
@@ -220,6 +238,43 @@ int main(void)
         check("PPM marche arriere intelligente : ses reglages visibles, PID et TC absents",
               ok && has(blob, got, "app_ppm_conf.smart_rev_max_duty") && !has(blob, got, "app_ppm_conf.pid_max_erpm") &&
               !has(blob, got, "app_ppm_conf.tc_max_diff"));
+
+        printf("== Commande 250 : variante complete (bit 7, conditions evaluees par RESC Tool)\n");
+        vesc_mcconf_defaults(&mc);
+        vesc_appconf_defaults(&ap);
+        static uint8_t blob2[64 * 1024];
+        int32_t t2, got2;
+        int ok2;
+        /* fichiers de test pour RESC Tool (fake_resc_device.py --raw) : sans bit / avec bit */
+        got = fetch250(0, blob, &total, &ok);
+        save("build/conf_xml_mc.bin", blob, got);
+        got2 = fetch250(0x80, blob2, &t2, &ok2);
+        save("build/vis_conf_xml_mc.bin", blob2, got2);
+        check("mc, 0x80 : reponse avec le meme octet, plus longue que la variante filtree", ok2 && got2 == t2 && got2 > got);
+        check("mc, 0x80 : tous les parametres (aimants et induction), avec leurs conditions",
+              has_raw(blob2, got2, "foc_acim_lm</param>") && has_raw(blob2, got2, "foc_motor_flux_linkage</param>") &&
+              has_raw(blob2, got2, "foc_hall_table__0</param>") && has_raw(blob2, got2, "foc_hfi_voltage_run</param>") &&
+              has_raw(blob2, got2, "<param visibleIf=\"foc_motor_kind == 1\">foc_acim_lm</param>"));
+        check("mc, 0x80 : !, parentheses, in [...], & sur un champ de bits, condition d'onglet, <Pages>",
+              has_raw(blob2, got2, "visibleIf=\"!(foc_sensor_mode == 1 &amp;&amp; (foc_motor_kind == 1 || !(l_additional_faults &amp; 1)))\"") &&
+              has_raw(blob2, got2, "m_sensor_port_mode in [") && has_raw(blob2, got2, "(bms.limit_mode &amp; 1)") &&
+              has_raw(blob2, got2, "<subgroup visibleIf=\"foc_sensor_mode == 1\"><subgroupName>Sensors</subgroupName>") &&
+              has_raw(blob2, got2, "<Pages><page name=\"motor_bldc\" visibleIf=\"foc_motor_kind &lt; 0\"/>"));
+        got = fetch250(1, blob, &total, &ok);
+        save("build/conf_xml_app.bin", blob, got);
+        got2 = fetch250(0x81, blob2, &t2, &ok2);
+        save("build/vis_conf_xml_app.bin", blob2, got2);
+        check("app, 0x81 : condition de groupe et de page (application utilisee)",
+              ok2 && got2 == t2 && has_raw(blob2, got2, "<group visibleIf=\"app_to_use in [2, 5, 10]\"><groupName>ADC</groupName>") &&
+              has_raw(blob2, got2, "<page name=\"app_adc\" visibleIf=\"app_to_use in [2, 5, 10]\"/>"));
+        check("app, 0x81 : options RESC de l'ADC avec leurs conditions",
+              has_raw(blob2, got2, "visibleIf=\"app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] &amp;&amp; app_adc_conf.resc_hybrid == 1\">app_adc_conf.resc_hybrid_band</param>") &&
+              has_raw(blob2, got2, "app_adc_conf.resc_smart_rev_ramp_time</param>"));
+        /* la variante complete ne depend pas de la configuration */
+        int32_t got3 = fetch250(0x80, blob, &total, &ok);
+        mc.foc_motor_kind = 1; mc.foc_sensor_mode = 3;
+        int32_t got4 = fetch250(0x80, blob2, &t2, &ok2);
+        check("variante complete identique quelle que soit la configuration", got3 == got4 && !memcmp(blob, blob2, (size_t)got3));
         conf_desc_source(0, 0);
     }
 #endif

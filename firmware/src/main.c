@@ -35,6 +35,7 @@
 #include "stats.h"
 #include "imu.h"
 #include "bms.h"
+#include "abs_enc.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
@@ -269,7 +270,10 @@ int main(void)
         uint32_t now = systime_ms();
         int c;
         for (int k = 0; k < 256 && (c = usb_cdc_getc()) >= 0; k++) packet_dec_byte(&s_dec_usb, (uint8_t)c, now);
-        for (int k = 0; k < 256 && (c = uart_getc(s_uart1)) >= 0; k++) packet_dec_byte(&s_dec_u1, (uint8_t)c, now);
+        /* UART du port COMM : paquets, sauf s'il sert au codeur TS5700N8501 */
+        if (!abs_enc_uart_owned())
+            for (int k = 0; k < 256 && (c = uart_getc(s_uart1)) >= 0; k++) packet_dec_byte(&s_dec_u1, (uint8_t)c, now);
+        abs_enc_poll(DWT->CYCCNT / 168u);
         /* UART permanent (module BLE / NRF) : permanent_uart_enabled */
         if (g_appconf.permanent_uart_enabled)
             for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now);
@@ -293,10 +297,7 @@ int main(void)
         /* Watchdog analogique : seuils a partir des offsets mesures, mis a jour toutes les 100 ms */
         if (foc_calibrated() && (!awd_set || now - awd_ms > 100u)) {
             const foc_params_t *p = foc_params();
-            /* limite lente : le watchdog analogique (echantillon par echantillon) est releve de 50 %,
-             * seulement sur une carte validee (plafond de courant a 100 %) */
-            bool slow = p->i_abs_slow && resc_current_cap_frac() >= 1.0f;
-            motor_hw_set_awd(g_foc_telem.off_cs, slow ? 1.5f * p->i_abs_trip : p->i_abs_trip, p->i_scale);
+            motor_hw_set_awd(g_foc_telem.off_cs, p->i_abs_trip, p->i_scale);
             awd_set = true;
             awd_ms = now;
         }

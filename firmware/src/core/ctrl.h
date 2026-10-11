@@ -19,7 +19,8 @@ typedef enum {
     CTRL_MODE_HANDBRAKE,
     CTRL_MODE_POS,              /* position (degres mecaniques, PID -> courant) */
     CTRL_MODE_OPENLOOP,         /* courant impose, angle a vitesse imposee */
-    CTRL_MODE_OPENLOOP_DUTY     /* rapport cyclique impose, angle a vitesse imposee */
+    CTRL_MODE_OPENLOOP_DUTY,    /* rapport cyclique impose, angle a vitesse imposee */
+    CTRL_MODE_CURRENT_HYB       /* courant, reduit a l'approche d'une limite de rapport cyclique (ADC hybride) */
 } ctrl_mode_t;
 
 typedef struct {
@@ -97,6 +98,9 @@ void ctrl_set_current_rel(float rel);
 void ctrl_set_brake(float amps);
 void ctrl_set_brake_rel(float rel);
 void ctrl_set_handbrake(float amps);
+/* Courant (A) avec limite de rapport cyclique : le courant decroit lineairement sur band (fraction
+ * de duty_lim) sous la limite et s'annule a la limite ; le pont reste actif tant que la commande dure. */
+void ctrl_set_current_hybrid(float amps, float duty_lim, float band);
 void ctrl_set_duty(float duty);
 void ctrl_set_rpm(float erpm);
 void ctrl_set_pos(float deg);
