@@ -58,6 +58,7 @@ void ctrl_init(const ctrl_limits_t *l)
 void ctrl_set_limits(const ctrl_limits_t *l) { C.l = *l; }
 const ctrl_limits_t *ctrl_limits(void) { return &C.l; }
 ctrl_mode_t ctrl_mode(void) { return C.mode; }
+float ctrl_pos_set_deg(void) { return C.mode == CTRL_MODE_POS ? C.value + C.l.p_offset : C.pos_acc; }
 const ctrl_stats_t *ctrl_stats(void) { return &C.st; }
 
 static void command(ctrl_mode_t m, float v)

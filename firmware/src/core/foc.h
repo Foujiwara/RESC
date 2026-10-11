@@ -236,6 +236,7 @@ typedef struct {
     float omega_raw;              /* rad/s el., sans filtrage */
     float theta;                  /* rad el. (angle de commande) */
     float obs_omega, obs_theta;   /* observateur sensorless seul (diagnostic) */
+    float sens_theta;             /* rad el. : angle du capteur (Hall ou codeur) */
     float flux_ratio;             /* |flux estime| / lambda */
     float lambda_est;             /* lambda utilise par l'observateur (adaptatif) */
     float acim_psir;              /* induction : flux rotorique du modele (Wb) */

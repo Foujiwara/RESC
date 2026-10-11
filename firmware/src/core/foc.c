@@ -1363,9 +1363,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     if (S.p.sensor_mode == FOC_SENSOR_HALL) {
         hall_update(&S.hall, &S.p.hall, S.hall_now, dt);
         sensor_ok = S.hall.ok;
+        g_foc_telem.sens_theta = S.hall.theta;
     } else if (S.p.sensor_mode == FOC_SENSOR_ENCODER && S.p.enc.cpr >= 4) {
         enc_update(&S.enc, &S.p.enc, S.enc_now, dt);
         sensor_ok = true;
+        g_foc_telem.sens_theta = S.enc.theta;
     }
 
     /* ---- 6. Machine d'etats */

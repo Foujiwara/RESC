@@ -23,6 +23,9 @@
 #endif
 
 #define RESC_FW_NAME        "RESC"
+#ifndef RESC_GIT_HASH
+#define RESC_GIT_HASH       "local"      /* remplace a la compilation par le commit (build.py) */
+#endif
 #ifdef RESC_CONF_PROFILE_RESC
 /* profil RESC : vraie version RESC (RESC Tool lit la description de la configuration) */
 #define RESC_FW_MAJOR       1
