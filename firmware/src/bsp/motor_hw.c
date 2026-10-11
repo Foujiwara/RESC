@@ -29,6 +29,7 @@
 #include "foc.h"
 #include "fault_codes.h"
 #include "platform.h"
+#include "sampler.h"
 
 #define ADC_SMP_15   1u          /* 15 cycles d'echantillonnage */
 #define TRIG_ADVANCE 60u         /* ticks avant le sommet : centre l'echantillonnage */
@@ -387,6 +388,7 @@ RAMFUNC void ADC_IRQHandler(void)
     foc_pwm_t out;
     foc_isr(&in, &out);
     pwm_write(out.duty, out.enable);
+    sampler_isr(&in);
 
     /* Watchdog analogique arme uniquement sur les phases dont l'echantillon suivant sera valide */
     if (H.awd_ready) {

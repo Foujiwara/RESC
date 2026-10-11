@@ -31,15 +31,20 @@
 #include "fault_codes.h"
 #include "apps.h"
 #include "vesc_defaults.h"
+#include "sampler.h"
+#include "stats.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
 static uint32_t w_usb(const uint8_t *d, uint32_t n) { return usb_cdc_write(d, n); }
 static uint32_t w_uart1(const uint8_t *d, uint32_t n) { return uart_write(s_uart1, d, n); }
 static uint32_t w_uart2(const uint8_t *d, uint32_t n) { return uart_write(s_uart2, d, n); }
-static const comm_iface_t IF_USB = { w_usb, 0, 0, false };
-static const comm_iface_t IF_UART1 = { w_uart1, 0, 0, false };
-static const comm_iface_t IF_UART2 = { w_uart2, 0, 0, false };
+static uint32_t f_usb(void) { return usb_cdc_tx_free(); }
+static uint32_t f_uart1(void) { return uart_tx_free(s_uart1); }
+static uint32_t f_uart2(void) { return uart_tx_free(s_uart2); }
+static const comm_iface_t IF_USB = { w_usb, 0, 0, false, f_usb };
+static const comm_iface_t IF_UART1 = { w_uart1, 0, 0, false, f_uart1 };
+static const comm_iface_t IF_UART2 = { w_uart2, 0, 0, false, f_uart2 };
 static packet_dec_t s_dec_usb, s_dec_u1, s_dec_u2;
 
 uint8_t plat_default_controller_id(void) { return board_uid_hash(); }
@@ -153,7 +158,7 @@ static void power_key_tick(void)
         if (mode == 0) off = s_rel_ms > 500u;
         else if (mode >= 2) off = s_key_ms > 2000u;
         if (mode >= 3 && mode <= 9 && now - apps_last_activity_ms() > idle_s[mode] * 1000u) off = true;
-        if (off && stopped) board_power_off();
+        if (off && stopped) g_req_poweroff = true;     /* boucle principale : odometre enregistre, puis coupure */
     }
 }
 #endif
@@ -249,6 +254,7 @@ int main(void)
     can_vesc_init();
     apps_configure();
     apps_note_activity(systime_ms());
+    stats_reset(systime_ms());
     wdg_init();
     if (wdg_was_reset()) foc_raise_fault(RESC_FAULT_WATCHDOG_RESET);
 
@@ -263,6 +269,16 @@ int main(void)
         for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now);
         can_vesc_poll(now);
         commands_poll(now);
+        sampler_poll();
+        {
+            static uint32_t st_ms;
+            if (now - st_ms >= 10u) {
+                st_ms = now;
+                stats_update(now);
+                const foc_params_t *fpp = foc_params();
+                sampler_set_scale(fpp->i_scale, fpp->v_scale, fpp->vph_scale, fpp->f_pwm);
+            }
+        }
         resc_conf_poll();
         usb_cdc_poll();
 
@@ -279,8 +295,14 @@ int main(void)
 
         bool idle = foc_state() == FOC_ST_IDLE || foc_state() == FOC_ST_FAULT || foc_state() == FOC_ST_CALIB;
         if (g_req_reboot && idle) {
+            resc_conf_store_backup();                       /* odometre */
             for (volatile int i = 0; i < 200000; i++) { }   /* laisse partir la derniere reponse */
             NVIC_SystemReset();
+        }
+        if (g_req_poweroff && idle) {
+            g_req_poweroff = false;
+            resc_conf_store_backup();
+            board_power_off();
         }
         if (g_req_bootloader && idle) {
             for (volatile int i = 0; i < 200000; i++) { }

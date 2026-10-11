@@ -33,6 +33,7 @@ bool resc_conf_apply_pending(void);
 
 bool resc_conf_store_mc(void);                  /* refuse si le moteur tourne */
 bool resc_conf_store_app(void);
+bool resc_conf_store_backup(void);              /* odometre (arret, redemarrage), s'il a change */
 
 /* Etat de la lecture en flash au demarrage */
 typedef enum {

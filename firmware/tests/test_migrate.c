@@ -2,6 +2,7 @@
  * test_migrate.c — Stockage par nom et migration de la configuration (compile dans les deux profils) :
  *  - ancien format (serialisation 7.00 + en-tete 'RESC') relu, valeurs conservees, reecrit par nom
  *  - format par nom relu a l'identique ; champs inconnus ignores, champs nouveaux aux defauts
+ *  - odometre enregistre avec la configuration des applications, relu, ecrit seulement s'il change
  *  - flash illisible : defauts, moteur non identifie (pont interdit)
  */
 #include <math.h>
@@ -9,6 +10,7 @@
 #include <string.h>
 #include "resc_conf.h"
 #include "vesc_conf.h"
+#include "stats.h"
 
 static int fails;
 static void check(const char *w, int ok) { printf("  [%s] %s\n", ok ? " OK " : "ECHEC", w); if (!ok) fails++; }
@@ -122,6 +124,22 @@ int main(void)
         resc_conf_init();
         check("champ inconnu ignore, conversion de type (int32 33 -> float 33)",
               resc_conf_load_status(false) == RESC_LOAD_OK && g_mcconf.l_current_max == 33.0f);
+    }
+
+    printf("== Odometre enregistre avec la configuration des applications\n");
+    {
+        stats_set_odometer_m(123456u);
+        resc_conf_store_app();
+        int w0 = n_writes;
+        resc_conf_store_backup();
+        check("odometre inchange : pas de nouvelle ecriture", n_writes == w0);
+        stats_set_odometer_m(0u);
+        resc_conf_init();
+        check("odometre relu a la mise sous tension (123456 m)", stats_odometer_m() == 123456u &&
+              resc_conf_load_status(true) == RESC_LOAD_OK);
+        stats_set_odometer_m(123500u);
+        resc_conf_store_backup();
+        check("odometre change : enregistre a l'arret", n_writes == w0 + 1);
     }
 
     printf("== Flash illisible\n");

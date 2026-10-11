@@ -17,6 +17,7 @@ struct comm_iface_s {
     uint8_t can_target;                                /* reponse via CAN vers ce controleur */
     uint8_t can_send_mode;
     bool is_can;
+    uint32_t (*tx_free)(void);                         /* place libre en emission (NULL : inconnue) */
 };
 
 typedef struct {

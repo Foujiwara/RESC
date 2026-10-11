@@ -20,6 +20,7 @@ static uint32_t s_rxbuf_fill;
 static const comm_iface_t *s_fwd_iface;
 static uint32_t s_last_status_ms, s_last_status2_ms;
 static uint32_t s_last_fwd_ms;
+static uint32_t s_now;
 
 /* scan PING */
 static const comm_iface_t *s_ping_reply;
@@ -44,9 +45,43 @@ uint32_t can_baud_from_enum(uint8_t e)
     }
 }
 
+/* kbit/s -> valeur de can_baud_rate (CAN_BAUD_*), -1 si inconnue */
+static int baud_enum_from_kbits(uint32_t k)
+{
+    switch (k) {
+    case 125: return CAN_BAUD_125K;
+    case 250: return CAN_BAUD_250K;
+    case 500: return CAN_BAUD_500K;
+    case 1000: return CAN_BAUD_1M;
+    case 10: return CAN_BAUD_10K;
+    case 20: return CAN_BAUD_20K;
+    case 50: return CAN_BAUD_50K;
+    case 75: return CAN_BAUD_75K;
+    case 100: return CAN_BAUD_100K;
+    default: return -1;
+    }
+}
+
+/* changement de vitesse programme */
+static struct {
+    int sends_left;
+    uint32_t next_ms, apply_ms;
+    uint32_t kbits, delay;
+    int baud;
+    bool apply;
+} s_baud;
+
+static void baud_schedule_apply(uint32_t kbits, uint32_t delay_ms)
+{
+    int e = baud_enum_from_kbits(kbits);
+    if (e < 0) return;
+    s_baud.baud = e;
+    s_baud.apply = true;
+    s_baud.apply_ms = s_now + delay_ms;
+}
+
 static can_peer_t s_peers[CAN_PEERS_MAX];
 static int s_npeers;
-static uint32_t s_now;
 
 const can_peer_t *can_vesc_peers(int *n) { *n = s_npeers; return s_peers; }
 
@@ -131,7 +166,7 @@ void can_vesc_send_buffer(uint8_t target, const uint8_t *d, uint32_t n, uint8_t 
 static void process_packet(uint8_t sender, uint8_t mode, uint8_t *d, uint32_t n)
 {
     static comm_iface_t reply;
-    static const comm_iface_t silent = { 0, 0, 0, false };
+    static const comm_iface_t silent = { 0, 0, 0, false, 0 };
     if (mode == 1) {
         /* reponse a une requete relayee : vers l'interface d'origine */
         if (s_fwd_iface) packet_send(s_fwd_iface, d, n);
@@ -161,7 +196,10 @@ static void handle_frame(const can_frame_t *fr)
         return;
     }
     if (cmd == CAN_PACKET_STATUS && fr->len >= 8 && id != me) { peer_update(id, d); return; }
-    if (id != me && !(id == 255 && cmd <= CAN_PACKET_SET_CURRENT_HANDBRAKE_REL)) return;
+    bool bcast_ok = cmd <= CAN_PACKET_SET_CURRENT_HANDBRAKE_REL || (cmd >= CAN_PACKET_CONF_CURRENT_LIMITS &&
+                    cmd <= CAN_PACKET_CONF_STORE_FOC_ERPMS) || cmd == CAN_PACKET_CONF_BATTERY_CUT ||
+                    cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT || cmd == CAN_PACKET_SHUTDOWN || cmd == CAN_PACKET_UPDATE_BAUD;
+    if (id != me && !(id == 255 && bcast_ok)) return;
 
     /* Longueur minimale de chaque commande : une trame tronquee est ignoree */
     switch (cmd) {
@@ -280,9 +318,52 @@ static void handle_frame(const can_frame_t *fr)
         resc_conf_apply();
         if (cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT) resc_conf_store_mc();
         break;
+    case CAN_PACKET_SHUTDOWN:
+        /* arret de la carte (si elle a un maintien d'alimentation), moteur arrete */
+        if (ctrl_stats()->erpm < 100.0f && ctrl_stats()->erpm > -100.0f) g_req_poweroff = true;
+        break;
+    case CAN_PACKET_UPDATE_BAUD:
+        if (fr->len >= 4) {
+            uint32_t kb = (uint32_t)vb_get_i16(d, &i);
+            uint32_t dl = (uint32_t)vb_get_i16(d, &i);
+            baud_schedule_apply(kb, dl);
+        }
+        break;
     default:
         break;
     }
+}
+
+void can_vesc_send_raw(uint32_t id, bool ext, const uint8_t *d, uint8_t n)
+{
+    if (ext) can_send(id, d, n);
+    else can_send_std(id, d, n);
+}
+
+void can_vesc_conf_battery_cut(bool store, float start, float end)
+{
+    uint8_t b[8];
+    int32_t i = 0;
+    vb_put_f32(b, start, 1e3f, &i);
+    vb_put_f32(b, end, 1e3f, &i);
+    can_send(EID(store ? CAN_PACKET_CONF_STORE_BATTERY_CUT : CAN_PACKET_CONF_BATTERY_CUT, 255), b, 8);
+}
+
+bool can_vesc_update_baud_all(uint32_t kbits, uint32_t delay_ms)
+{
+    if (baud_enum_from_kbits(kbits) < 0) return false;
+    s_baud.kbits = kbits;
+    s_baud.delay = delay_ms;
+    s_baud.sends_left = 10;                 /* 10 annonces espacees de 50 ms, comme VESC */
+    s_baud.next_ms = s_now;
+    return true;
+}
+
+int can_vesc_active_count(void)
+{
+    int n = 0;
+    for (int k = 0; k < s_npeers; k++) if (s_now - s_peers[k].ms < 100u) n++;
+    return n;
 }
 
 /* Trames de statut choisies par le masque m (bit0 STATUS 1 ... bit5 STATUS 6) */
@@ -361,6 +442,23 @@ void can_vesc_poll(uint32_t now)
     if (rate2 > 0 && now - s_last_status2_ms >= 1000u / rate2) {
         s_last_status2_ms = now;
         send_status(g_appconf.can_status_msgs_r2);
+    }
+
+    /* changement de vitesse : annonces puis bascule (et enregistrement) */
+    if (s_baud.sends_left > 0 && (int32_t)(now - s_baud.next_ms) >= 0) {
+        uint8_t b[4];
+        int32_t i = 0;
+        vb_put_i16(b, (int16_t)s_baud.kbits, &i);
+        vb_put_i16(b, (int16_t)s_baud.delay, &i);
+        can_send(EID(CAN_PACKET_UPDATE_BAUD, 255), b, 4);
+        s_baud.next_ms = now + 50u;
+        if (--s_baud.sends_left == 0) baud_schedule_apply(s_baud.kbits, s_baud.delay);
+    }
+    if (s_baud.apply && (int32_t)(now - s_baud.apply_ms) >= 0) {
+        s_baud.apply = false;
+        g_appconf.can_baud_rate = (uint8_t)s_baud.baud;
+        can_set_bitrate(can_baud_from_enum((uint8_t)s_baud.baud));
+        resc_conf_store_app();
     }
 
     /* Scan PING : 8 requetes par passage, puis 100 ms d'attente des PONG */

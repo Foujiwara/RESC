@@ -7,6 +7,7 @@
 
 void usb_cdc_init(void);
 int  usb_cdc_getc(void);                         /* -1 si vide */
+uint32_t usb_cdc_tx_free(void);
 uint32_t usb_cdc_write(const uint8_t *d, uint32_t n);
 bool usb_cdc_configured(void);
 void usb_cdc_poll(void);                         /* relance l'emission (boucle principale) */

@@ -20,7 +20,8 @@ static bool tx_mailbox(const can_frame_t *f)
     m->TDTR = f->len & 0xFu;
     m->TDLR = (uint32_t)f->data[0] | (uint32_t)f->data[1] << 8 | (uint32_t)f->data[2] << 16 | (uint32_t)f->data[3] << 24;
     m->TDHR = (uint32_t)f->data[4] | (uint32_t)f->data[5] << 8 | (uint32_t)f->data[6] << 16 | (uint32_t)f->data[7] << 24;
-    m->TIR = (f->id << CAN_TI0R_EXID_Pos) | CAN_TI0R_IDE | CAN_TI0R_TXRQ;
+    m->TIR = f->std ? ((f->id & 0x7FFu) << CAN_TI0R_STID_Pos) | CAN_TI0R_TXRQ
+                    : (f->id << CAN_TI0R_EXID_Pos) | CAN_TI0R_IDE | CAN_TI0R_TXRQ;
     return true;
 }
 
@@ -113,12 +114,13 @@ bool can_init(uint32_t br)
 #endif
 }
 
-bool can_send(uint32_t eid, const uint8_t *data, uint8_t len)
+static bool send_frame(uint32_t id, bool std, const uint8_t *data, uint8_t len)
 {
     if (!s_ok) return false;
     if (len > 8) len = 8;
     can_frame_t f;
-    f.id = eid & 0x1FFFFFFFu;
+    f.id = std ? (id & 0x7FFu) : (id & 0x1FFFFFFFu);
+    f.std = std ? 1 : 0;
     f.len = len;
     for (int k = 0; k < 8; k++) f.data[k] = k < len ? data[k] : 0;
     NVIC_DisableIRQ(CAN1_TX_IRQn);
@@ -141,5 +143,8 @@ bool can_recv(can_frame_t *f)
     s_rt = (uint16_t)((s_rt + 1) % RXQ);
     return true;
 }
+
+bool can_send(uint32_t eid, const uint8_t *data, uint8_t len) { return send_frame(eid, false, data, len); }
+bool can_send_std(uint32_t sid, const uint8_t *data, uint8_t len) { return send_frame(sid, true, data, len); }
 
 uint32_t can_errors(void) { return s_err; }

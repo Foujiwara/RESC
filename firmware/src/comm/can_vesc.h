@@ -13,6 +13,16 @@ void can_vesc_set_forward_iface(const comm_iface_t *iface);   /* destination des
 void can_vesc_start_ping_scan(const comm_iface_t *reply);
 uint32_t can_baud_from_enum(uint8_t e);
 
+/* Trame brute (COMM_CAN_FWD_FRAME) */
+void can_vesc_send_raw(uint32_t id, bool ext, const uint8_t *d, uint8_t n);
+/* Coupure batterie diffusee a tous les controleurs (COMM_SET_BATTERY_CUT) */
+void can_vesc_conf_battery_cut(bool store, float start, float end);
+/* Nouvelle vitesse du bus pour tous (COMM_CAN_UPDATE_BAUD_ALL) : annonces, puis bascule apres
+ * delay_ms ; false si la vitesse n'existe pas */
+bool can_vesc_update_baud_all(uint32_t kbits, uint32_t delay_ms);
+/* Controleurs actifs (statut recu depuis moins de 100 ms) */
+int can_vesc_active_count(void);
+
 /* Autres controleurs vus sur le bus (trame STATUS 1) */
 typedef struct {
     uint8_t id;

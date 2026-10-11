@@ -69,7 +69,7 @@ def board_description(board, conf, out):
     gcc = find_tool("gcc", HOST_DIRS)
     defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"', "-DRESC_HOST"] + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else [])
     exe = os.path.join(out, "dump_defaults.exe")
-    srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+    srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
             "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
     run([gcc, "-std=gnu11", "-O1"] + defs + ["-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm",
                                              "-Isrc/bsp"] + srcs + ["-lm", "-o", exe])
@@ -90,6 +90,12 @@ def build(board, conf):
     out = os.path.join(HERE, "build", board.replace("/", "_") + ("_resc" if conf == "resc" else ""))
     os.makedirs(out, exist_ok=True)
     defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"'] + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else [])
+    try:
+        ghash = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], cwd=ROOT, capture_output=True,
+                               text=True).stdout.strip() or "local"
+    except OSError:
+        ghash = "local"
+    defs.append(f'-DRESC_GIT_HASH="{ghash}"')
     incs = ["-I" + i for i in INC]
     objs = []
     failed = []
@@ -190,9 +196,10 @@ def tests(board):
     flags = ["-std=gnu11", "-O1", "-Wall", "-Wextra", "-DRESC_HOST", f'-DRESC_BOARD_HEADER="boards/{board}.h"',
              "-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm", "-Isrc/bsp"]
     suites = {
-        "test_conf": ["tests/test_conf.c", "src/app/resc_conf.c", "src/vesc/vesc_conf.c", "src/comm/packet.c",
+        "test_conf": ["tests/test_conf.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/comm/packet.c",
                       "src/core/foc.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"],
         "test_apps": ["tests/test_apps.c", "src/app/apps.c", "src/vesc/vesc_conf.c"],
+        "test_sampler": ["tests/test_sampler.c", "src/comm/sampler.c", "src/comm/packet.c"],
     }
     rc = 0
     for name, srcs in suites.items():
@@ -209,7 +216,7 @@ def tests(board):
         rc |= subprocess.run([exe], cwd=HERE).returncode
         rc |= 0 if check_cmd250(conf) else 1
         exe = os.path.join(out, f"test_migrate_{conf}.exe")
-        mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+        mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
                "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
         run([gcc] + flags + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else []) + mig + ["-lm", "-o", exe])
         print(f"== test_migrate (profil {conf})")

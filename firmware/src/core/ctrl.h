@@ -111,6 +111,7 @@ void ctrl_estop(void);
 void ctrl_set_power_allowed(bool allowed);
 
 ctrl_mode_t ctrl_mode(void);
+float ctrl_pos_set_deg(void);          /* consigne de position (degres), position actuelle hors mode position */
 
 /* Pas de controle, a appeler a 1 kHz. now_ms : horloge systeme. */
 void ctrl_update(uint32_t now_ms, float dt);

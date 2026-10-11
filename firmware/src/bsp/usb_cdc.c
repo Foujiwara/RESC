@@ -397,6 +397,12 @@ int usb_cdc_getc(void)
     return c;
 }
 
+uint32_t usb_cdc_tx_free(void)
+{
+    if (!s_configured) return 0;
+    return (uint32_t)((s_tt + TXN - s_th - 1) % TXN);
+}
+
 uint32_t usb_cdc_write(const uint8_t *d, uint32_t n)
 {
     if (!s_configured) return 0;

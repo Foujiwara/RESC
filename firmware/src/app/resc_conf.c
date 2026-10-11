@@ -3,6 +3,7 @@
  */
 #include <string.h>
 #include "resc_conf.h"
+#include "stats.h"
 #include "vesc_compat_defaults.h"
 #include "hw_config.h"
 #include "fmath.h"
@@ -576,10 +577,25 @@ const conf_field_t *resc_conf_field(bool app, const char *name)
 float resc_conf_field_get(bool app, const conf_field_t *f) { return field_get(app ? (void *)&g_appconf : (void *)&g_mcconf, f); }
 void resc_conf_field_set(bool app, const conf_field_t *f, float v) { field_set(app ? (void *)&g_appconf : (void *)&g_mcconf, f, v); }
 
+/* Donnees de sauvegarde (odometre), enregistrees avec la configuration des applications sous un
+ * nom qui n'est pas un champ de configuration */
+static const char BACKUP_ODO[] = "backup_odometer";
+static uint32_t s_odo_stored = 0xFFFFFFFFu;
+
 static bool store(uint32_t slot, const void *conf, const conf_field_t *t, uint16_t n)
 {
     if (foc_state() == FOC_ST_RUN || foc_state() == FOC_ST_START || foc_state() == FOC_ST_DETECT) return false;
     uint8_t *d = s_buf + sizeof(conf_hdr_t);
+    uint32_t extra = 0;
+    if (slot == SLOT_APP) {
+        uint32_t h = crc32((const uint8_t *)BACKUP_ODO, sizeof(BACKUP_ODO) - 1), v = stats_odometer_to_store();
+        memcpy(d, &h, 4);
+        d[4] = 5;
+        memcpy(d + 5, &v, 4);
+        d += REC_SIZE;
+        extra = 1;
+        s_odo_stored = v;
+    }
     for (uint16_t k = 0; k < n; k++) {
         const uint8_t *p = (const uint8_t *)conf + t[k].offset;
         uint8_t raw[4] = { 0, 0, 0, 0 };
@@ -592,7 +608,7 @@ static bool store(uint32_t slot, const void *conf, const conf_field_t *t, uint16
     }
     conf_hdr_t h;
     h.magic = CONF_MAGIC_V2;
-    h.len = (uint32_t)n * REC_SIZE;
+    h.len = ((uint32_t)n + extra) * REC_SIZE;
     h.crc = crc32(s_buf + sizeof(h), h.len);
     h.reserved = slot;
     memcpy(s_buf, &h, sizeof(h));
@@ -601,6 +617,13 @@ static bool store(uint32_t slot, const void *conf, const conf_field_t *t, uint16
 
 bool resc_conf_store_mc(void) { return store(SLOT_MC, &g_mcconf, vesc_mcconf_fields, vesc_mcconf_nfields); }
 bool resc_conf_store_app(void) { return store(SLOT_APP, &g_appconf, vesc_appconf_fields, vesc_appconf_nfields); }
+
+/* Arret ou redemarrage de la carte : odometre enregistre s'il a change */
+bool resc_conf_store_backup(void)
+{
+    if (stats_odometer_to_store() == s_odo_stored) return true;
+    return resc_conf_store_app();
+}
 
 /* Lit un emplacement : format par nom ou ancien format. Retourne l'etat de la lecture. */
 static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, uint16_t n,
@@ -615,10 +638,18 @@ static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, u
     if (h.len > len - sizeof(h) || crc32(p + sizeof(h), h.len) != h.crc) return RESC_LOAD_FAILED;
     const uint8_t *d = p + sizeof(h);
     if (h.magic == CONF_MAGIC_V2) {
+        const uint32_t h_odo = crc32((const uint8_t *)BACKUP_ODO, sizeof(BACKUP_ODO) - 1);
         for (uint32_t r = 0; r + REC_SIZE <= h.len; r += REC_SIZE) {
             uint32_t hash;
             memcpy(&hash, d + r, 4);
             uint8_t ct = d[r + 4];
+            if (slot == SLOT_APP && hash == h_odo && ct == 5) {
+                uint32_t v;
+                memcpy(&v, d + r + 5, 4);
+                stats_odometer_restore(v);
+                s_odo_stored = v;
+                continue;
+            }
             for (uint16_t k = 0; k < n; k++) {
                 if (t[k].hash != hash) continue;
                 if (ct == t[k].ctype) {
