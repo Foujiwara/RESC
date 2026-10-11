@@ -11,7 +11,7 @@
 vesc_mcconf_t  g_mcconf;
 vesc_appconf_t g_appconf;
 
-#define CONF_MAGIC    0x52455343u     /* 'RESC' */
+#define CONF_MAGIC    0x52455343u     /* 'RESC' : ancien format (serialisation 7.00) */
 #define SLOT_MC       0
 #define SLOT_APP      1
 
@@ -67,7 +67,7 @@ bool resc_motor_configured(void)
 void resc_conf_derive_current_gains(vesc_mcconf_t *c, float bw)
 {
     if (!(c->foc_motor_r > 0.0f && c->foc_motor_l > 0.0f)) return;
-    if (bw <= 0.0f) bw = RESC_CURRENT_BW_DEFAULT;
+    if (!(bw > 10.0f)) bw = c->foc_resc_cc_bw > 10.0f ? c->foc_resc_cc_bw : RESC_CURRENT_BW_DEFAULT;
     c->foc_current_kp = c->foc_motor_l * bw;
     c->foc_current_ki = c->foc_motor_r * bw;
 }
@@ -448,55 +448,153 @@ void resc_conf_poll(void)
     if (s_apply_pending && !motor_busy()) resc_conf_apply();
 }
 
-/* --------------------------------------------------------- flash */
-static uint8_t s_buf[VESC_MCCONF_SER_MAX > VESC_APPCONF_SER_MAX ? VESC_MCCONF_SER_MAX + 16 : VESC_APPCONF_SER_MAX + 16];
+/* --------------------------------------------------------- flash
+ * Format de stockage (independant du profil et de la version) : en-tete, puis un
+ * enregistrement par champ : [crc32 du nom u32][type u8][valeur 4 octets], petit-boutiste.
+ * A la lecture, chaque champ connu est recopie (converti si son type a change), les
+ * champs nouveaux gardent leur defaut, les champs disparus sont ignores : la
+ * configuration survit aux changements de profil et de version.
+ * Ancien format (RESC 0.x, serialisation VESC 7.00 avec signature) : relu une fois avec
+ * le parseur 7.00, puis reecrit dans le format par nom. */
+#define CONF_MAGIC_V2  0x32534552u     /* 'RES2' */
+#define REC_SIZE       9u
 
-static bool store(uint32_t slot, int32_t (*ser)(uint8_t *, const void *), const void *conf)
+static uint8_t s_buf[16 + REC_SIZE * 320u];
+static resc_conf_load_t s_load_mc, s_load_app;
+
+resc_conf_load_t resc_conf_load_status(bool app) { return app ? s_load_app : s_load_mc; }
+
+static float field_get(const void *conf, const conf_field_t *f)
+{
+    const uint8_t *p = (const uint8_t *)conf + f->offset;
+    switch (f->ctype) {
+    case 0: { float v; memcpy(&v, p, 4); return v; }
+    case 1: return (float)*p;
+    case 2: return (float)(int8_t)*p;
+    case 3: { uint16_t v; memcpy(&v, p, 2); return (float)v; }
+    case 4: { int16_t v; memcpy(&v, p, 2); return (float)v; }
+    case 5: { uint32_t v; memcpy(&v, p, 4); return (float)v; }
+    default: { int32_t v; memcpy(&v, p, 4); return (float)v; }
+    }
+}
+
+static void field_set(void *conf, const conf_field_t *f, float v)
+{
+    uint8_t *p = (uint8_t *)conf + f->offset;
+    switch (f->ctype) {
+    case 0: memcpy(p, &v, 4); break;
+    case 1: *p = (uint8_t)fm_sat(v, 0.0f, 255.0f); break;
+    case 2: *p = (uint8_t)(int8_t)fm_sat(v, -128.0f, 127.0f); break;
+    case 3: { uint16_t x = (uint16_t)fm_sat(v, 0.0f, 65535.0f); memcpy(p, &x, 2); break; }
+    case 4: { int16_t x = (int16_t)fm_sat(v, -32768.0f, 32767.0f); memcpy(p, &x, 2); break; }
+    case 5: { uint32_t x = (uint32_t)fm_max(v, 0.0f); memcpy(p, &x, 4); break; }
+    default: { int32_t x = (int32_t)v; memcpy(p, &x, 4); break; }
+    }
+}
+
+/* Recherche d'un champ par nom (terminal) */
+const conf_field_t *resc_conf_field(bool app, const char *name)
+{
+    const conf_field_t *t = app ? vesc_appconf_fields : vesc_mcconf_fields;
+    uint16_t n = app ? vesc_appconf_nfields : vesc_mcconf_nfields;
+    for (uint16_t k = 0; k < n; k++)
+        if (!strcmp(t[k].name, name)) return &t[k];
+    return NULL;
+}
+float resc_conf_field_get(bool app, const conf_field_t *f) { return field_get(app ? (void *)&g_appconf : (void *)&g_mcconf, f); }
+void resc_conf_field_set(bool app, const conf_field_t *f, float v) { field_set(app ? (void *)&g_appconf : (void *)&g_mcconf, f, v); }
+
+static bool store(uint32_t slot, const void *conf, const conf_field_t *t, uint16_t n)
 {
     if (foc_state() == FOC_ST_RUN || foc_state() == FOC_ST_START || foc_state() == FOC_ST_DETECT) return false;
+    uint8_t *d = s_buf + sizeof(conf_hdr_t);
+    for (uint16_t k = 0; k < n; k++) {
+        const uint8_t *p = (const uint8_t *)conf + t[k].offset;
+        uint8_t raw[4] = { 0, 0, 0, 0 };
+        uint8_t sz = t[k].ctype == 0 || t[k].ctype >= 5 ? 4 : (t[k].ctype >= 3 ? 2 : 1);
+        memcpy(raw, p, sz);
+        memcpy(d, &t[k].hash, 4);
+        d[4] = t[k].ctype;
+        memcpy(d + 5, raw, 4);
+        d += REC_SIZE;
+    }
     conf_hdr_t h;
-    int32_t n = ser(s_buf + sizeof(h), conf);
-    h.magic = CONF_MAGIC;
-    h.len = (uint32_t)n;
-    h.crc = crc32(s_buf + sizeof(h), (uint32_t)n);
+    h.magic = CONF_MAGIC_V2;
+    h.len = (uint32_t)n * REC_SIZE;
+    h.crc = crc32(s_buf + sizeof(h), h.len);
     h.reserved = slot;
     memcpy(s_buf, &h, sizeof(h));
-    return plat_conf_write(slot, s_buf, (uint32_t)n + sizeof(h));
+    return plat_conf_write(slot, s_buf, h.len + sizeof(h));
 }
 
-static int32_t ser_mc(uint8_t *b, const void *c) { return vesc_mcconf_serialize(b, (const vesc_mcconf_t *)c); }
-static int32_t ser_app(uint8_t *b, const void *c) { return vesc_appconf_serialize(b, (const vesc_appconf_t *)c); }
+bool resc_conf_store_mc(void) { return store(SLOT_MC, &g_mcconf, vesc_mcconf_fields, vesc_mcconf_nfields); }
+bool resc_conf_store_app(void) { return store(SLOT_APP, &g_appconf, vesc_appconf_fields, vesc_appconf_nfields); }
 
-bool resc_conf_store_mc(void) { return store(SLOT_MC, ser_mc, &g_mcconf); }
-bool resc_conf_store_app(void) { return store(SLOT_APP, ser_app, &g_appconf); }
-
-static const uint8_t *load(uint32_t slot, uint32_t *len)
+/* Lit un emplacement : format par nom ou ancien format. Retourne l'etat de la lecture. */
+static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, uint16_t n,
+                             bool (*old_deser)(const uint8_t *, int32_t, void *))
 {
-    uint32_t n;
-    const uint8_t *p = plat_conf_read(slot, &n);
-    if (!p || n < sizeof(conf_hdr_t)) return NULL;
+    uint32_t len;
+    const uint8_t *p = plat_conf_read(slot, &len);
+    if (!p || len < sizeof(conf_hdr_t)) return RESC_LOAD_EMPTY;
     conf_hdr_t h;
     memcpy(&h, p, sizeof(h));
-    if (h.magic != CONF_MAGIC || h.len > n - sizeof(h) || crc32(p + sizeof(h), h.len) != h.crc) return NULL;
-    *len = h.len;
-    return p + sizeof(h);
+    if (h.magic == 0xFFFFFFFFu) return RESC_LOAD_EMPTY;
+    if (h.len > len - sizeof(h) || crc32(p + sizeof(h), h.len) != h.crc) return RESC_LOAD_FAILED;
+    const uint8_t *d = p + sizeof(h);
+    if (h.magic == CONF_MAGIC_V2) {
+        for (uint32_t r = 0; r + REC_SIZE <= h.len; r += REC_SIZE) {
+            uint32_t hash;
+            memcpy(&hash, d + r, 4);
+            uint8_t ct = d[r + 4];
+            for (uint16_t k = 0; k < n; k++) {
+                if (t[k].hash != hash) continue;
+                if (ct == t[k].ctype) {
+                    uint8_t sz = ct == 0 || ct >= 5 ? 4 : (ct >= 3 ? 2 : 1);
+                    memcpy((uint8_t *)conf + t[k].offset, d + r + 5, sz);
+                } else {
+                    /* type change : conversion par la valeur */
+                    conf_field_t tmp = t[k];
+                    tmp.ctype = ct;
+                    tmp.offset = 0;
+                    uint8_t raw[4];
+                    memcpy(raw, d + r + 5, 4);
+                    field_set(conf, &t[k], field_get(raw, &tmp));
+                }
+                break;
+            }
+        }
+        return RESC_LOAD_OK;
+    }
+    if (h.magic == CONF_MAGIC) {
+        /* ancien format : configuration 7.00 serialisee */
+        return old_deser(d, (int32_t)h.len, conf) ? RESC_LOAD_MIGRATED : RESC_LOAD_FAILED;
+    }
+    return RESC_LOAD_FAILED;
 }
+
+static bool old_mc(const uint8_t *b, int32_t n, void *c) { return vesc700_mcconf_deserialize(b, n, (vesc_mcconf_t *)c); }
+static bool old_app(const uint8_t *b, int32_t n, void *c) { return vesc700_appconf_deserialize(b, n, (vesc_appconf_t *)c); }
 
 void resc_conf_init(void)
 {
     resc_conf_defaults_mc(&g_mcconf);
     resc_conf_defaults_app(&g_appconf);
-    uint32_t n;
-    const uint8_t *p = load(SLOT_MC, &n);
-    vesc_mcconf_t mc;
-    if (p && vesc_mcconf_deserialize(p, (int32_t)n, &mc)) {
+    static vesc_mcconf_t mc;
+    static vesc_appconf_t app;
+    mc = g_mcconf;
+    app = g_appconf;
+    s_load_mc = load(SLOT_MC, &mc, vesc_mcconf_fields, vesc_mcconf_nfields, old_mc);
+    if (s_load_mc == RESC_LOAD_OK || s_load_mc == RESC_LOAD_MIGRATED) {
         resc_conf_clamp_mc(&mc);
         g_mcconf = mc;
     }
-    p = load(SLOT_APP, &n);
-    vesc_appconf_t app;
-    if (p && vesc_appconf_deserialize(p, (int32_t)n, &app)) {
+    s_load_app = load(SLOT_APP, &app, vesc_appconf_fields, vesc_appconf_nfields, old_app);
+    if (s_load_app == RESC_LOAD_OK || s_load_app == RESC_LOAD_MIGRATED) {
         resc_conf_clamp_app(&app);
         g_appconf = app;
     }
+    /* migration : reecriture immediate dans le format par nom */
+    if (s_load_mc == RESC_LOAD_MIGRATED) resc_conf_store_mc();
+    if (s_load_app == RESC_LOAD_MIGRATED) resc_conf_store_app();
 }

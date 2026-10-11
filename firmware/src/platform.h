@@ -23,9 +23,16 @@
 #endif
 
 #define RESC_FW_NAME        "RESC"
+#ifdef RESC_CONF_PROFILE_RESC
+/* profil RESC : vraie version RESC (RESC Tool lit la description de la configuration) */
+#define RESC_FW_MAJOR       1
+#define RESC_FW_MINOR       0
+#define RESC_VERSION_STR    "RESC 1.0.0 (profil RESC)"
+#else
 #define RESC_FW_MAJOR       7      /* version annoncee a VESC Tool (format 7.00) */
 #define RESC_FW_MINOR       0
-#define RESC_VERSION_STR    "RESC 0.1.0"
+#define RESC_VERSION_STR    "RESC 1.0.0 (profil VESC 7.00)"
+#endif
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 

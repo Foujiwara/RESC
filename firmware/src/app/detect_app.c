@@ -89,7 +89,7 @@ bool detect_app_start_rl(const comm_iface_t *reply, float cur)
     d.kind = FOC_DET_RL;
     /* Courant du palier haut : valeur demandee, sinon une fraction du courant moteur max
      * configure (l_current_max, borne par le statut de la carte). Paliers a 1/2, 3/4, 1. */
-    d.i_test = fm_sat(cur > 0.5f ? cur : RESC_RL_CURRENT_FRAC * i_cap(), 1.0f, i_cap());
+    d.i_test = fm_sat(cur > 0.5f ? cur : fm_sat(g_mcconf.foc_resc_rl_frac, 0.1f, 1.0f) * i_cap(), 1.0f, i_cap());
     if (!launch(&d)) { send_rl(0, 0, 0); return false; }
     s_st = DA_RL;
     commands_printf("Mesure R/L a %.1f A...", (double)d.i_test);
@@ -243,7 +243,7 @@ void detect_app_poll(uint32_t now_ms)
             g_mcconf.foc_motor_r = d->r;
             g_mcconf.foc_motor_l = l;
             g_mcconf.foc_motor_ld_lq_diff = d->lq - d->ld;
-            resc_conf_derive_current_gains(&g_mcconf, RESC_CURRENT_BW_DEFAULT);
+            resc_conf_derive_current_gains(&g_mcconf, g_mcconf.foc_resc_cc_bw);
             resc_conf_apply();
             resc_conf_store_mc();
             commands_printf("Paliers %.1f / %.1f / %.1f A, chute ohmique %.3f V, tension perdue (temps mort) %.3f V",
@@ -267,7 +267,7 @@ void detect_app_poll(uint32_t now_ms)
         else {
             g_mcconf.foc_motor_flux_linkage = d->lambda;
             resc_conf_derive_observer_gain(&g_mcconf);
-            resc_conf_derive_current_gains(&g_mcconf, RESC_CURRENT_BW_DEFAULT);   /* si R/L deja connus */
+            resc_conf_derive_current_gains(&g_mcconf, g_mcconf.foc_resc_cc_bw);   /* si R/L deja connus */
             resc_conf_apply();
             resc_conf_store_mc();
             commands_printf("lambda = %.3f mWb  ->  gain observateur %.4g (sauvegarde)%s", (double)(d->lambda * 1e3f),

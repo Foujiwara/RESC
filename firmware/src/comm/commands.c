@@ -19,6 +19,7 @@
 #include "flash.h"
 #include "systime.h"
 #include "apps.h"
+#include "conf_desc.h"
 
 volatile bool g_req_reboot, g_req_bootloader;
 
@@ -375,6 +376,10 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     }
     case COMM_SET_CHUCK_DATA:
         apps_set_chuck(d, n, systime_ms());
+        break;
+    case COMM_RESC_GET_CONF_XML:
+        o = conf_desc_reply(d, n, b);
+        reply(src, b, (uint32_t)o);
         break;
     case COMM_APP_DISABLE_OUTPUT:
         if (n >= 4) apps_disable_output(vb_get_i32(d, &i), systime_ms());

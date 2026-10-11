@@ -1,8 +1,8 @@
 /*
  * resc_conf.h — Configuration RESC.
  *
- * La configuration est conservee dans le format de VESC Tool (MCCONF/APPCONF)
- * pour que l'outil puisse la lire et l'ecrire. resc_conf_build() la traduit
+ * La configuration est echangee dans le format de l'outil (MCCONF/APPCONF, profil
+ * VESC 7.00 ou RESC) et stockee en flash champ par champ, par nom. resc_conf_build() la traduit
  * vers les parametres du coeur RESC (foc_params_t, ctrl_limits_t) en
  * appliquant les limites absolues de la carte et le plafond lie a son statut.
  */
@@ -33,6 +33,20 @@ bool resc_conf_apply_pending(void);
 
 bool resc_conf_store_mc(void);                  /* refuse si le moteur tourne */
 bool resc_conf_store_app(void);
+
+/* Etat de la lecture en flash au demarrage */
+typedef enum {
+    RESC_LOAD_EMPTY = 0,     /* rien en flash : defauts */
+    RESC_LOAD_OK,            /* format par nom */
+    RESC_LOAD_MIGRATED,      /* ancien format 7.00 relu et reecrit */
+    RESC_LOAD_FAILED         /* illisible : defauts (moteur non identifie, pont interdit) */
+} resc_conf_load_t;
+resc_conf_load_t resc_conf_load_status(bool app);
+
+/* Acces generique par nom de champ (terminal) */
+const conf_field_t *resc_conf_field(bool app, const char *name);
+float resc_conf_field_get(bool app, const conf_field_t *f);
+void resc_conf_field_set(bool app, const conf_field_t *f, float v);
 
 /* Valeurs derivees des mesures, calculees automatiquement apres chaque detection :
  *  gains de courant  kp = L * bw, ki = R * bw  (bw : bande passante, rad/s)
