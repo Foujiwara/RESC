@@ -80,6 +80,7 @@ typedef struct {
     float delay_comp;     /* retard compense, en periodes PWM */
     /* Protections rapides (dans l'ISR) */
     float i_abs_trip;     /* A crete */
+    bool  i_abs_slow;     /* limite sur le module filtre (l_slow_abs_current) au lieu de chaque echantillon */
     float vbus_trip_max;  /* V */
     float vbus_trip_min;  /* V (pont actif seulement) */
     /* Demarrage sensorless (I/f) */

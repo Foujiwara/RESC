@@ -66,6 +66,7 @@ typedef struct {
     bool  dr_on;                 /* duty : regulateur de descente actif */
     float dr_int;
     float duty_abs;              /* modulation appliquee (0..1, Vbus/sqrt3 = 1) */
+    float i_abs_f;               /* module du courant filtre (limite lente) */
     float fw_id;                 /* defluxage */
     float iq_lpf;                /* iq mesure filtre (MTPA) */
     float lam_eff;               /* lambda courant (adaptatif, temperature, saturation) */
@@ -1213,10 +1214,12 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     if (S.p.cs_two_shunts) valid[2] = false;
 
     /* ---- 4. Protections rapides */
-    for (int x = 0; x < 3; x++) {
-        if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
-            trip(RESC_FAULT_ABS_OVER_CURRENT);
-            break;
+    if (!S.p.i_abs_slow) {
+        for (int x = 0; x < 3; x++) {
+            if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
+                trip(RESC_FAULT_ABS_OVER_CURRENT);
+                break;
+            }
         }
     }
     if (S.vbus > S.p.vbus_trip_max) trip(RESC_FAULT_OVER_VOLTAGE);
@@ -1225,7 +1228,8 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     reconstruct_currents(valid);
     {
         float imag = fm_sqrt(S.i_a * S.i_a + S.i_b * S.i_b);
-        if (imag > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
+        FM_LPF(S.i_abs_f, imag, 0.2f);                /* ~0.3 ms a 15 kHz */
+        if ((S.p.i_abs_slow ? S.i_abs_f : imag) > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
         if (imag > g_foc_telem.i_phase_max) g_foc_telem.i_phase_max = imag;
     }
 
