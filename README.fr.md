@@ -21,6 +21,7 @@ Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs exista
 | Contrôle : courant, frein, duty (mode tension, frein de descente), vitesse, position, boucle ouverte, limitations | `firmware/src/core/ctrl.c` | simulation OK |
 | Applications : PPM, ADC (+ boutons), VESC Remote, PAS, multi-contrôleurs CAN avec antipatinage, arrêt d'urgence | `firmware/src/app/apps.c`, `bsp/inputs.c` | tests PC OK |
 | Configuration : profils VESC700 / RESC générés depuis les XML, stockage par nom avec migration, description envoyée à RESC Tool (commande 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | tests PC OK |
+| Fonctions de VESC 7.00 : échantillonnage V0/V7, surmodulation, frein tenu jusqu'à l'arrêt avec court-circuit par les low-sides, frein à main, échantillonnage pour l'outil, statistiques, odomètre, codeurs absolus (AS5047, MT6816, AS5x47U, TLE5012, AMT22, MA782, AD2S1205, sin/cos, PWM), IMU (BMI160), BMS VESC par CAN, assistant (détection automatique, CAN compris), mise à jour du firmware sur le bus CAN | `core/`, `bsp/abs_enc.c`, `app/imu.c`, `app/bms.c`, `app/detect_all.c`, `comm/sampler.c` | simulation et tests PC OK |
 | Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break, survitesse | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partiellement simulé |
 | STM32F405 : TIM1, ADC triple, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **à valider sur carte** |
 
@@ -29,7 +30,7 @@ Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs exista
 | | Profil VESC700 (défaut) | Profil RESC |
 |---|---|---|
 | Outil | VESC Tool officiel, Android, et RESC Tool | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 149 + 80 : sans BLDC, DC, sin/cos, DRV8301, BMS, UAVCAN, NRF24, IMU ; seuls les choix pris en charge restent dans les listes |
+| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 179 + 104 : sans BLDC, DC, DRV8301, UAVCAN, NRF24 ; seuls les choix pris en charge par RESC et par la carte restent dans les listes |
 | Dans RESC Tool | Paramètres inutilisés cachés | **Seuls les paramètres utilisés par les réglages en cours sont affichés** (voir ci-dessous) |
 
 **Motor Type** (Motor > General > General) : **FOC Permanent Magnets (PMSM / BLDC / IPM)** ou **FOC Induction (ACIM)**.

@@ -26,6 +26,16 @@ donnees** du projet VESC :
 
 Source de reference : https://github.com/vedderb/bldc/tree/release_7_00
 
+## Autres elements repris ou inspires de VESC 7.00 (reimplementes)
+
+- Formats et comportements du protocole : echantillonnage (COMM_SAMPLE_PRINT), statistiques, BMS sur CAN
+  (trames et limites), detection automatique (sequence et resultats), mise a jour du firmware sur le bus CAN.
+- IMU : conventions d'angles, rotation de montage, confiance dans l'accelerometre et calibration comme
+  `imu/imu.c` et `imu/ahrs.c` de VESC ; filtres de Madgwick et de Mahony (algorithmes publies) ; mode
+  « Madgwick Fusion » d'apres l'algorithme Fusion de x-io Technologies (Seb Madgwick, licence MIT).
+- Codeurs absolus : protocoles des capteurs (parite, CRC, trames) d'apres les fiches techniques et les
+  pilotes `encoder/` de VESC ; les CRC precalcules de VESC pour l'AS5x47U servent de verification.
+
 ## Observateur MXLEMMING
 
 L'observateur MXLEMMING (`firmware/src/core/observer.c`, types 1 et 3) a pour auteur
