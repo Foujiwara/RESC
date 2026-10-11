@@ -17,11 +17,13 @@
     M.b = 0.06; M.t_load = 0.3;
 
     /* ------------------------------------------------------------------ */
-    printf("== 14. Observateurs (foc_observer_type 0..7), demarrage I/f puis 20 A\n");
-    static const char *oname[8] = { "ORTEGA_ORIGINAL", "MXLEMMING", "ORTEGA_LAMBDA_COMP", "MXLEMMING_LAMBDA_COMP",
-                                    "MXV", "MXV_LAMBDA_COMP", "MXV_LAMBDA_COMP_LIN", "RESC_ACTIVE_FLUX" };
-    for (int ty = 0; ty < 8; ty++) {
-        bool adapt = ty == 2 || ty == 3 || ty == 5 || ty == 6;
+    printf("== 14. Observateurs (foc_observer_type 0..13), demarrage I/f puis 20 A\n");
+    static const char *oname[14] = { "ORTEGA_ORIGINAL", "MXLEMMING", "ORTEGA_LAMBDA_COMP", "MXLEMMING_LAMBDA_COMP",
+                                     "MXV", "MXV_LAMBDA_COMP", "MXV_LAMBDA_COMP_LIN", "RESC_ACTIVE_FLUX",
+                                     "RESC_RADIAL", "RESC_ACTIVE_FLUX_LAMBDA", "RESC_RADIAL_LAMBDA", "RESC_BEMF",
+                                     "RESC_BEMF_LAMBDA", "RESC_HYBRID_LAMBDA" };
+    for (int ty = 0; ty < 14; ty++) {
+        bool adapt = ty == 2 || ty == 3 || ty == 5 || ty == 6 || ty == 9 || ty == 10 || ty == 12 || ty == 13;
         p = p0;
         p.obs_type = (uint8_t)ty;
         if (adapt) p.lambda = 0.85f * p0.lambda;          /* lambda configure faux de 15 % */

@@ -9,9 +9,16 @@
  *  4 MXV                     |
  *  5 MXV_LAMBDA_COMP         |
  *  6 MXV_LAMBDA_COMP_LIN    /
- *  7 RESC_ACTIVE_FLUX       observateur RESC : flux actif (Boldea) avec la correction non lineaire
- *                           de Lee, Ortega et al. 2010 ; module attendu lambda + (Ld - Lq) id,
- *                           valable pour les moteurs a poles lisses comme saillants
+ *  7 RESC_ACTIVE_FLUX        \  observateurs RESC, sur le flux actif eta = psi_s - Lq i (Boldea),
+ *  8 RESC_RADIAL             |  module attendu lambda + (Ld - Lq) id (poles lisses et saillants) :
+ *  9 RESC_ACTIVE_FLUX_LAMBDA |   7 : correction non lineaire (Lee, Ortega et al. 2010)
+ * 10 RESC_RADIAL_LAMBDA      |   8 : rappel radial lineaire du module, gain 2|w| (sans reglage)
+ * 11 RESC_BEMF               |  11 : observateur de FEM (Luenberger sur le courant, FEM integree,
+ * 12 RESC_BEMF_LAMBDA        |       sans derivee du courant mesure, bande suivant la vitesse,
+ * 13 RESC_HYBRID_LAMBDA     /        retard et gain compenses ; angle independant de lambda)
+ *                               13 : flux actif a basse vitesse, FEM a haute vitesse (melange lineaire)
+ *                               _LAMBDA : lambda reestime en marche a partir de |e| / |w|
+ *                               (constante 1 s, +-30 %, quand la FEM domine la chute ohmique)
  *
  * Modele commun (repere alpha/beta) : d(psi_s)/dt = v - R i, flux de l'aimant = psi_s - L i.
  * Gain a basse vitesse : gamma_eff = gamma * (gain_slow + (1 - gain_slow) * min(1, 2 |m|)),
@@ -32,13 +39,25 @@ typedef enum {
     OBS_MXV_LAMBDA_COMP,
     OBS_MXV_LAMBDA_COMP_LIN,
     OBS_RESC_ACTIVE_FLUX,
+    OBS_RESC_RADIAL,
+    OBS_RESC_ACTIVE_FLUX_LAMBDA,
+    OBS_RESC_RADIAL_LAMBDA,
+    OBS_RESC_BEMF,
+    OBS_RESC_BEMF_LAMBDA,
+    OBS_RESC_HYBRID_LAMBDA,
     OBS_COUNT
 } obs_kind_t;
 
 typedef struct {
-    float x1, x2;           /* etat (flux statorique ou flux de l'aimant selon l'observateur) */
+    float x1, x2;           /* etat (flux statorique, ou flux de l'aimant pour MXLEMMING) */
     float ia_last, ib_last; /* courant precedent (MXLEMMING) */
-    float lambda_est;       /* lambda estime (variantes LAMBDA_COMP) */
+    float lambda_est;       /* lambda estime (variantes LAMBDA_COMP de VESC) */
+    /* observateur de FEM (RESC) */
+    float ia_hat, ib_hat;   /* courant estime */
+    float ea, eb;           /* FEM estimee */
+    float e_gain;           /* gain |H| a la vitesse actuelle */
+    float e_omega;          /* vitesse de rotation de e^ (rad/s, filtree) */
+    float e_theta;
     /* sorties */
     float theta;            /* angle rotor */
     float flux;             /* module du flux de l'aimant estime (Wb) */
@@ -51,10 +70,12 @@ typedef struct {
 typedef struct {
     obs_kind_t kind;
     float r, ld, lq, lambda;
-    float id, iq;           /* courants d/q (inductance de saillance) */
+    float id, iq;           /* courants d/q (saillance) */
     float gamma;
     float gain_slow;        /* fraction du gain a modulation nulle (0..1) */
     float offset;           /* periodes */
+    bool  adapt_on;         /* RESC _LAMBDA : reestimation autorisee maintenant (marche observee) */
+    float hyb_w1, hyb_w2;   /* rad/s : melange flux -> FEM (RESC_HYBRID_LAMBDA) */
     float pll_kp, pll_ki;
 } obs_cfg_t;
 
