@@ -29,11 +29,11 @@ Le fichier fait exactement 1 048 576 octets. Il contient le firmware VESC, sa co
 **Mise à jour en gardant la configuration** (R, L, flux, limites, apps). Recommandée dès qu'une configuration existe : on flashe les vecteurs, puis l'application. Les secteurs de configuration (1-2) ne sont pas touchés.
 
 ```bash
-"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/release/resc_ubox_single_85_200_vec.bin 0x08000000 -V
+"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/build/ubox_board_ubox_single_85_200/resc_vec.bin 0x08000000 -V
 ```
 
 ```bash
-"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/release/resc_ubox_single_85_200_app.bin 0x0800C000 -V -Rst
+"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/build/ubox_board_ubox_single_85_200/resc_app.bin 0x0800C000 -V -Rst
 ```
 
 Au premier démarrage d'une nouvelle version, la configuration est relue champ par champ. Celle de RESC 0.1 est convertie : la commande `status` affiche « MIGRÉE ».
