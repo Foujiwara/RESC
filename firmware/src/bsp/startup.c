@@ -70,6 +70,7 @@ void PendSV_Handler(void) WEAK_ALIAS;
 void SysTick_Handler(void) WEAK_ALIAS;
 void ADC_IRQHandler(void) WEAK_ALIAS;
 void TIM1_BRK_TIM9_IRQHandler(void) WEAK_ALIAS;
+void TIM1_UP_TIM10_IRQHandler(void) WEAK_ALIAS;
 void USART1_IRQHandler(void) WEAK_ALIAS;
 void USART2_IRQHandler(void) WEAK_ALIAS;
 void USART3_IRQHandler(void) WEAK_ALIAS;
@@ -109,6 +110,7 @@ const vector_t g_vectors[NVEC] = {
     [15] = SysTick_Handler,
     [16 + ADC_IRQn] = ADC_IRQHandler,
     [16 + TIM1_BRK_TIM9_IRQn] = TIM1_BRK_TIM9_IRQHandler,
+    [16 + TIM1_UP_TIM10_IRQn] = TIM1_UP_TIM10_IRQHandler,
     [16 + USART1_IRQn] = USART1_IRQHandler,
     [16 + USART2_IRQn] = USART2_IRQHandler,
     [16 + USART3_IRQn] = USART3_IRQHandler,

@@ -15,6 +15,11 @@
  *        la fin des conversions ni le calcul FOC.
  * Mises a jour des rapports cycliques : preload, UDIS pendant l'ecriture,
  * prises en compte au creux suivant (une demi-periode apres l'echantillon).
+ * foc_control_sample_mode :
+ *   V0 et V7 interpole (2) : interruption de mise a jour de TIM1 au creux ; les rapports
+ *     cycliques de la seconde moitie (angle interpole) sont ecrits pour le sommet suivant.
+ *   V0 et V7 (1, shunts en ligne seulement) : TRGO sur chaque evenement de mise a jour,
+ *     echantillon et boucle complete au sommet et au creux (boucle a 2 x f_pwm).
  */
 #include "motor_hw.h"
 #include "stm32.h"
@@ -40,6 +45,7 @@ static CCMBSS struct {
     uint8_t cs_adc[3];           /* ADC (0..2) de chaque courant de phase */
     uint32_t cyc, cyc_max, overruns;
     bool awd_ready;
+    uint8_t ctl_mode;
 } H;
 
 static uint16_t s_slow_raw[18];
@@ -141,8 +147,8 @@ static void tim1_init(float f)
     if (!BOARD_PWM_LS_ACTIVE_HIGH) ccer |= TIM_CCER_CC1NP | TIM_CCER_CC2NP | TIM_CCER_CC3NP;
     TIM1->CCER = ccer;
 
-    /* Etats de repos = MOSFET bloques ; OC4REF -> TRGO */
-    uint32_t cr2 = (7u << TIM_CR2_MMS_Pos);
+    /* Etats de repos = MOSFET bloques ; OC4REF -> TRGO (V0), mise a jour -> TRGO (V0 et V7) */
+    uint32_t cr2 = (H.ctl_mode == 1 ? 2u : 7u) << TIM_CR2_MMS_Pos;
     if (!BOARD_PWM_HS_ACTIVE_HIGH) cr2 |= TIM_CR2_OIS1 | TIM_CR2_OIS2 | TIM_CR2_OIS3;
     if (!BOARD_PWM_LS_ACTIVE_HIGH) cr2 |= TIM_CR2_OIS1N | TIM_CR2_OIS2N | TIM_CR2_OIS3N;
     TIM1->CR2 = cr2;
@@ -160,8 +166,11 @@ static void tim1_init(float f)
 
     TIM1->EGR = TIM_EGR_UG;
     TIM1->SR = 0;
+    /* V0 + V7 interpole : interruption a chaque mise a jour, filtree au creux dans le gestionnaire */
+    NVIC_SetPriority(TIM1_UP_TIM10_IRQn, PRIO_ADC_FOC);
+    if (H.ctl_mode == 2) { TIM1->DIER |= TIM_DIER_UIE; NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn); }
 #if BOARD_BKIN_PIN != HW_PIN_NONE
-    TIM1->DIER = TIM_DIER_BIE;
+    TIM1->DIER |= TIM_DIER_BIE;
     NVIC_SetPriority(TIM1_BRK_TIM9_IRQn, PRIO_BRK);
     NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
 #endif
@@ -186,6 +195,16 @@ RAMFUNC static void pwm_write(const float d[3], bool en)
     } else {
         TIM1->BDTR &= ~TIM_BDTR_MOE;
     }
+}
+
+/* Creux du compteur (comptage montant apres le debordement bas) : seconde moitie interpolee */
+RAMFUNC void TIM1_UP_TIM10_IRQHandler(void)
+{
+    if (!(TIM1->SR & TIM_SR_UIF)) return;
+    TIM1->SR = ~TIM_SR_UIF;
+    if (TIM1->CR1 & TIM_CR1_DIR) return;          /* sommet (comptage descendant) : rien */
+    foc_pwm_t out;
+    if (foc_isr_half(&out) && (TIM1->BDTR & TIM_BDTR_MOE)) pwm_write(out.duty, true);
 }
 
 RAMFUNC void foc_hw_kill(void)
@@ -439,20 +458,33 @@ static void fault_exti_init(void) { }
 #endif
 
 /* ---------------------------------------------------------------- API */
-void motor_hw_init(float f)
+void motor_hw_init(float f_loop, uint8_t ctl_mode)
 {
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+#if BOARD_CS_TOPOLOGY != HW_CS_INLINE_3
+    if (ctl_mode == 1) ctl_mode = 2;
+#endif
+    H.ctl_mode = ctl_mode;
+    float f = ctl_mode == 1 ? 0.5f * f_loop : f_loop;
     H.win_frac = (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;
     adc_init();
     tim1_init(f);
     fault_exti_init();
 }
 
-void motor_hw_set_freq(float f)
+void motor_hw_set_freq(float f_loop, uint8_t ctl_mode)
 {
     if (TIM1->BDTR & TIM_BDTR_MOE) return;
+#if BOARD_CS_TOPOLOGY != HW_CS_INLINE_3
+    if (ctl_mode == 1) ctl_mode = 2;
+#endif
+    float f = ctl_mode == 1 ? 0.5f * f_loop : f_loop;
+    H.ctl_mode = ctl_mode;
+    TIM1->CR2 = (TIM1->CR2 & ~TIM_CR2_MMS) | ((ctl_mode == 1 ? 2u : 7u) << TIM_CR2_MMS_Pos);
+    if (ctl_mode == 2) { TIM1->DIER |= TIM_DIER_UIE; NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn); }
+    else { TIM1->DIER &= ~TIM_DIER_UIE; NVIC_DisableIRQ(TIM1_UP_TIM10_IRQn); }
     H.f_pwm = f;
     H.arr = (uint32_t)((float)TIM1_CLK_HZ / (2.0f * f));
     H.win_frac = (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;
@@ -468,6 +500,6 @@ uint32_t motor_hw_isr_cycles_max(void) { return H.cyc_max; }
 uint32_t motor_hw_overruns(void) { return H.overruns; }
 void motor_hw_reset_stats(void) { H.cyc_max = 0; H.overruns = 0; }
 
-void plat_pwm_set_freq(float f) { motor_hw_set_freq(f); }
+void plat_pwm_set_freq(float f, uint8_t ctl_mode) { motor_hw_set_freq(f, ctl_mode); }
 void plat_sensor_config(uint8_t mode, uint32_t cpr) { motor_hw_sensor_config(mode, cpr); }
 void plat_hall_samples(uint8_t extra) { motor_hw_set_hall_samples(extra); }

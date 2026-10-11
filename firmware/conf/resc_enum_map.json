@@ -31,6 +31,22 @@
    0
   ]
  },
+ "foc_control_sample_mode": {
+  "bits": false,
+  "keep": [
+   0,
+   2,
+   1
+  ]
+ },
+ "foc_current_sample_mode": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   2
+  ]
+ },
  "m_out_aux_mode": {
   "bits": false,
   "keep": [

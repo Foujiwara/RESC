@@ -441,12 +441,14 @@ bool vesc700_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *
 int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    vb_put_u32(buf, RESCP_MCCONF_SIGNATURE, &i);
+    vb_put_u32(buf, g_rescp_mcconf_sig, &i);
     buf[i++] = (uint8_t)c->motor_type;
     vb_put_f32_auto(buf, c->l_current_max, &i);
     vb_put_f32_auto(buf, c->l_current_min, &i);
     vb_put_f32_auto(buf, c->l_in_current_max, &i);
     vb_put_f32_auto(buf, c->l_in_current_min, &i);
+    vb_put_f16(buf, c->l_in_current_map_start, 10000, &i);
+    vb_put_f16(buf, c->l_in_current_map_filter, 10000, &i);
     vb_put_f32_auto(buf, c->l_abs_current_max, &i);
     vb_put_f32_auto(buf, c->l_min_erpm, &i);
     vb_put_f32_auto(buf, c->l_max_erpm, &i);
@@ -511,10 +513,13 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f32_auto(buf, c->foc_hall_interp_erpm, &i);
     vb_put_f32_auto(buf, c->foc_sl_erpm_start, &i);
     vb_put_f32_auto(buf, c->foc_sl_erpm, &i);
+    buf[i++] = map_out((uint8_t)c->foc_control_sample_mode, g_keepb_foc_control_sample_mode, g_keepb_foc_control_sample_mode_n);
+    buf[i++] = map_out((uint8_t)c->foc_current_sample_mode, g_keepb_foc_current_sample_mode, g_keepb_foc_current_sample_mode_n);
     buf[i++] = (uint8_t)c->foc_sat_comp_mode;
     vb_put_f16(buf, c->foc_sat_comp, 1000, &i);
     buf[i++] = (uint8_t)c->foc_temp_comp;
     vb_put_f16(buf, c->foc_temp_comp_base_temp, 100, &i);
+    vb_put_f16(buf, c->foc_current_filter_const, 10000, &i);
     buf[i++] = (uint8_t)c->foc_cc_decoupling;
     buf[i++] = (uint8_t)c->foc_observer_type;
     buf[i++] = map_out((uint8_t)c->foc_hfi_amb_mode, KEEP_FOC_HFI_AMB_MODE, 2);
@@ -527,7 +532,9 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->foc_hfi_max_err, 1000, &i);
     vb_put_f16(buf, c->foc_hfi_hyst, 100, &i);
     vb_put_f32_auto(buf, c->foc_sl_erpm_hfi, &i);
+    vb_put_f32_auto(buf, c->foc_hfi_reset_erpm, &i);
     vb_put_u16(buf, c->foc_hfi_start_samples, &i);
+    vb_put_f32_auto(buf, c->foc_hfi_obs_ovr_sec, &i);
     buf[i++] = (uint8_t)c->foc_hfi_samples;
     buf[i++] = map_bits_out((uint8_t)c->foc_offsets_cal_mode, KEEP_FOC_OFFSETS_CAL_MODE, 1);
     vb_put_f32_auto(buf, c->foc_offsets_current_0, &i);
@@ -547,7 +554,11 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f16(buf, c->foc_fw_duty_start, 10000, &i);
     vb_put_f16(buf, c->foc_fw_ramp_time, 1000, &i);
     vb_put_f16(buf, c->foc_fw_q_current_factor, 10000, &i);
+    vb_put_f16(buf, c->foc_fw_backoff, 1000, &i);
     buf[i++] = (uint8_t)c->foc_speed_soure;
+    buf[i++] = (uint8_t)c->foc_short_ls_on_zero_duty;
+    vb_put_f16(buf, c->foc_overmod_factor, 10000, &i);
+    vb_put_f16(buf, c->foc_mag_vd_max, 10000, &i);
     buf[i++] = map_out((uint8_t)c->sp_pid_loop_rate, KEEP_SP_PID_LOOP_RATE, 6);
     vb_put_f32_auto(buf, c->s_pid_kp, &i);
     vb_put_f32_auto(buf, c->s_pid_ki, &i);
@@ -560,6 +571,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f32_auto(buf, c->p_pid_kp, &i);
     vb_put_f32_auto(buf, c->p_pid_ki, &i);
     vb_put_f32_auto(buf, c->p_pid_kd, &i);
+    vb_put_f32_auto(buf, c->p_pid_kd_proc, &i);
     vb_put_f16(buf, c->p_pid_kd_filter, 10000, &i);
     vb_put_f32_auto(buf, c->p_pid_ang_div, &i);
     vb_put_f16(buf, c->p_pid_gain_dec_angle, 10, &i);
@@ -597,13 +609,15 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < 381) return false;
-    if (vb_get_u32(buf, &i) != RESCP_MCCONF_SIGNATURE) return false;
+    if (len < 408) return false;
+    if (vb_get_u32(buf, &i) != g_rescp_mcconf_sig) return false;
     c->motor_type = (uint8_t)buf[i++];
     c->l_current_max = vb_get_f32_auto(buf, &i);
     c->l_current_min = vb_get_f32_auto(buf, &i);
     c->l_in_current_max = vb_get_f32_auto(buf, &i);
     c->l_in_current_min = vb_get_f32_auto(buf, &i);
+    c->l_in_current_map_start = vb_get_f16(buf, 10000, &i);
+    c->l_in_current_map_filter = vb_get_f16(buf, 10000, &i);
     c->l_abs_current_max = vb_get_f32_auto(buf, &i);
     c->l_min_erpm = vb_get_f32_auto(buf, &i);
     c->l_max_erpm = vb_get_f32_auto(buf, &i);
@@ -668,10 +682,13 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_hall_interp_erpm = vb_get_f32_auto(buf, &i);
     c->foc_sl_erpm_start = vb_get_f32_auto(buf, &i);
     c->foc_sl_erpm = vb_get_f32_auto(buf, &i);
+    c->foc_control_sample_mode = (uint8_t)map_in(buf[i++], g_keepb_foc_control_sample_mode, g_keepb_foc_control_sample_mode_n);
+    c->foc_current_sample_mode = (uint8_t)map_in(buf[i++], g_keepb_foc_current_sample_mode, g_keepb_foc_current_sample_mode_n);
     c->foc_sat_comp_mode = (uint8_t)buf[i++];
     c->foc_sat_comp = vb_get_f16(buf, 1000, &i);
     c->foc_temp_comp = (uint8_t)buf[i++];
     c->foc_temp_comp_base_temp = vb_get_f16(buf, 100, &i);
+    c->foc_current_filter_const = vb_get_f16(buf, 10000, &i);
     c->foc_cc_decoupling = (uint8_t)buf[i++];
     c->foc_observer_type = (uint8_t)buf[i++];
     c->foc_hfi_amb_mode = (uint8_t)map_in(buf[i++], KEEP_FOC_HFI_AMB_MODE, 2);
@@ -684,7 +701,9 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_hfi_max_err = vb_get_f16(buf, 1000, &i);
     c->foc_hfi_hyst = vb_get_f16(buf, 100, &i);
     c->foc_sl_erpm_hfi = vb_get_f32_auto(buf, &i);
+    c->foc_hfi_reset_erpm = vb_get_f32_auto(buf, &i);
     c->foc_hfi_start_samples = vb_get_u16(buf, &i);
+    c->foc_hfi_obs_ovr_sec = vb_get_f32_auto(buf, &i);
     c->foc_hfi_samples = (uint8_t)buf[i++];
     c->foc_offsets_cal_mode = (uint8_t)map_bits_in(buf[i++], KEEP_FOC_OFFSETS_CAL_MODE, 1);
     c->foc_offsets_current_0 = vb_get_f32_auto(buf, &i);
@@ -704,7 +723,11 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_fw_duty_start = vb_get_f16(buf, 10000, &i);
     c->foc_fw_ramp_time = vb_get_f16(buf, 1000, &i);
     c->foc_fw_q_current_factor = vb_get_f16(buf, 10000, &i);
+    c->foc_fw_backoff = vb_get_f16(buf, 1000, &i);
     c->foc_speed_soure = (uint8_t)buf[i++];
+    c->foc_short_ls_on_zero_duty = (uint8_t)buf[i++];
+    c->foc_overmod_factor = vb_get_f16(buf, 10000, &i);
+    c->foc_mag_vd_max = vb_get_f16(buf, 10000, &i);
     c->sp_pid_loop_rate = (uint8_t)map_in(buf[i++], KEEP_SP_PID_LOOP_RATE, 6);
     c->s_pid_kp = vb_get_f32_auto(buf, &i);
     c->s_pid_ki = vb_get_f32_auto(buf, &i);
@@ -717,6 +740,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->p_pid_kp = vb_get_f32_auto(buf, &i);
     c->p_pid_ki = vb_get_f32_auto(buf, &i);
     c->p_pid_kd = vb_get_f32_auto(buf, &i);
+    c->p_pid_kd_proc = vb_get_f32_auto(buf, &i);
     c->p_pid_kd_filter = vb_get_f16(buf, 10000, &i);
     c->p_pid_ang_div = vb_get_f32_auto(buf, &i);
     c->p_pid_gain_dec_angle = vb_get_f16(buf, 10, &i);
@@ -1910,3 +1934,10 @@ const conf_field_t vesc_appconf_fields[] = {
 };
 const uint16_t vesc_appconf_nfields = 121;
 
+
+/* choix dependant de la carte (tools/resc_conf/board_enum.py) */
+__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3930393213u;
+__attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
+__attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
+__attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 2 };
+__attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode_n = 3;

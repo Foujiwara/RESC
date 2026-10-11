@@ -152,13 +152,7 @@ p, li { white-space: pre-wrap; }
             <longName>Input Current Limit Map Start</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Start limiting the Q axis current when the input current reaches this fraction of the maximum input current. The default value of 100% disables this function. This is useful for limiting the input current when using field weakening and MTPA.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Setting this value too low will limit the current more than needed and setting it too high can lead to oscillation close to the maximum current. A value of 80-90% is a good starting point.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Above this fraction of Battery Current Max, the motor current limit is reduced linearly to zero at Battery Current Max (smoother than the input current regulation). 1 = off.&lt;/p&gt;</description>
             <cDefine>MCCONF_L_IN_CURRENT_MAP_START</cDefine>
             <editorDecimalsDouble>2</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -176,11 +170,7 @@ p, li { white-space: pre-wrap; }
             <longName>Input Current Map Filter</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Input current filter for the mapped Q axis current limit. Range 0.0 to 1.0 where 1.0 is no filtering and the closer to 0.0 the more filtering there is. Filtering the input current before the mapped limit can affect oscillations caused by the limit.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Low-pass filter of the input current used by the map (per PWM period).&lt;/p&gt;</description>
             <cDefine>MCCONF_L_IN_CURRENT_MAP_FILTER</cDefine>
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -1942,20 +1932,7 @@ p, li { white-space: pre-wrap; }
             <longName>Control Sample Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;V0 Only&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Sample and run the control loop in V0 only.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;V0 and V7&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Sample currents and voltages in both V0 and V7 and run the full control loop at twice the rate. Can be useful for high speed motors at limited switching frequency, or in order to decrease the modulation noise. Notice that this option will require twice the amount of computational power for a given switching frequency.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This mode is only valid for hardware with phase shunts, such as the VESC Six. For other shunt configurations it is ignored.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;V0 and V7 Interpolation&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Regular sampling and control in V0 and advance the voltage vector with interpolation in V7. This can help motors run better at high speeds.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;V0 Only&lt;/b&gt;: one current sample and one control update per PWM period (zero vector V0, all low-side FETs on).&lt;/p&gt;&lt;p&gt;&lt;b&gt;V0 and V7 Interpolation&lt;/b&gt;: same sampling; at the opposite end of the period (V7) the modulation is updated again with the angle advanced by half a period. Smoother at high electrical speed.&lt;/p&gt;&lt;p&gt;&lt;b&gt;V0 and V7&lt;/b&gt;: sampling and full control at both ends of the period (control loop at twice the PWM frequency). Only on boards with in-line or phase shunts (not shown otherwise).&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_CONTROL_SAMPLE_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>V0 Only</enumNames>
@@ -1966,21 +1943,7 @@ p, li { white-space: pre-wrap; }
             <longName>Current Sample Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Longest Zero Time&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Pick the two sensors that spend the longest time in the zero vectors and calculate the third current from them. This can help reduce noise and gives low side shunt hardware more time to rise before the sample is taken on high modulation. &lt;span style=" font-weight:600;"&gt;Note&lt;/span&gt;: When this mode is selected, &lt;span style=" font-weight:600;"&gt;All Sensors Combined&lt;/span&gt; will be used on low modulation up until a timer compare value of 900 counts, which corresponds to around 70% duty cycle on 30 kHz zero vector frequency. This is done because HFI works much better then and also because combining all sensors generally gives better samples when the avalible sampling time is longer.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-weight:600;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;All Sensors Combined&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Use all three current readings and make a full Clarke transform. This helps reject common mode noise and also reduces current offsets on motors with low inductance with high current ripple.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;High Current&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Choose the lowest currents during sampling to derive the highest current. Since the motor currents are balanced and sum to 0, two of the phase currents can be used to derive the third one. Enabling this option will make the current measurement compare all motor currents and derive the highest one from the two lower currents. This way higher currents can be measured than the ADC gain allows by a factor of 2 / sqrt(3), or roughly 1.15. For example, for the VESC6 this increases the current measurement capability from 165A to roughly 190A.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Note&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This parameter is only valid for hardware with three shunts, such as the VESC Six. For other shunt configurations it is ignored.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;Longest Zero Time&lt;/b&gt;: the phase with the shortest low-side window is rebuilt from the two others when its window approaches the minimum. &lt;b&gt;All Sensors Combined&lt;/b&gt;: every valid phase is used. &lt;b&gt;High Current&lt;/b&gt;: the phase with the highest current is rebuilt from the two others (more range from the current amplifiers). Phases without a valid window are always rebuilt.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_CURRENT_SAMPLE_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>Longest Zero Time</enumNames>
@@ -2085,11 +2048,7 @@ p, li { white-space: pre-wrap; }
             <longName>Current Filter Constant</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Constant for the filtered current in the FOC implementation. Will affect how fast the slow abs max current fault triggers. Range 0 to 1, where 0 is the slowest and 1 is no filtering.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Low-pass filter of the d/q currents used for display, limits and power (per PWM period, 1 = none). The current loop always uses the unfiltered samples.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_CURRENT_FILTER_CONST</cDefine>
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -2335,11 +2294,7 @@ p, li { white-space: pre-wrap; }
             <longName>HFI Reset ERPM</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;ERPM below which the ambiguity resolution is reset. This can usually be quite low as the observer will update the HFI state when the motor is undriven. When the motor is undriven the tracking works down to very low speeds.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;HFI and VSS: when the motor is restarted while still turning above this speed, it restarts from the observer angle; below, the position and polarity search is done again.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_HFI_RESET_ERPM</cDefine>
             <editorDecimalsDouble>2</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -2373,11 +2328,7 @@ p, li { white-space: pre-wrap; }
             <longName>HFI Observer Override Time</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Override HFI position with observer position for this amount of time after dropping below the HFI ERPM threshold. This can prevent oscillating between the two at a transition. Setting this value too high can make HFI catch the motor 180 electrical degrees off, as the observer position might degrade too much.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;HFI: after slowing down below Sensorless ERPM HFI, the injection angle follows the observer during this time (the observer is still good just below the switch speed).&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_HFI_OBS_OVR_SEC</cDefine>
             <editorDecimalsDouble>1</editorDecimalsDouble>
             <editorScale>1000</editorScale>
@@ -2756,11 +2707,7 @@ p, li { white-space: pre-wrap; }
             <longName>Backoff Gain</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;When more field weakening than is possible to achieve is requested the current controller will place almost all voltage in vd. When that happens we can enter a runaway condition where the iq controller does not have enough headroom to overcome the D axis coupling. The backoff gain uses the iq error to reduce the field weakening setpoint when iq is greater than iq_target.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Field weakening backoff: when iq exceeds its target (not enough voltage left on q), the maximum field weakening current is reduced by gain x (iq - iq target) / FW current max. 0 = off.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_FW_BACKOFF</cDefine>
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -2821,11 +2768,7 @@ p, li { white-space: pre-wrap; }
             <longName>Short Low-Side FETs on Zero Duty</longName>
             <type>5</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Short low-side FETs on 0 duty cycle. This will give a bit more braking torque when the motor is standing still and braking is requested. It also uses less power to drive the FETs. The downsides are that the low-side FETs will take all load by themselves and that the transition to and from full brake will be a bit more rough.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;When the voltage is zero (braking at low speed, zero duty), keep all low-side FETs on instead of a modulated short: less losses, no dead-time error and more braking torque at low speed, down to standstill.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_SHORT_LS_ON_ZERO_DUTY</cDefine>
             <valInt>0</valInt>
         </foc_short_ls_on_zero_duty>
@@ -2833,11 +2776,7 @@ p, li { white-space: pre-wrap; }
             <longName>Overmodulation Factor</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;FOC overmodulation factor. Allows slightly higher speed at the expense of output voltage distortion. A factor of 1.15 results in a modulated hexagon, similar to trapezoidal commutation. Generally it does not make sense to go higher than 1.15.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Radius of the voltage circle: linear limit x this factor. Above 1 the phase duty cycles are clipped (overmodulation): more voltage at top speed, more current ripple and harmonics, and shorter low-side windows (more rebuilt current samples).&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_OVERMOD_FACTOR</cDefine>
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -2855,11 +2794,7 @@ p, li { white-space: pre-wrap; }
             <longName>Maximum VD Magnitude</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;FOC maximum D axis voltage magnitude. When saturating the voltage output of the current controller the D axis has priority. Setting this value to less than 1.0 leaves some voltage headroom for the Q axis controller under full modulation in situations where the D axis tries to use all available voltage.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Part of the voltage circle the d axis may use. The d axis has priority (field weakening, stability); q gets the rest.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_MAG_VD_MAX</cDefine>
             <editorDecimalsDouble>3</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -3150,11 +3085,7 @@ p, li { white-space: pre-wrap; }
             <longName>Position PID Kd Process</longName>
             <type>1</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Derivative gain for the position controller. This derivative term is applied on the process variable (position_now) only and not on the error term (position_set - position_now). This way oscillations can be dampened without amplifying control signal input.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Derivative on the measured position (damping without kick when the setpoint changes).&lt;/p&gt;</description>
             <cDefine>MCCONF_P_PID_KD_PROC</cDefine>
             <editorDecimalsDouble>5</editorDecimalsDouble>
             <editorScale>1</editorScale>
@@ -4730,6 +4661,8 @@ p, li { white-space: pre-wrap; }
                     <param>::sep::Battery</param>
                     <param>l_in_current_max</param>
                     <param>l_in_current_min</param>
+                    <param>l_in_current_map_start</param>
+                    <param>l_in_current_map_filter</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -4906,7 +4839,9 @@ p, li { white-space: pre-wrap; }
                     <param>foc_hfi_max_err</param>
                     <param>foc_hfi_hyst</param>
                     <param>foc_sl_erpm_hfi</param>
+                    <param>foc_hfi_reset_erpm</param>
                     <param>foc_hfi_start_samples</param>
+                    <param>foc_hfi_obs_ovr_sec</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -4951,6 +4886,7 @@ p, li { white-space: pre-wrap; }
                     <param>foc_fw_duty_start</param>
                     <param>foc_fw_ramp_time</param>
                     <param>foc_fw_q_current_factor</param>
+                    <param>foc_fw_backoff</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -4962,12 +4898,18 @@ p, li { white-space: pre-wrap; }
                     <param>foc_pll_ki</param>
                     <param>foc_duty_dowmramp_kp</param>
                     <param>foc_duty_dowmramp_ki</param>
+                    <param>foc_control_sample_mode</param>
+                    <param>foc_current_sample_mode</param>
                     <param>foc_observer_gain_slow</param>
+                    <param>foc_current_filter_const</param>
                     <param>foc_cc_decoupling</param>
                     <param>foc_observer_type</param>
                     <param>foc_mtpa_mode</param>
                     <param>foc_observer_offset</param>
                     <param>foc_speed_soure</param>
+                    <param>foc_short_ls_on_zero_duty</param>
+                    <param>foc_overmod_factor</param>
+                    <param>foc_mag_vd_max</param>
                 </subgroupParams>
             </subgroup>
         </group>
@@ -4992,6 +4934,7 @@ p, li { white-space: pre-wrap; }
                     <param>p_pid_kp</param>
                     <param>p_pid_ki</param>
                     <param>p_pid_kd</param>
+                    <param>p_pid_kd_proc</param>
                     <param>p_pid_kd_filter</param>
                     <param>p_pid_ang_div</param>
                     <param>p_pid_gain_dec_angle</param>

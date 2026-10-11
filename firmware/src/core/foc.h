@@ -48,6 +48,8 @@ typedef struct {
     float sl_omega;               /* rad/s : observateur au-dessus */
     float hyst;                   /* fraction de sl_omega */
     float i_ref;                  /* A : courant pour v_max */
+    float reset_omega;            /* rad/s : pont coupe au-dessus, redemarrage sur l'observateur sans recherche */
+    float obs_ovr;                /* s : angle HFI recale sur l'observateur apres le retour a basse vitesse */
 } hfi_cfg_t;
 
 typedef struct {
@@ -140,6 +142,15 @@ typedef struct {
     float acim_lm, acim_lr, acim_rr;   /* H, H, Ohm (rotor ramene au stator) */
     float acim_im;        /* A : courant magnetisant (axe d) */
     float acim_base_omega;/* rad/s el. : defluxage au-dessus (0 = non) */
+    /* Modulation (foc_overmod_factor, foc_mag_vd_max, foc_short_ls_on_zero_duty) */
+    float overmod;        /* rayon du cercle de tension x overmod (1..1.5, surmodulation au-dela de 1) */
+    float vd_max;         /* fraction du cercle autorisee sur l'axe d */
+    bool  short_ls;       /* tensions nulles : low-sides passants en continu au lieu d'un court-circuit module */
+    /* Echantillonnage (foc_control_sample_mode, foc_current_sample_mode, foc_current_filter_const) */
+    uint8_t ctl_mode;     /* 0 V0, 1 V0 et V7 (boucle a 2 x f_pwm, shunts en ligne), 2 V0 + mise a jour interpolee en V7 */
+    uint8_t cs_mode;      /* 0 plus longue fenetre, 1 tous les capteurs valides, 2 fort courant */
+    float i_filter;       /* filtre des courants d/q affiches et limites (par periode) */
+    float fw_backoff;     /* defluxage reduit quand iq depasse sa consigne */
     /* Offsets enregistres (calibration manuelle) */
     bool  use_stored_offsets;
     float stored_off_cs[3];   /* LSB */
@@ -154,12 +165,15 @@ typedef struct {
     volatile uint8_t run;          /* pont souhaite actif */
     volatile uint8_t allow_start;  /* autorise le demarrage I/f depuis l'arret */
     volatile int8_t  dir;          /* sens du demarrage I/f : +1 / -1 */
-    volatile uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty */
+    volatile uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty,
+                                      3 frein a main (courant iq_ref sur l'axe d, angle fige) */
     volatile float   ol_omega;     /* rad/s el. (signe = sens) */
     volatile float   ol_duty;      /* -1..1, mode 2 */
     volatile uint8_t duty_mode;    /* marche a rapport cyclique impose (tension q), courant borne */
     volatile float   duty;         /* -1..1 */
     volatile float   i_hi, i_lo;   /* A : bornes de iq en mode duty (i_lo <= 0 : frein) */
+    volatile uint8_t brake;        /* frein : |iq_ref| oppose a la vitesse ; phases en court-circuit si ce
+                                      courant n'est pas atteignable (basse vitesse), y compris a l'arret */
 } foc_cmd_t;
 
 /* ------------------------------------------------------------ Etats */
@@ -252,6 +266,20 @@ const foc_params_t *foc_params(void);
 
 /* Boucle FOC (ISR, RAM). Retourne les rapports cycliques a appliquer. */
 void foc_isr(const foc_adc_t *adc, foc_pwm_t *out);
+/* Mise a jour de demi-periode (creux du compteur, ctl_mode 2) : rapports cycliques de la seconde
+ * moitie avec l'angle interpole. Retourne false s'il n'y a rien a ecrire. */
+bool foc_isr_half(foc_pwm_t *out);
+/* Echantillons bruts de la derniere periode (echantillonnage pour VESC Tool) */
+typedef struct {
+    float i[3];          /* A, courants de phase */
+    float v[3];          /* V, tensions de phase */
+    float vzero;         /* V, point milieu (Vbus / 2 pont actif) */
+    float duty[3];
+    float theta;         /* rad, angle de commande */
+    float i_ab[2];       /* A, alpha / beta */
+    uint8_t state;
+} foc_sample_t;
+void foc_last_sample(foc_sample_t *s);
 
 extern foc_cmd_t   g_foc_cmd;
 extern foc_telem_t g_foc_telem;

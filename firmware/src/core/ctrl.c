@@ -1,6 +1,7 @@
 /*
  * ctrl.c — Applications de controle RESC (executees a 1 kHz).
  */
+#include <math.h>
 #include <string.h>
 #include "ctrl.h"
 #include "foc.h"
@@ -35,6 +36,8 @@ typedef struct {
     float vbus_f;
     float pos_acc;                   /* degres mecaniques accumules */
     float p_int, p_prev_err, p_d_filt;
+    float p_prev_proc, p_dproc_filt;
+    float i_in_map_f;                /* courant d'entree filtre (cartographie) */
     uint8_t s_div;
     float s_iq_hold;                 /* sortie du PID vitesse entre deux pas */
     uint32_t oc_count;
@@ -148,6 +151,12 @@ static void current_window(float erpm, float *lo, float *hi)
     /* Le sens du courant qui motorise depend du sens de rotation */
     bool fwd = erpm >= 0.0f;
     float k_motor = kb * C.lim_in_f * kta * kd;
+    /* courant d'entree cartographie : au-dessus de in_map_start x i_in_max, le courant moteur
+     * maximal baisse lineairement jusqu'a 0 a i_in_max (limitation plus douce que la regulation) */
+    if (l->in_map_start < 0.98f && l->i_in_max > 0.0f && C.i_in_map_f > 0.0f) {
+        float frac = C.i_in_map_f / l->i_in_max;
+        if (frac > l->in_map_start) k_motor *= fm_sat((1.0f - frac) / (1.0f - l->in_map_start), 0.0f, 1.0f);
+    }
     float k_regen = kr * kt;
     if (fwd) {
         hi_ *= k_motor * kpos;
@@ -176,6 +185,13 @@ void ctrl_update(uint32_t now_ms, float dt)
     C.st.vbus = C.vbus_f;
     C.st.duty = t->duty;
     C.st.i_in = t->i_bus;
+    {
+        /* filtre du courant d'entree de la cartographie, defini par periode PWM, ramene a 1 kHz */
+        float k = fm_sat(l->in_map_filter, 0.0f, 1.0f);
+        float n = l->f_isr > 0.0f ? l->f_isr * dt : 1.0f;
+        float kk = k >= 1.0f ? 1.0f : 1.0f - powf(1.0f - k, n);
+        C.i_in_map_f += kk * (t->i_bus - C.i_in_map_f);
+    }
     float i_motor = (t->iq < 0.0f ? -1.0f : 1.0f) * t->i_abs;
     FM_LPF(C.st.i_motor, i_motor, 0.1f);
     C.st.fault = t->fault;
@@ -241,6 +257,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     bool run = false, allow_start = false;
     uint8_t openloop = 0;
     bool duty_mode = false;
+    bool brake = false;
     int8_t dir = 1;
     float v = C.value;
 
@@ -265,9 +282,12 @@ void ctrl_update(uint32_t now_ms, float dt)
         break;
 
     case CTRL_MODE_BRAKE:
-        if (fm_abs(erpm) > l->start_erpm_exit && v > l->cc_min_current) {
+        /* le coeur tient le frein jusqu'a l'arret : courant oppose a la vitesse, puis phases en
+         * court-circuit (low-sides passants avec foc_short_ls_on_zero_duty) quand il n'est plus atteignable */
+        if (v > l->cc_min_current) {
             iq = erpm > 0.0f ? -v : v;
             run = true;
+            brake = true;
         }
         break;
 
@@ -329,7 +349,13 @@ void ctrl_update(uint32_t now_ms, float dt)
         float dterm = (e - C.p_prev_err) * l->p_kd / dt;
         C.p_prev_err = e;
         FM_LPF(C.p_d_filt, dterm, l->p_kd_filter > 0.0f ? l->p_kd_filter : 1.0f);
-        float out = fm_sat_sym(g * (e * l->p_kp + C.p_d_filt) + C.p_int, 1.0f);
+        /* derivee sur la position mesuree (p_pid_kd_proc) */
+        float dp = C.pos_acc - C.p_prev_proc;
+        while (dp > 180.0f) dp -= 360.0f;
+        while (dp < -180.0f) dp += 360.0f;
+        C.p_prev_proc = C.pos_acc;
+        FM_LPF(C.p_dproc_filt, -dp * l->p_kd_proc / dt, l->p_kd_filter > 0.0f ? l->p_kd_filter : 1.0f);
+        float out = fm_sat_sym(g * (e * l->p_kp + C.p_d_filt + C.p_dproc_filt) + C.p_int, 1.0f);
         iq = out * (out >= 0.0f ? l->i_max : -l->i_min);
         run = true;
         allow_start = false;          /* pas de demarrage I/f : la position demande un angle reel */
@@ -352,7 +378,15 @@ void ctrl_update(uint32_t now_ms, float dt)
         }
         break;
 
-    case CTRL_MODE_HANDBRAKE:   /* non supporte en sensorless : roue libre */
+    case CTRL_MODE_HANDBRAKE:
+        /* frein a main : courant continu a angle fige, maintient le rotor a l'arret */
+        if (v > l->cc_min_current) {
+            iq = v;
+            run = true;
+            openloop = 3;
+        }
+        break;
+
     case CTRL_MODE_NONE:
     default:
         C.s_int = 0.0f;
@@ -361,9 +395,10 @@ void ctrl_update(uint32_t now_ms, float dt)
     }
 
     if (C.mode != CTRL_MODE_RPM) { C.s_set = erpm; C.s_iq_hold = 0.0f; }
-    if (C.mode != CTRL_MODE_POS) { C.p_int = 0.0f; C.p_prev_err = 0.0f; C.p_d_filt = 0.0f; }
+    if (C.mode != CTRL_MODE_POS) { C.p_int = 0.0f; C.p_prev_err = 0.0f; C.p_d_filt = 0.0f; C.p_prev_proc = C.pos_acc; C.p_dproc_filt = 0.0f; }
 
-    iq = fm_sat(iq, lo, hi);
+    if (openloop != 3) iq = fm_sat(iq, lo, hi);
+    else iq = fm_min(iq, fm_max(hi, -lo));
 
     /* -- rearmement automatique des defauts (consigne relachee, condition disparue) */
     if (t->state == FOC_ST_FAULT) {
@@ -410,6 +445,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     g_foc_cmd.i_hi = hi;
     g_foc_cmd.i_lo = lo;
     g_foc_cmd.duty_mode = (run && duty_mode) ? 1 : 0;
+    g_foc_cmd.brake = (run && brake) ? 1 : 0;
     g_foc_cmd.openloop = openloop;
     g_foc_cmd.run = run ? 1 : 0;
 }

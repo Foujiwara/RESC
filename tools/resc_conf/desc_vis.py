@@ -103,6 +103,12 @@ VIS_MC = {
     "foc_hfi_voltage_max": HFI,
     "foc_hfi_hyst": HFI,
     "foc_sl_erpm_hfi": HFI,
+    "foc_hfi_reset_erpm": "(%s || %s)" % (HFI, VSS),
+    "foc_hfi_obs_ovr_sec": HFI,
+    "foc_fw_backoff": both(PM, "mc->foc_fw_current_max > 0.0f"),
+    "l_in_current_map_filter": "mc->l_in_current_map_start < 0.98f",
+    # trois capteurs de courant (sinon un seul mode possible)
+    "foc_current_sample_mode": "(BOARD_CS_TOPOLOGY != HW_CS_LOWSIDE_2)",
     # filtre de phase
     "foc_phase_filter_max_erpm": "mc->foc_phase_filter_enable",
     "foc_phase_filter_disable_fault": "mc->foc_phase_filter_enable",
@@ -218,7 +224,7 @@ def c_lines(raw, root, key, vis):
 
 def file_lines(header, descs):
     """descs : liste de (raw, root, key, vis). En-tete et includes communs."""
-    L = [header, '#include "vesc_conf.h"', '#include "conf_desc.h"', ""]
+    L = [header, '#include "hw_config.h"', '#include "vesc_conf.h"', '#include "conf_desc.h"', ""]
     for raw, root, key, vis in descs:
         L += c_lines(raw, root, key, vis)
         L.append("")

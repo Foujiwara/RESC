@@ -26,6 +26,12 @@ static void run(double seconds)
     long n = (long)(seconds * M.f_pwm);
     for (long k = 0; k < n; k++) {
         foc_isr(&ADC, &OUT);
+        {
+            /* creux du compteur : seconde moitie interpolee (ctl_mode 2) */
+            foc_pwm_t h;
+            M.hn_ok = foc_isr_half(&h);
+            for (int x = 0; x < 3; x++) M.duty_hn[x] = h.duty[x];
+        }
         sim_step(&M, &OUT, &ADC);
         double i[3];
         sim_phase_currents(&M, i);
@@ -64,6 +70,7 @@ static void report(const char *tag)
 int main(void)
 {
     /* --- Moteur type moyeu (valeurs representatives) */
+    if (getenv("SIM_SEED")) srand((unsigned)atoi(getenv("SIM_SEED")));
     memset(&M, 0, sizeof(M));
     M.r = 0.06; M.ld = 90e-6; M.lq = 110e-6; M.lambda = 0.018; M.pp = 7;
     M.j = 0.004; M.b = 2e-4; M.t_load = 0.05;   /* a vide pour l'identification */
@@ -99,6 +106,7 @@ int main(void)
     p.st_i = 15; p.st_t_align = 0.3f; p.st_t_ramp = 1.0f;
     p.st_omega = 1500 * 2 * 3.14159f / 60; p.st_omega_exit = 700 * 2 * 3.14159f / 60; p.st_timeout = 4;
     p.i_slew = 2000;
+    if (getenv("SIM_CS")) p.cs_mode = (uint8_t)atoi(getenv("SIM_CS"));
     foc_init(&p);
 
     printf("== 1. Calibration des offsets\n");
@@ -350,7 +358,10 @@ int main(void)
     ctrl_set_brake(20);
     for (int k = 0; k < 30 && foc_state() == FOC_ST_RUN; k++) { ctrl_alive(); RUN_CTRL(0.1); }
     report("SET_CURRENT_BRAKE 20 A");
-    check("frein : arret sans repartir en arriere", foc_state() == FOC_ST_IDLE && sim_omega_e(&M) > -50);
+    /* le frein tient le moteur en court-circuit jusqu'a l'arret (comportement VESC), sans le relancer */
+    check("frein : arret sans repartir en arriere", fabs(sim_omega_e(&M)) < 50 && foc_state() == FOC_ST_RUN);
+    ctrl_release();
+    RUN_CTRL(0.02);
     ctrl_set_rpm(8000);
     for (int k = 0; k < 40; k++) { ctrl_alive(); RUN_CTRL(0.1); }
     report("SET_RPM 8000");
@@ -419,6 +430,7 @@ int main(void)
     check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
 
 #include "sim_features.inc"
+#include "sim_vesc1.inc"
 #include "sim_acim.inc"
 
     printf("\nCharge : %s  (%d echec(s))\n", g_fail ? "ECHEC" : "TOUS LES ESSAIS PASSENT", g_fail);

@@ -41,10 +41,6 @@ MC_REMOVE = [
     "m_encoder_sin_amp", "m_encoder_cos_amp", "m_encoder_sin_offset", "m_encoder_cos_offset",
     "m_encoder_sincos_filter_constant", "m_encoder_sincos_phase_correction", "m_sensor_port_mode",
     "m_drv8301_oc_mode", "m_drv8301_oc_adj",
-    # echantillonnage et modulation fixes dans RESC
-    "foc_control_sample_mode", "foc_current_sample_mode", "foc_current_filter_const", "foc_overmod_factor",
-    "foc_mag_vd_max", "foc_short_ls_on_zero_duty", "foc_fw_backoff", "foc_hfi_reset_erpm",
-    "foc_hfi_obs_ovr_sec", "l_in_current_map_start", "l_in_current_map_filter", "p_pid_kd_proc",
 ] + ["hall_table__%d" % k for k in range(8)] + [
     "bms.type", "bms.limit_mode", "bms.t_limit_start", "bms.t_limit_end", "bms.soc_limit_start",
     "bms.soc_limit_end", "bms.vmin_limit_start", "bms.vmin_limit_end", "bms.vmax_limit_start",
@@ -143,6 +139,48 @@ MC_EDIT = {
     "foc_offsets_cal_mode": dict(description=html(
         "Bit 0 set: offsets measured at every boot. Bit 0 clear: the offsets of the manual calibration "
         "(offsets_cal) are used when they agree with the boot measurement.")),
+    "foc_control_sample_mode": dict(description=html(
+        "<b>V0 Only</b>: one current sample and one control update per PWM period (zero vector V0, all "
+        "low-side FETs on).",
+        "<b>V0 and V7 Interpolation</b>: same sampling; at the opposite end of the period (V7) the modulation "
+        "is updated again with the angle advanced by half a period. Smoother at high electrical speed.",
+        "<b>V0 and V7</b>: sampling and full control at both ends of the period (control loop at twice the "
+        "PWM frequency). Only on boards with in-line or phase shunts (not shown otherwise).")),
+    "foc_current_sample_mode": dict(description=html(
+        "<b>Longest Zero Time</b>: the phase with the shortest low-side window is rebuilt from the two others "
+        "when its window approaches the minimum. <b>All Sensors Combined</b>: every valid phase is used. "
+        "<b>High Current</b>: the phase with the highest current is rebuilt from the two others (more range "
+        "from the current amplifiers). Phases without a valid window are always rebuilt.")),
+    "foc_current_filter_const": dict(description=html(
+        "Low-pass filter of the d/q currents used for display, limits and power (per PWM period, 1 = none). "
+        "The current loop always uses the unfiltered samples.")),
+    "foc_overmod_factor": dict(description=html(
+        "Radius of the voltage circle: linear limit x this factor. Above 1 the phase duty cycles are clipped "
+        "(overmodulation): more voltage at top speed, more current ripple and harmonics, and shorter low-side "
+        "windows (more rebuilt current samples).")),
+    "foc_mag_vd_max": dict(description=html(
+        "Part of the voltage circle the d axis may use. The d axis has priority (field weakening, stability); "
+        "q gets the rest.")),
+    "foc_short_ls_on_zero_duty": dict(description=html(
+        "When the voltage is zero (braking at low speed, zero duty), keep all low-side FETs on instead of a "
+        "modulated short: less losses, no dead-time error and more braking torque at low speed, down to "
+        "standstill.")),
+    "foc_fw_backoff": dict(description=html(
+        "Field weakening backoff: when iq exceeds its target (not enough voltage left on q), the maximum "
+        "field weakening current is reduced by gain x (iq - iq target) / FW current max. 0 = off.")),
+    "foc_hfi_reset_erpm": dict(description=html(
+        "HFI and VSS: when the motor is restarted while still turning above this speed, it restarts from "
+        "the observer angle; below, the position and polarity search is done again.")),
+    "foc_hfi_obs_ovr_sec": dict(description=html(
+        "HFI: after slowing down below Sensorless ERPM HFI, the injection angle follows the observer "
+        "during this time (the observer is still good just below the switch speed).")),
+    "l_in_current_map_start": dict(description=html(
+        "Above this fraction of Battery Current Max, the motor current limit is reduced linearly to zero at "
+        "Battery Current Max (smoother than the input current regulation). 1 = off.")),
+    "l_in_current_map_filter": dict(description=html(
+        "Low-pass filter of the input current used by the map (per PWM period).")),
+    "p_pid_kd_proc": dict(description=html(
+        "Derivative on the measured position (damping without kick when the setpoint changes).")),
     "l_slow_abs_current": dict(description=html(
         "Absolute current limit on the filtered current magnitude instead of each sample (the hardware "
         "analog watchdog is then set 50 % higher).")),
@@ -178,6 +216,8 @@ ENUM_KEEP = {
     "sp_pid_loop_rate": [(0, "25 Hz"), (1, "50 Hz"), (2, "100 Hz"), (3, "250 Hz"), (4, "500 Hz"), (5, "1000 Hz")],
     "foc_hfi_amb_mode": [(1, "Id Single Pulse"), (2, "Id Double Pulse")],
     "foc_offsets_cal_mode": [(0, "Calibrate on Boot")],
+    "foc_control_sample_mode": [(0, "V0 Only"), (2, "V0 and V7 Interpolation"), (1, "V0 and V7")],
+    "foc_current_sample_mode": [(0, "Longest Zero Time"), (1, "All Sensors Combined"), (2, "High Current")],
     "m_out_aux_mode": [(0, "Off"), (1, "On after 2 seconds"), (2, "On after 5 seconds"), (3, "On after 10 seconds"),
                        (5, "On when running"), (6, "On when not running"), (7, "Temp motor > 50 C"),
                        (8, "Temp mosfet > 50 C"), (9, "Temp motor > 70 C"), (10, "Temp mosfet > 70 C"),

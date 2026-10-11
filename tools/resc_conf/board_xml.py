@@ -26,6 +26,7 @@ CONF = os.path.join(ROOT, "firmware", "conf")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_resc_conf import crc32c  # noqa: E402
 import desc_vis  # noqa: E402
+import board_enum  # noqa: E402
 
 SKIP = {"controller_id"}          # propre a chaque controleur (UID) : la valeur lue fait foi
 
@@ -121,14 +122,19 @@ def main():
     files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if prof == "resc" else \
             {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
     lines = ["/* GENERE par tools/resc_conf/board_xml.py pour %s (profil %s) - ne pas editer. */" % (data["board"], prof),
-             '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
+             '#include "hw_config.h"', '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
     for k, f in files.items():
         root = ET.parse(os.path.join(CONF, f)).getroot()
-        sig0 = signature(root)
         emap = json.load(open(os.path.join(CONF, "resc_enum_map.json"))) if prof == "resc" else {}
+        if prof == "resc" and k == "mc":
+            # choix absents sur cette carte : retires de la liste (signature et table de la carte)
+            emap = board_enum.reduce(root, emap, set(data.get("caps", [])))
+        sig0 = signature(root)
         n = patch(root, data[k], data["limits"], emap)
         if signature(root) != sig0:
             raise SystemExit("signature modifiee : interdit")
+        if prof == "resc" and k == "mc":
+            lines += board_enum.c_lines(emap, sig0)
         ET.indent(root, space="    ")
         raw = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
         if len(sys.argv) > 4:
