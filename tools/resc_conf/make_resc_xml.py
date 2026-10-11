@@ -40,13 +40,10 @@ MC_REMOVE = [
     # entrees et capteurs absents ou non pris en charge
     "m_drv8301_oc_mode", "m_drv8301_oc_adj",
 ] + ["hall_table__%d" % k for k in range(8)] + [
-    "bms.type", "bms.limit_mode", "bms.t_limit_start", "bms.t_limit_end", "bms.soc_limit_start",
-    "bms.soc_limit_end", "bms.vmin_limit_start", "bms.vmin_limit_end", "bms.vmax_limit_start",
-    "bms.vmax_limit_end", "bms.fwd_can_mode",
 ]
 APP_REMOVE = [
-    "pairing_done", "permanent_uart_enabled", "can_mode", "uavcan_esc_index", "uavcan_raw_mode",
-    "uavcan_raw_rpm_max", "uavcan_status_current_mode", "servo_out_enable", "app_pas_conf.sensor_type",
+    "pairing_done", "uavcan_esc_index", "uavcan_raw_mode",
+    "uavcan_raw_rpm_max", "uavcan_status_current_mode", "app_pas_conf.sensor_type",
 ] + [p for p in (
     "app_nrf_conf.speed app_nrf_conf.power app_nrf_conf.crc_type app_nrf_conf.retry_delay app_nrf_conf.retries "
     "app_nrf_conf.channel app_nrf_conf.address__0 app_nrf_conf.address__1 app_nrf_conf.address__2 "
@@ -174,6 +171,11 @@ MC_EDIT = {
         "Low-pass filter of the input current used by the map (per PWM period).")),
     "p_pid_kd_proc": dict(description=html(
         "Derivative on the measured position (damping without kick when the setpoint changes).")),
+    "bms.type": dict(description=html(
+        "VESC BMS on the CAN bus: battery current limited by cell temperature (charge and discharge), state of "
+        "charge and lowest cell (discharge), highest cell (regeneration). The values are taken from the hottest, "
+        "least charged, lowest and highest BMS seen in the last 2 s. BMS page of the tool and BMS commands "
+        "relayed to it.")),
     "m_sensor_port_mode": dict(description=html(
         "Encoder type used when the angle source (FOC, General) is Encoder.",
         "<b>ABI</b>: incremental A/B on the Hall port (H1, H2), Encoder Counts per turn. "
@@ -209,6 +211,15 @@ APP_EDIT = {
         "permanent UART, BLE). <b>ADC</b> alone uses the UART TX/RX pins for the cruise and reverse buttons; "
         "<b>PAS</b> uses them for the pedal sensor. Servo input on the PPM pin (TIM4).")),
     "can_baud_rate": dict(description=html("CAN bus speed (all rates supported).")),
+    "can_mode": dict(description=html(
+        "<b>VESC</b>: VESC CAN protocol (status messages, commands, packet forwarding, BMS). "
+        "<b>COMM Bridge</b>: every received frame is forwarded to the tool (COMM_CAN_FWD_FRAME), no VESC "
+        "processing. <b>Unused</b>: the CAN bus is ignored.")),
+    "servo_out_enable": dict(description=html(
+        "Servo output on the servo pin (50 Hz, 1 to 2 ms) when no PPM application uses it; position "
+        "set by COMM_SET_SERVO_POS.")),
+    "permanent_uart_enabled": dict(description=html(
+        "Packets accepted on the permanent UART (Bluetooth / NRF module of the board).")),
     "shutdown_mode": dict(description=html(
         "Power button. <b>ALWAYS_OFF</b>: the board turns off 0.5 s after the button is released (use only with "
         "a latching switch). <b>ALWAYS_ON</b>: never turned off by the firmware. <b>TOGGLE_BUTTON_ONLY</b>: "
@@ -234,6 +245,7 @@ ENUM_KEEP = {
     "sp_pid_loop_rate": [(0, "25 Hz"), (1, "50 Hz"), (2, "100 Hz"), (3, "250 Hz"), (4, "500 Hz"), (5, "1000 Hz")],
     "foc_hfi_amb_mode": [(1, "Id Single Pulse"), (2, "Id Double Pulse")],
     "foc_offsets_cal_mode": [(0, "Calibrate on Boot")],
+    "bms.limit_mode": [(0, "Overtemp"), (1, "SOC"), (2, "VCell Min"), (3, "VCell Max")],
     "m_sensor_port_mode": [(1, "ABI Encoder"), (2, "AS5047 Encoder"), (3, "AD2S1205 Resolver"),
                            (4, "Sin/Cos Encoder"), (7, "MT6816 Encoder (SPI)"), (8, "AS5X47U Encoder (SPI)"),
                            (10, "TLE5012 Encoder (SSC SW)"), (13, "PWM"), (15, "MA782"), (16, "AMT22 (SW SPI)")],
@@ -245,6 +257,7 @@ ENUM_KEEP = {
                        (11, "Temp motor or mosfet > 50 C"), (12, "Temp motor or mosfet > 70 C")],
 }
 APP_ENUM_KEEP = {
+    "can_mode": [(0, "VESC"), (2, "COMM Bridge"), (3, "Unused")],
     "imu_conf.type": [(0, "Off"), (1, "Internal (BMI160)"), (4, "External BMI160 (UART port, I2C)")],
     "imu_conf.mode": [(0, "Madgwick"), (1, "Mahony"), (2, "Madgwick Fusion")],
     "imu_conf.filter": [(0, "Low"), (1, "Medium"), (2, "High")],

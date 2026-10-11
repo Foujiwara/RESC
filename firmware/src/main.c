@@ -34,6 +34,7 @@
 #include "sampler.h"
 #include "stats.h"
 #include "imu.h"
+#include "bms.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
@@ -257,6 +258,7 @@ int main(void)
     apps_note_activity(systime_ms());
     stats_reset(systime_ms());
     imu_configure();
+    bms_set_fwd_iface(0, &IF_USB);
     wdg_init();
     if (wdg_was_reset()) foc_raise_fault(RESC_FAULT_WATCHDOG_RESET);
 
@@ -268,7 +270,9 @@ int main(void)
         int c;
         for (int k = 0; k < 256 && (c = usb_cdc_getc()) >= 0; k++) packet_dec_byte(&s_dec_usb, (uint8_t)c, now);
         for (int k = 0; k < 256 && (c = uart_getc(s_uart1)) >= 0; k++) packet_dec_byte(&s_dec_u1, (uint8_t)c, now);
-        for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now);
+        /* UART permanent (module BLE / NRF) : permanent_uart_enabled */
+        if (g_appconf.permanent_uart_enabled)
+            for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now);
         can_vesc_poll(now);
         commands_poll(now);
         sampler_poll();
@@ -278,6 +282,7 @@ int main(void)
             if (now - st_ms >= 10u) {
                 st_ms = now;
                 stats_update(now);
+                bms_update(now);
                 const foc_params_t *fpp = foc_params();
                 sampler_set_scale(fpp->i_scale, fpp->v_scale, fpp->vph_scale, fpp->f_pwm);
             }

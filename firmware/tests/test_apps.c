@@ -25,6 +25,8 @@ static bool in_servo_ok = true, in_servo_lvl = true, in_cc, in_rev;
 static float in_adc[3];
 static int32_t in_pas;
 void inputs_init(bool servo, in_uart_use_t u, bool o) { (void)servo; (void)u; (void)o; }
+void inputs_servo_out_init(void) { }
+void inputs_servo_out_set(float p) { (void)p; }
 bool inputs_servo_ms(float *ms, uint32_t now) { (void)now; *ms = in_servo_ms; return in_servo_ok; }
 bool inputs_servo_level(void) { return in_servo_lvl; }
 float inputs_adc_v(int n) { return in_adc[n]; }

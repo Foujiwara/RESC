@@ -31,6 +31,8 @@ typedef struct {
     foc_state_t last_state;
     float tacho_acc;
     float lim_in_f;                  /* facteur de limitation du courant d'entree (filtre) */
+    float lim_rg_f;                  /* idem en regeneration (courant batterie negatif, puissance) */
+    float bms_lo, bms_hi;            /* limites du BMS */
     float fault_clear_t;
     uint32_t fault_ms;               /* debut du defaut en cours */
     float vbus_f;
@@ -52,6 +54,9 @@ void ctrl_init(const ctrl_limits_t *l)
     memset(&C, 0, sizeof(C));
     C.l = *l;
     C.lim_in_f = 1.0f;
+    C.lim_rg_f = 1.0f;
+    C.bms_lo = -1e9f;
+    C.bms_hi = 1e9f;
     C.st.tfet = C.st.tmot = 25.0f;
 }
 
@@ -89,6 +94,7 @@ void ctrl_alive(void)               { C.last_cmd_ms = C.now_ms; C.st.timeout = f
 void ctrl_set_off_delay(float s)    { C.off_delay = fm_sat(s, 0.0f, 10.0f); }
 void ctrl_estop(void)               { C.estop = true; command(CTRL_MODE_NONE, 0.0f); }
 void ctrl_set_power_allowed(bool a) { C.power_ok = a; }
+void ctrl_set_bms_limits(float lo, float hi) { C.bms_lo = lo; C.bms_hi = hi; }
 
 void ctrl_set_temps(float t1, float t2, float t3, float tm)
 {
@@ -118,6 +124,13 @@ static float derate_down(float x, float start, float end)
 {
     if (start <= end) return x > end ? 1.0f : 0.0f;
     return fm_sat((x - end) / (start - end), 0.0f, 1.0f);
+}
+
+/* Limites du courant batterie effectives (configuration et BMS) ; 0 dans la configuration : aucune */
+static void in_limits(const ctrl_limits_t *l, float *in_min, float *in_max)
+{
+    *in_max = l->i_in_max > 0.0f ? fm_min(l->i_in_max, C.bms_hi) : C.bms_hi;
+    *in_min = l->i_in_min < 0.0f ? fm_max(l->i_in_min, C.bms_lo) : C.bms_lo;
 }
 
 /* Bornes de courant [lo, hi] apres toutes les limitations */
@@ -158,13 +171,20 @@ static void current_window(float erpm, float *lo, float *hi)
         float frac = C.i_in_map_f / l->i_in_max;
         if (frac > l->in_map_start) k_motor *= fm_sat((1.0f - frac) / (1.0f - l->in_map_start), 0.0f, 1.0f);
     }
-    float k_regen = kr * kt;
+    float k_regen = kr * kt * C.lim_rg_f;
+    /* courant batterie -> courant moteur (puissance conservee : I_batterie ~ I_moteur x duty), comme
+     * VESC ; la boucle lente (lim_in_f, lim_rg_f) corrige ensuite les pertes */
+    float in_min, in_max;
+    in_limits(l, &in_min, &in_max);
+    float dabs = fm_max(fm_abs(C.st.duty), 0.02f);
+    float cap_m = in_max < 1e8f ? fm_max(in_max, 0.0f) / dabs : 1e9f;
+    float cap_r = in_min > -1e8f ? fm_max(-in_min, 0.0f) / dabs : 1e9f;
     if (fwd) {
-        hi_ *= k_motor * kpos;
-        lo_ *= k_regen;
+        hi_ = fm_min(hi_ * k_motor * kpos, cap_m);
+        lo_ = fm_max(lo_ * k_regen, -cap_r);
     } else {
-        lo_ *= k_motor * kneg;
-        hi_ *= k_regen;
+        lo_ = fm_max(lo_ * k_motor * kneg, -cap_m);
+        hi_ = fm_min(hi_ * k_regen, cap_r);
     }
     *hi = hi_;
     *lo = lo_;
@@ -244,10 +264,20 @@ void ctrl_update(uint32_t now_ms, float dt)
     /* -- limitation du courant d'entree et de la puissance (boucle lente) */
     {
         float k = 1.0f;
-        if (l->i_in_max > 0.0f && t->i_bus > l->i_in_max) k = fm_min(k, l->i_in_max / t->i_bus);
+        float in_min, in_max;
+        in_limits(l, &in_min, &in_max);
+        if (in_max <= 0.0f && t->i_bus > 0.05f) k = 0.0f;
+        else if (t->i_bus > in_max) k = fm_min(k, in_max / t->i_bus);
         if (l->watt_max > 0.0f && p > l->watt_max) k = fm_min(k, l->watt_max / p);
         FM_LPF(C.lim_in_f, k < 1.0f ? C.lim_in_f * k : 1.0f, 0.05f);
         C.lim_in_f = fm_sat(C.lim_in_f, 0.0f, 1.0f);
+        /* regeneration : courant batterie (l_in_current_min, BMS) et puissance (l_watt_min) */
+        float kr = 1.0f;
+        if (in_min >= 0.0f && t->i_bus < -0.05f) kr = 0.0f;
+        else if (t->i_bus < in_min) kr = fm_min(kr, in_min / t->i_bus);
+        if (l->watt_min < 0.0f && p < l->watt_min) kr = fm_min(kr, l->watt_min / p);
+        FM_LPF(C.lim_rg_f, kr < 1.0f ? C.lim_rg_f * kr : 1.0f, 0.05f);
+        C.lim_rg_f = fm_sat(C.lim_rg_f, 0.0f, 1.0f);
     }
 
     float lo, hi;

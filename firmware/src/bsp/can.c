@@ -39,11 +39,12 @@ void CAN1_RX0_IRQHandler(void)
     while (CAN1->RF0R & CAN_RF0R_FMP0) {
         CAN_FIFOMailBox_TypeDef *m = &CAN1->sFIFOMailBox[0];
         uint32_t rir = m->RIR;
-        if (rir & CAN_RI0R_IDE) {
+        {
             uint16_t n = (uint16_t)((s_rh + 1) % RXQ);
             if (n != s_rt) {
                 can_frame_t *f = &s_rx[s_rh];
-                f->id = rir >> CAN_RI0R_EXID_Pos;
+                f->std = (rir & CAN_RI0R_IDE) ? 0 : 1;
+                f->id = f->std ? (rir >> CAN_RI0R_STID_Pos) & 0x7FFu : rir >> CAN_RI0R_EXID_Pos;
                 f->len = (uint8_t)(m->RDTR & 0xFu);
                 if (f->len > 8) f->len = 8;
                 uint32_t l = m->RDLR, h = m->RDHR;

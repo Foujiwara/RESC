@@ -11,6 +11,8 @@ static uint8_t map_in(uint8_t j, const uint8_t *k, uint8_t n) { return j < n ? k
 static uint8_t map_bits_out(uint8_t v, const uint8_t *k, uint8_t n) { uint8_t o = 0; for (uint8_t j = 0; j < n; j++) if (v & (1u << k[j])) o |= (uint8_t)(1u << j); return o; }
 static uint8_t map_bits_in(uint8_t o, const uint8_t *k, uint8_t n) { uint8_t v = 0; for (uint8_t j = 0; j < n; j++) if (o & (1u << j)) v |= (uint8_t)(1u << k[j]); return v; }
 static const uint8_t KEEP_APP_ADC_CONF_BUTTONS[] = { 0, 1, 2 };
+static const uint8_t KEEP_BMS_LIMIT_MODE[] = { 0, 1, 2, 3 };
+static const uint8_t KEEP_CAN_MODE[] = { 0, 2, 3 };
 static const uint8_t KEEP_CAN_STATUS_MSGS_R1[] = { 0, 1, 2, 3, 4, 5 };
 static const uint8_t KEEP_CAN_STATUS_MSGS_R2[] = { 0, 1, 2, 3, 4, 5 };
 static const uint8_t KEEP_FOC_HFI_AMB_MODE[] = { 1, 2 };
@@ -604,6 +606,17 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     buf[i++] = (uint8_t)c->si_battery_cells;
     vb_put_f32_auto(buf, c->si_battery_ah, &i);
     vb_put_f32_auto(buf, c->si_motor_nl_current, &i);
+    buf[i++] = (uint8_t)c->bms_type;
+    buf[i++] = map_bits_out((uint8_t)c->bms_limit_mode, KEEP_BMS_LIMIT_MODE, 4);
+    buf[i++] = (uint8_t)c->bms_t_limit_start;
+    buf[i++] = (uint8_t)c->bms_t_limit_end;
+    vb_put_f16(buf, c->bms_soc_limit_start, 1000, &i);
+    vb_put_f16(buf, c->bms_soc_limit_end, 1000, &i);
+    vb_put_f16(buf, c->bms_vmin_limit_start, 1000, &i);
+    vb_put_f16(buf, c->bms_vmin_limit_end, 1000, &i);
+    vb_put_f16(buf, c->bms_vmax_limit_start, 1000, &i);
+    vb_put_f16(buf, c->bms_vmax_limit_end, 1000, &i);
+    buf[i++] = (uint8_t)c->bms_fwd_can_mode;
     buf[i++] = (uint8_t)c->foc_motor_kind;
     vb_put_f32_auto(buf, c->foc_acim_lm, &i);
     vb_put_f32_auto(buf, c->foc_acim_lr, &i);
@@ -618,7 +631,7 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
 bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < 421) return false;
+    if (len < 438) return false;
     if (vb_get_u32(buf, &i) != g_rescp_mcconf_sig) return false;
     c->motor_type = (uint8_t)buf[i++];
     c->l_current_max = vb_get_f32_auto(buf, &i);
@@ -780,6 +793,17 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->si_battery_cells = (float)buf[i++];
     c->si_battery_ah = vb_get_f32_auto(buf, &i);
     c->si_motor_nl_current = vb_get_f32_auto(buf, &i);
+    c->bms_type = (uint8_t)buf[i++];
+    c->bms_limit_mode = (uint8_t)map_bits_in(buf[i++], KEEP_BMS_LIMIT_MODE, 4);
+    c->bms_t_limit_start = (float)buf[i++];
+    c->bms_t_limit_end = (float)buf[i++];
+    c->bms_soc_limit_start = vb_get_f16(buf, 1000, &i);
+    c->bms_soc_limit_end = vb_get_f16(buf, 1000, &i);
+    c->bms_vmin_limit_start = vb_get_f16(buf, 1000, &i);
+    c->bms_vmin_limit_end = vb_get_f16(buf, 1000, &i);
+    c->bms_vmax_limit_start = vb_get_f16(buf, 1000, &i);
+    c->bms_vmax_limit_end = vb_get_f16(buf, 1000, &i);
+    c->bms_fwd_can_mode = (uint8_t)buf[i++];
     c->foc_motor_kind = (uint8_t)buf[i++];
     c->foc_acim_lm = vb_get_f32_auto(buf, &i);
     c->foc_acim_lr = vb_get_f32_auto(buf, &i);
@@ -1526,7 +1550,10 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     buf[i++] = map_bits_out((uint8_t)c->can_status_msgs_r1, KEEP_CAN_STATUS_MSGS_R1, 6);
     buf[i++] = map_bits_out((uint8_t)c->can_status_msgs_r2, KEEP_CAN_STATUS_MSGS_R2, 6);
     buf[i++] = (uint8_t)c->can_baud_rate;
+    buf[i++] = (uint8_t)c->permanent_uart_enabled;
     buf[i++] = (uint8_t)c->shutdown_mode;
+    buf[i++] = map_out((uint8_t)c->can_mode, KEEP_CAN_MODE, 3);
+    buf[i++] = (uint8_t)c->servo_out_enable;
     buf[i++] = (uint8_t)c->kill_sw_mode;
     buf[i++] = (uint8_t)c->app_to_use;
     buf[i++] = (uint8_t)c->app_ppm_conf_ctrl_type;
@@ -1625,7 +1652,7 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
 bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
 {
     int32_t i = 0;
-    if (len < 261) return false;
+    if (len < 264) return false;
     if (vb_get_u32(buf, &i) != g_rescp_appconf_sig) return false;
     c->controller_id = (float)buf[i++];
     c->timeout_msec = vb_get_u32(buf, &i);
@@ -1635,7 +1662,10 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->can_status_msgs_r1 = (uint8_t)map_bits_in(buf[i++], KEEP_CAN_STATUS_MSGS_R1, 6);
     c->can_status_msgs_r2 = (uint8_t)map_bits_in(buf[i++], KEEP_CAN_STATUS_MSGS_R2, 6);
     c->can_baud_rate = (uint8_t)buf[i++];
+    c->permanent_uart_enabled = (uint8_t)buf[i++];
     c->shutdown_mode = (uint8_t)buf[i++];
+    c->can_mode = (uint8_t)map_in(buf[i++], KEEP_CAN_MODE, 3);
+    c->servo_out_enable = (uint8_t)buf[i++];
     c->kill_sw_mode = (uint8_t)buf[i++];
     c->app_to_use = (uint8_t)buf[i++];
     c->app_ppm_conf_ctrl_type = (uint8_t)buf[i++];
@@ -1994,7 +2024,7 @@ const uint16_t vesc_appconf_nfields = 121;
 
 
 /* choix dependant de la carte (mcconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 480116984u;
+__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3988168616u;
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 2 };
@@ -2003,6 +2033,6 @@ __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 1, 2, 3, 4,
 __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 10;
 
 /* choix dependant de la carte (appconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 2038491941u;
+__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 3809187766u;
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type[] = { 0, 1, 4 };
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type_n = 3;

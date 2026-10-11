@@ -247,11 +247,7 @@ p, li { white-space: pre-wrap; }
             <longName>Enable Permanent UART</longName>
             <type>5</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Enable the permanent UART port (if the hardware has one). This port can be connected to e.g. the NRF51 for providing a BLE link. You may want to disable this to prevent access to your VESC over BLE.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Packets accepted on the permanent UART (Bluetooth / NRF module of the board).&lt;/p&gt;</description>
             <cDefine>APPCONF_PERMANENT_UART_ENABLED</cDefine>
             <valInt>1</valInt>
         </permanent_uart_enabled>
@@ -277,27 +273,7 @@ p, li { white-space: pre-wrap; }
             <longName>CAN Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;CAN-bus mode.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;VESC&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Default VESC CAN-bus. Required for CAN forwarding and configuring multiple VESCs using VESC Tool.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;UAVCAN&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Basic implementation of UAVCAN. Currently needs some work.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Comm Brigde&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Bridge CAN-bus to commands. Useful for using the VESC and VESC Tool as a generic CAN interface and debugger.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Unused&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;CAN-frames are not processed at all and just ignored. Custom applications and scripts can still process CAN-frames. This is very similar to &lt;span style=" font-weight:600;"&gt;Comm Bridge&lt;/span&gt;, but the received frames are not forwarded using commands.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;UAVCAN and VESC&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Experimental mode where frames that aren't processed by UAVCAN are processed by the VESC decoder. This can give limited VESC Tool configuration support on UAVCAN networks.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;VESC&lt;/b&gt;: VESC CAN protocol (status messages, commands, packet forwarding, BMS). &lt;b&gt;COMM Bridge&lt;/b&gt;: every received frame is forwarded to the tool (COMM_CAN_FWD_FRAME), no VESC processing. &lt;b&gt;Unused&lt;/b&gt;: the CAN bus is ignored.&lt;/p&gt;</description>
             <cDefine>APPCONF_CAN_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>VESC</enumNames>
@@ -394,11 +370,7 @@ p, li { white-space: pre-wrap; }
             <longName>Enable Servo Output</longName>
             <type>5</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;Enable servo output on PPM-port when PPM-app is disabled.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Servo output on the servo pin (50 Hz, 1 to 2 ms) when no PPM application uses it; position set by COMM_SET_SERVO_POS.&lt;/p&gt;</description>
             <cDefine>APPCONF_SERVO_OUT_ENABLE</cDefine>
             <valInt>0</valInt>
         </servo_out_enable>
@@ -2793,7 +2765,10 @@ p, li { white-space: pre-wrap; }
                     <param>timeout_msec</param>
                     <param>timeout_brake_current</param>
                     <param>can_baud_rate</param>
+                    <param>permanent_uart_enabled</param>
                     <param>shutdown_mode</param>
+                    <param>can_mode</param>
+                    <param>servo_out_enable</param>
                     <param>kill_sw_mode</param>
                     <param>::sep::CAN Messages Rate 1</param>
                     <param>can_status_rate_1</param>

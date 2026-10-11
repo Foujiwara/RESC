@@ -17,6 +17,9 @@ typedef enum {
 
 /* servo_pin_owned : la broche servo sert a un autre usage (codeur PWM), n'y pas toucher */
 void inputs_init(bool servo, in_uart_use_t uart_use, bool servo_pin_owned);
+/* Sortie servo (servo_out_enable) : impulsions de 1 a 2 ms a 50 Hz sur la broche servo */
+void inputs_servo_out_init(void);
+void inputs_servo_out_set(float pos);     /* 0..1 */
 
 /* Derniere impulsion servo (ms) ; false si aucune impulsion depuis 100 ms */
 bool inputs_servo_ms(float *ms, uint32_t now_ms);

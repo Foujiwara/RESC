@@ -45,7 +45,18 @@ def both(*c):
 
 
 PORT = "mc->m_sensor_port_mode"
+BMS = "(mc->bms_type == 1)"
 VIS_MC = {
+    "bms.limit_mode": BMS,
+    "bms.fwd_can_mode": BMS,
+    "bms.t_limit_start": both(BMS, "(mc->bms_limit_mode & 1)"),
+    "bms.t_limit_end": both(BMS, "(mc->bms_limit_mode & 1)"),
+    "bms.soc_limit_start": both(BMS, "(mc->bms_limit_mode & 2)"),
+    "bms.soc_limit_end": both(BMS, "(mc->bms_limit_mode & 2)"),
+    "bms.vmin_limit_start": both(BMS, "(mc->bms_limit_mode & 4)"),
+    "bms.vmin_limit_end": both(BMS, "(mc->bms_limit_mode & 4)"),
+    "bms.vmax_limit_start": both(BMS, "(mc->bms_limit_mode & 8)"),
+    "bms.vmax_limit_end": both(BMS, "(mc->bms_limit_mode & 8)"),
     "m_sensor_port_mode": ENC,
     "m_encoder_counts": both(ENC, "(%s <= 1)" % PORT),
     "m_encoder_sin_amp": both(ENC, "(%s == 4)" % PORT),
@@ -127,8 +138,12 @@ for _k in range(8):
 PPM = "app->app_ppm_conf_ctrl_type"      # 2, 5, 7, 11 sans marche arriere ; 6, 7 PID ; 8 hysteresis ; 9 intelligente
 ADC = "app->app_adc_conf_ctrl_type"      # centrees : 2, 5, 6, 10, 13 ; frein ADC2 : 4, 8
 VIS_APP = {
-    "can_status_msgs_r1": "app->can_status_rate_1 > 0",
-    "can_status_msgs_r2": "app->can_status_rate_2 > 0",
+    "can_status_msgs_r1": "(app->can_status_rate_1 > 0 && app->can_mode == 0)",
+    "can_status_msgs_r2": "(app->can_status_rate_2 > 0 && app->can_mode == 0)",
+    "can_status_rate_1": "app->can_mode == 0",
+    "can_status_rate_2": "app->can_mode == 0",
+    "servo_out_enable": "(app->app_to_use != 1 && app->app_to_use != 4)",
+    "permanent_uart_enabled": "(BOARD_UART2_INST != 0)",
     "app_ppm_conf.pulse_center": "!" + any_of(PPM, (2, 5, 7, 11)),
     "app_ppm_conf.pid_max_erpm": any_of(PPM, (6, 7)),
     "app_ppm_conf.max_erpm_for_dir": any_of(PPM, (8, 9)),
