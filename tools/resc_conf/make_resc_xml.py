@@ -50,12 +50,7 @@ APP_REMOVE = [
 ] + [p for p in (
     "app_nrf_conf.speed app_nrf_conf.power app_nrf_conf.crc_type app_nrf_conf.retry_delay app_nrf_conf.retries "
     "app_nrf_conf.channel app_nrf_conf.address__0 app_nrf_conf.address__1 app_nrf_conf.address__2 "
-    "app_nrf_conf.send_crc_ack imu_conf.type imu_conf.mode imu_conf.filter imu_conf.accel_lowpass_filter_x "
-    "imu_conf.accel_lowpass_filter_y imu_conf.accel_lowpass_filter_z imu_conf.gyro_lowpass_filter "
-    "imu_conf.sample_rate_hz imu_conf.use_magnetometer imu_conf.accel_confidence_decay imu_conf.mahony_kp "
-    "imu_conf.mahony_ki imu_conf.madgwick_beta imu_conf.rot_roll imu_conf.rot_pitch imu_conf.rot_yaw "
-    "imu_conf.accel_offsets__0 imu_conf.accel_offsets__1 imu_conf.accel_offsets__2 imu_conf.gyro_offsets__0 "
-    "imu_conf.gyro_offsets__1 imu_conf.gyro_offsets__2").split()]
+    "app_nrf_conf.send_crc_ack imu_conf.use_magnetometer").split()]
 
 
 def html(*paras):
@@ -197,6 +192,18 @@ MC_EDIT = {
         "analog watchdog is then set 50 % higher).")),
 }
 APP_EDIT = {
+    "imu_conf.type": dict(description=html(
+        "<b>Internal</b>: BMI160 of the board (software I2C). <b>External BMI160</b>: on the UART port pins "
+        "(SCL = TX, SDA = RX), only when no UART application uses them.",
+        "Data in the IMU page of the tool (roll, pitch, yaw, accelerations, rates, quaternion); calibration "
+        "from the tool (gyro offsets, roll and pitch of the mounting).")),
+    "imu_conf.filter": dict(description=html(
+        "Internal filter of the BMI160. <b>Low</b>: average of 4 samples. <b>Medium</b>: oversampling x2 at "
+        "twice the rate. <b>High</b>: oversampling x4 at four times the rate.")),
+    "imu_conf.mode": dict(description=html(
+        "Attitude filter. <b>Madgwick</b>: gradient descent, gain Beta. <b>Mahony</b>: PI on the gravity "
+        "error, Kp and Ki. <b>Madgwick Fusion</b>: proportional gravity feedback, gain Beta. The accelerometer "
+        "weight decreases when the acceleration differs from 1 g (Accelerometer Confidence Decay).")),
     "app_to_use": dict(description=html(
         "Control application. <b>UART</b> also accepts the VESC Remote through packets (radio module on the "
         "permanent UART, BLE). <b>ADC</b> alone uses the UART TX/RX pins for the cruise and reverse buttons; "
@@ -238,6 +245,9 @@ ENUM_KEEP = {
                        (11, "Temp motor or mosfet > 50 C"), (12, "Temp motor or mosfet > 70 C")],
 }
 APP_ENUM_KEEP = {
+    "imu_conf.type": [(0, "Off"), (1, "Internal (BMI160)"), (4, "External BMI160 (UART port, I2C)")],
+    "imu_conf.mode": [(0, "Madgwick"), (1, "Mahony"), (2, "Madgwick Fusion")],
+    "imu_conf.filter": [(0, "Low"), (1, "Medium"), (2, "High")],
     "can_status_msgs_r1": [(k, "Status %d" % (k + 1)) for k in range(6)],
     "can_status_msgs_r2": [(k, "Status %d" % (k + 1)) for k in range(6)],
     "app_adc_conf.buttons": [(0, "Enable Cruise Control"), (1, "Invert CC Button"), (2, "Invert Reverse Button")],

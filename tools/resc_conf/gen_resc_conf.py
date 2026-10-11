@@ -105,7 +105,7 @@ EMAP = {}     # profil RESC : listes reduites (resc_enum_map.json)
 def ser_line(p, ct, rmap=False):
     c = "c->" + p.c
     m = EMAP.get(p.c) if rmap else None
-    if m and p.c in board_enum.BOARD_ENUM:
+    if m and p.c in board_enum.ALL_FLAT:
         return "buf[i++] = map_out((uint8_t)%s, g_keepb_%s, g_keepb_%s_n);" % (c, p.c, p.c)
     if m:
         f = "map_bits_out" if m["bits"] else "map_out"
@@ -126,7 +126,7 @@ def ser_line(p, ct, rmap=False):
 def deser_line(p, ct, rmap=False):
     c = "c->" + p.c
     m = EMAP.get(p.c) if rmap else None
-    if m and p.c in board_enum.BOARD_ENUM:
+    if m and p.c in board_enum.ALL_FLAT:
         return "%s = (%s)map_in(buf[i++], g_keepb_%s, g_keepb_%s_n);" % (c, ct, p.c, p.c)
     if m:
         f = "map_bits_in" if m["bits"] else "map_in"
@@ -197,7 +197,7 @@ def main():
     c.append("static uint8_t map_bits_out(uint8_t v, const uint8_t *k, uint8_t n) { uint8_t o = 0; for (uint8_t j = 0; j < n; j++) if (v & (1u << k[j])) o |= (uint8_t)(1u << j); return o; }")
     c.append("static uint8_t map_bits_in(uint8_t o, const uint8_t *k, uint8_t n) { uint8_t v = 0; for (uint8_t j = 0; j < n; j++) if (o & (1u << j)) v |= (uint8_t)(1u << k[j]); return v; }")
     for name, m in sorted(EMAP.items()):
-        if name in board_enum.BOARD_ENUM:
+        if name in board_enum.ALL_FLAT:
             continue
         c.append("static const uint8_t KEEP_%s[] = { %s };" % (name.upper(), ", ".join(str(v) for v in m["keep"])))
     c.append("")
@@ -230,11 +230,10 @@ def main():
         h.append("#define VESC_%s_SIGNATURE VESC700_%s_SIGNATURE" % (up, up))
         h.append("#endif")
         h.append("#define VESC_%s_SER_MAX %d" % (up, max(sz_v, sz_r)))
-        if k == "mc":
-            h.append("/* signature RESC et choix dependant de la carte (description de la carte compilee) */")
-            h.append("extern const uint32_t g_rescp_mcconf_sig;")
-            for f in board_enum.BOARD_ENUM:
-                h.append("extern const uint8_t g_keepb_%s[], g_keepb_%s_n;" % (f, f))
+        h.append("/* signature RESC et choix dependant de la carte (description de la carte compilee) */")
+        h.append("extern const uint32_t g_rescp_%s_sig;" % lname)
+        for f in sorted(board_enum.FLAT[k]):
+            h.append("extern const uint8_t g_keepb_%s[], g_keepb_%s_n;" % (f, f))
         h.append("")
         for pre in ("vesc700", "rescp", "vesc"):
             h.append("int32_t %s_%s_serialize(uint8_t *buf, const %s *c);" % (pre, lname, sname))
@@ -242,7 +241,7 @@ def main():
         h.append("void    vesc_%s_defaults(%s *c);" % (lname, sname))
 
         # serialisation des deux profils
-        rsig = "g_rescp_mcconf_sig" if k == "mc" else "RESCP_%s_SIGNATURE" % up
+        rsig = "g_rescp_%s_sig" % lname
         for pre, ps, sigm in (("vesc700", v_ps, "VESC700_%s_SIGNATURE" % up), ("rescp", r_ps, rsig)):
             c.append("int32_t %s_%s_serialize(uint8_t *buf, const %s *c)\n{" % (pre, lname, sname))
             c.append("    int32_t i = 0;")
@@ -312,7 +311,8 @@ def main():
     x.append("#endif")
 
     # valeurs generiques (faibles) : la description de la carte compilee les remplace
-    c += [""] + board_enum.c_lines(EMAP, prof["resc"]["mc"][2], weak=True)
+    for k in ("mc", "app"):
+        c += [""] + board_enum.c_lines(k, EMAP, prof["resc"][k][2], weak=True)
     open(os.path.join(OUT, "vesc_conf.h"), "w", encoding="utf-8", newline="\n").write("\n".join(h) + "\n")
     open(os.path.join(OUT, "vesc_conf.c"), "w", encoding="utf-8", newline="\n").write("\n".join(c) + "\n")
     open(os.path.join(OUT, "conf_xml.c"), "w", encoding="utf-8", newline="\n").write("\n".join(x) + "\n")

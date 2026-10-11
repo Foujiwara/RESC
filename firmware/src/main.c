@@ -33,6 +33,7 @@
 #include "vesc_defaults.h"
 #include "sampler.h"
 #include "stats.h"
+#include "imu.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
@@ -255,6 +256,7 @@ int main(void)
     apps_configure();
     apps_note_activity(systime_ms());
     stats_reset(systime_ms());
+    imu_configure();
     wdg_init();
     if (wdg_was_reset()) foc_raise_fault(RESC_FAULT_WATCHDOG_RESET);
 
@@ -270,6 +272,7 @@ int main(void)
         can_vesc_poll(now);
         commands_poll(now);
         sampler_poll();
+        imu_poll(DWT->CYCCNT / 168u);
         {
             static uint32_t st_ms;
             if (now - st_ms >= 10u) {

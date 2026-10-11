@@ -1826,6 +1826,452 @@ p, li { white-space: pre-wrap; }
             <suffix> Hz</suffix>
             <vTx>3</vTx>
         </app_pas_conf.update_rate_hz>
+        <imu_conf.type>
+            <longName>IMU Type</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;&lt;b&gt;Internal&lt;/b&gt;: BMI160 of the board (software I2C). &lt;b&gt;External BMI160&lt;/b&gt;: on the UART port pins (SCL = TX, SDA = RX), only when no UART application uses them.&lt;/p&gt;&lt;p&gt;Data in the IMU page of the tool (roll, pitch, yaw, accelerations, rates, quaternion); calibration from the tool (gyro offsets, roll and pitch of the mounting).&lt;/p&gt;</description>
+            <cDefine>APPCONF_IMU_TYPE</cDefine>
+            <valInt>1</valInt>
+            <enumNames>Off</enumNames>
+            <enumNames>Internal (BMI160)</enumNames>
+            <enumNames>External BMI160 (UART port, I2C)</enumNames>
+            <maxInt>2</maxInt>
+        </imu_conf.type>
+        <imu_conf.mode>
+            <longName>IMU AHRS Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Attitude filter. &lt;b&gt;Madgwick&lt;/b&gt;: gradient descent, gain Beta. &lt;b&gt;Mahony&lt;/b&gt;: PI on the gravity error, Kp and Ki. &lt;b&gt;Madgwick Fusion&lt;/b&gt;: proportional gravity feedback, gain Beta. The accelerometer weight decreases when the acceleration differs from 1 g (Accelerometer Confidence Decay).&lt;/p&gt;</description>
+            <cDefine>APPCONF_IMU_AHRS_MODE</cDefine>
+            <valInt>0</valInt>
+            <enumNames>Madgwick</enumNames>
+            <enumNames>Mahony</enumNames>
+            <enumNames>Madgwick Fusion</enumNames>
+            <maxInt>2</maxInt>
+        </imu_conf.mode>
+        <imu_conf.filter>
+            <longName>Accel/Gyro Filter</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Internal filter of the BMI160. &lt;b&gt;Low&lt;/b&gt;: average of 4 samples. &lt;b&gt;Medium&lt;/b&gt;: oversampling x2 at twice the rate. &lt;b&gt;High&lt;/b&gt;: oversampling x4 at four times the rate.&lt;/p&gt;</description>
+            <cDefine>APPCONF_IMU_FILTER</cDefine>
+            <valInt>0</valInt>
+            <enumNames>Low</enumNames>
+            <enumNames>Medium</enumNames>
+            <enumNames>High</enumNames>
+            <maxInt>2</maxInt>
+        </imu_conf.filter>
+        <imu_conf.accel_lowpass_filter_x>
+            <longName>Accel lowpass filter X</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Accelerometer lowpass filter&lt;/span&gt;&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Biquad lowpass filter applied to X axis. This is run on the ESC and will be applied regardless of IMU model.&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Setting the filter to 0Hz will disable it.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ACCEL_LOWPASS_FILTER_X</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.5</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> Hz</suffix>
+            <vTx>7</vTx>
+        </imu_conf.accel_lowpass_filter_x>
+        <imu_conf.accel_lowpass_filter_y>
+            <longName>Accel lowpass filter Y</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Accelerometer lowpass filter&lt;/span&gt;&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Biquad lowpass filter applied to Y axis. This is run on the ESC and will be applied regardless of IMU model.&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Setting the filter to 0Hz will disable it.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ACCEL_LOWPASS_FILTER_Y</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.5</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> Hz</suffix>
+            <vTx>7</vTx>
+        </imu_conf.accel_lowpass_filter_y>
+        <imu_conf.accel_lowpass_filter_z>
+            <longName>Accel lowpass filter Z</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Accelerometer lowpass filter&lt;/span&gt;&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Biquad lowpass filter applied to Z axis. This is run on the ESC and will be applied regardless of IMU model.&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Setting the filter to 0Hz will disable it.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ACCEL_LOWPASS_FILTER_Z</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.5</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> Hz</suffix>
+            <vTx>7</vTx>
+        </imu_conf.accel_lowpass_filter_z>
+        <imu_conf.gyro_lowpass_filter>
+            <longName>Gyro lowpass filter</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Gyrosocpe lowpass filter&lt;/span&gt;&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Biquad lowpass filter applied to all 3 axes of the gyroscope. This is run on the ESC and will be applied regardless of IMU model.&lt;/p&gt;
+&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Setting the filter to 0Hz will disable it.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_GYRO_LOWPASS_FILTER</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.5</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> Hz</suffix>
+            <vTx>7</vTx>
+        </imu_conf.gyro_lowpass_filter>
+        <imu_conf.sample_rate_hz>
+            <longName>Sample Rate</longName>
+            <type>2</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;IMU sample rate. Higher sample rates use more CPU cycles, but perform better.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_SAMPLE_RATE_HZ</cDefine>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxInt>10000</maxInt>
+            <minInt>1</minInt>
+            <showDisplay>0</showDisplay>
+            <stepInt>10</stepInt>
+            <valInt>200</valInt>
+            <suffix> Hz</suffix>
+            <vTx>3</vTx>
+        </imu_conf.sample_rate_hz>
+        <imu_conf.accel_confidence_decay>
+            <longName>Accelerometer Confidence Decay</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;This factor sets how fast the accelerometer confidence will be decreased if the acceleration vector differs from 1.0.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ACCEL_CONFIDENCE_DECAY</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>999</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </imu_conf.accel_confidence_decay>
+        <imu_conf.mahony_kp>
+            <longName>Mahony KP</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;KP for Mahony filter. Decides how much the accelerometer is used for attitude estimation. Increasing this value helps against gyro offsets, but makes the output noisier.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_MAHONY_KP</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>999</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>0.3</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </imu_conf.mahony_kp>
+        <imu_conf.mahony_ki>
+            <longName>Mahony KI</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;KI for Mahony filter. Integrates gyro offsets over time.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_MAHONY_KI</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>999</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </imu_conf.mahony_ki>
+        <imu_conf.madgwick_beta>
+            <longName>Madgwick Beta</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Beta for Madgwick filter. Decides how much the accelerometer is used for attitude estimation. Increasing this value helps against gyro offsets, but makes the output noisier.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_MADGWICK_BETA</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>999</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.1</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </imu_conf.madgwick_beta>
+        <imu_conf.rot_roll>
+            <longName>Imu Rotation Roll</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Roll rotation of IMU. Can be adjusted if the IMU is not aligned with the vehicle.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ROT_ROLL</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>360</maxDouble>
+            <minDouble>-360</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °</suffix>
+            <vTx>9</vTx>
+        </imu_conf.rot_roll>
+        <imu_conf.rot_pitch>
+            <longName>Imu Rotation Pitch</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Pitch rotation of IMU. Can be adjusted if the IMU is not aligned with the vehicle.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ROT_PITCH</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>360</maxDouble>
+            <minDouble>-360</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °</suffix>
+            <vTx>9</vTx>
+        </imu_conf.rot_pitch>
+        <imu_conf.rot_yaw>
+            <longName>Imu Rotation Yaw</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Yaw rotation of IMU. Can be adjusted if the IMU is not aligned with the vehicle.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_ROT_YAW</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>360</maxDouble>
+            <minDouble>-360</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °</suffix>
+            <vTx>9</vTx>
+        </imu_conf.rot_yaw>
+        <imu_conf.accel_offsets__0>
+            <longName>Accel Offset X</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Accelerometer offset X.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_A_OFFSET_0</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>16</maxDouble>
+            <minDouble>-16</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> G</suffix>
+            <vTx>9</vTx>
+        </imu_conf.accel_offsets__0>
+        <imu_conf.accel_offsets__1>
+            <longName>Accel Offset Y</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Accelerometer offset Y.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_A_OFFSET_1</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>16</maxDouble>
+            <minDouble>-16</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> G</suffix>
+            <vTx>9</vTx>
+        </imu_conf.accel_offsets__1>
+        <imu_conf.accel_offsets__2>
+            <longName>Accel Offset Z</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Accelerometer offset Z.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_A_OFFSET_2</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>16</maxDouble>
+            <minDouble>-16</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> G</suffix>
+            <vTx>9</vTx>
+        </imu_conf.accel_offsets__2>
+        <imu_conf.gyro_offsets__0>
+            <longName>Gyro Offset X</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Gyro offset (drift) X.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_G_OFFSET_0</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>-1000</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °/s</suffix>
+            <vTx>9</vTx>
+        </imu_conf.gyro_offsets__0>
+        <imu_conf.gyro_offsets__1>
+            <longName>Gyro Offset Y</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Gyro offset (drift) Y.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_G_OFFSET_1</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>-1000</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °/s</suffix>
+            <vTx>9</vTx>
+        </imu_conf.gyro_offsets__1>
+        <imu_conf.gyro_offsets__2>
+            <longName>Gyro Offset Z</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
+p, li { white-space: pre-wrap; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
+&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Gyro offset (drift) Z.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <cDefine>APPCONF_IMU_G_OFFSET_2</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1000</maxDouble>
+            <minDouble>-1000</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1</vTxDoubleScale>
+            <suffix> °/s</suffix>
+            <vTx>9</vTx>
+        </imu_conf.gyro_offsets__2>
     </Params>
     <SerOrder>
         <ser>controller_id</ser>
@@ -1908,6 +2354,27 @@ p, li { white-space: pre-wrap; }
         <ser>app_pas_conf.ramp_time_pos</ser>
         <ser>app_pas_conf.ramp_time_neg</ser>
         <ser>app_pas_conf.update_rate_hz</ser>
+        <ser>imu_conf.type</ser>
+        <ser>imu_conf.mode</ser>
+        <ser>imu_conf.filter</ser>
+        <ser>imu_conf.accel_lowpass_filter_x</ser>
+        <ser>imu_conf.accel_lowpass_filter_y</ser>
+        <ser>imu_conf.accel_lowpass_filter_z</ser>
+        <ser>imu_conf.gyro_lowpass_filter</ser>
+        <ser>imu_conf.sample_rate_hz</ser>
+        <ser>imu_conf.accel_confidence_decay</ser>
+        <ser>imu_conf.mahony_kp</ser>
+        <ser>imu_conf.mahony_ki</ser>
+        <ser>imu_conf.madgwick_beta</ser>
+        <ser>imu_conf.rot_roll</ser>
+        <ser>imu_conf.rot_pitch</ser>
+        <ser>imu_conf.rot_yaw</ser>
+        <ser>imu_conf.accel_offsets__0</ser>
+        <ser>imu_conf.accel_offsets__1</ser>
+        <ser>imu_conf.accel_offsets__2</ser>
+        <ser>imu_conf.gyro_offsets__0</ser>
+        <ser>imu_conf.gyro_offsets__1</ser>
+        <ser>imu_conf.gyro_offsets__2</ser>
     </SerOrder>
     <Grouping>
         <group>
@@ -2051,6 +2518,38 @@ p, li { white-space: pre-wrap; }
                     <param>app_chuk_conf.throttle_exp</param>
                     <param>app_chuk_conf.throttle_exp_brake</param>
                     <param>app_chuk_conf.throttle_exp_mode</param>
+                </subgroupParams>
+            </subgroup>
+        </group>
+        <group>
+            <groupName>IMU</groupName>
+            <subgroup>
+                <subgroupName>General</subgroupName>
+                <subgroupParams>
+                    <param>imu_conf.type</param>
+                    <param>imu_conf.sample_rate_hz</param>
+                    <param>imu_conf.filter</param>
+                    <param>imu_conf.accel_lowpass_filter_x</param>
+                    <param>imu_conf.accel_lowpass_filter_y</param>
+                    <param>imu_conf.accel_lowpass_filter_z</param>
+                    <param>imu_conf.gyro_lowpass_filter</param>
+                    <param>::sep::AHRS</param>
+                    <param>imu_conf.mode</param>
+                    <param>imu_conf.accel_confidence_decay</param>
+                    <param>imu_conf.mahony_kp</param>
+                    <param>imu_conf.mahony_ki</param>
+                    <param>imu_conf.madgwick_beta</param>
+                    <param>::sep::Rotation</param>
+                    <param>imu_conf.rot_roll</param>
+                    <param>imu_conf.rot_pitch</param>
+                    <param>imu_conf.rot_yaw</param>
+                    <param>::sep::Offsets</param>
+                    <param>imu_conf.accel_offsets__0</param>
+                    <param>imu_conf.accel_offsets__1</param>
+                    <param>imu_conf.accel_offsets__2</param>
+                    <param>imu_conf.gyro_offsets__0</param>
+                    <param>imu_conf.gyro_offsets__1</param>
+                    <param>imu_conf.gyro_offsets__2</param>
                 </subgroupParams>
             </subgroup>
         </group>

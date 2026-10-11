@@ -97,6 +97,7 @@
 #define BOARD_PWR_KEY_OD_TRICK  1
 #define BOARD_IMU_SDA_PIN       HW_PB4      /* BMI160, I2C logiciel */
 #define BOARD_IMU_SCL_PIN       HW_PB12
+#define BOARD_IMU_FLIP          1           /* IMU_FLIP de VESC : axes x et z inverses */
 
 /* ---------------------------------------------------- Communications */
 /* UART VESC : USART3 PB10/PB11 (commun). UART permanent NRF52 : UART4 */

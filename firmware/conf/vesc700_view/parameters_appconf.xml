@@ -2204,11 +2204,7 @@ p, li { white-space: pre-wrap; }
             <longName>IMU Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;IMU type. The internal IMU is only available if the hardware supports it. External IMUs can be connected to the SDA and SCL pins. If using an external IMU, make sure that no app that uses the same pins is selected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;Internal&lt;/b&gt;: BMI160 of the board (software I2C). &lt;b&gt;External BMI160&lt;/b&gt;: on the UART port pins (SCL = TX, SDA = RX), only when no UART application uses them.&lt;/p&gt;&lt;p&gt;Data in the IMU page of the tool (roll, pitch, yaw, accelerations, rates, quaternion); calibration from the tool (gyro offsets, roll and pitch of the mounting).&lt;/p&gt;</description>
             <cDefine>APPCONF_IMU_TYPE</cDefine>
             <valInt>1</valInt>
             <enumNames>IMU_TYPE_OFF</enumNames>
@@ -2222,11 +2218,7 @@ p, li { white-space: pre-wrap; }
             <longName>IMU AHRS Mode</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Use the Madgwick or Mahony AHRS filter.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Attitude filter. &lt;b&gt;Madgwick&lt;/b&gt;: gradient descent, gain Beta. &lt;b&gt;Mahony&lt;/b&gt;: PI on the gravity error, Kp and Ki. &lt;b&gt;Madgwick Fusion&lt;/b&gt;: proportional gravity feedback, gain Beta. The accelerometer weight decreases when the acceleration differs from 1 g (Accelerometer Confidence Decay).&lt;/p&gt;</description>
             <cDefine>APPCONF_IMU_AHRS_MODE</cDefine>
             <valInt>0</valInt>
             <enumNames>AHRS_MODE_MADGWICK</enumNames>
@@ -2237,11 +2229,7 @@ p, li { white-space: pre-wrap; }
             <longName>Accel/Gyro Filter</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Set the onboard accel/gyro filters.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Internal filter of the BMI160. &lt;b&gt;Low&lt;/b&gt;: average of 4 samples. &lt;b&gt;Medium&lt;/b&gt;: oversampling x2 at twice the rate. &lt;b&gt;High&lt;/b&gt;: oversampling x4 at four times the rate.&lt;/p&gt;</description>
             <cDefine>APPCONF_IMU_FILTER</cDefine>
             <valInt>0</valInt>
             <enumNames>IMU_FILTER_LOW</enumNames>
@@ -2952,7 +2940,31 @@ p, li { white-space: pre-wrap; }
             <subgroup>
                 <subgroupName>General</subgroupName>
                 <subgroupParams>
-                    </subgroupParams>
+                    <param>imu_conf.type</param>
+                    <param>imu_conf.sample_rate_hz</param>
+                    <param>imu_conf.filter</param>
+                    <param>imu_conf.accel_lowpass_filter_x</param>
+                    <param>imu_conf.accel_lowpass_filter_y</param>
+                    <param>imu_conf.accel_lowpass_filter_z</param>
+                    <param>imu_conf.gyro_lowpass_filter</param>
+                    <param>::sep::AHRS</param>
+                    <param>imu_conf.mode</param>
+                    <param>imu_conf.accel_confidence_decay</param>
+                    <param>imu_conf.mahony_kp</param>
+                    <param>imu_conf.mahony_ki</param>
+                    <param>imu_conf.madgwick_beta</param>
+                    <param>::sep::Rotation</param>
+                    <param>imu_conf.rot_roll</param>
+                    <param>imu_conf.rot_pitch</param>
+                    <param>imu_conf.rot_yaw</param>
+                    <param>::sep::Offsets</param>
+                    <param>imu_conf.accel_offsets__0</param>
+                    <param>imu_conf.accel_offsets__1</param>
+                    <param>imu_conf.accel_offsets__2</param>
+                    <param>imu_conf.gyro_offsets__0</param>
+                    <param>imu_conf.gyro_offsets__1</param>
+                    <param>imu_conf.gyro_offsets__2</param>
+                </subgroupParams>
             </subgroup>
         </group>
         <group>

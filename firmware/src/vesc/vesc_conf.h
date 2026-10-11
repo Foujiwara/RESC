@@ -381,15 +381,18 @@ typedef struct {
 } vesc_appconf_t;
 
 #define VESC700_APPCONF_SIGNATURE 2384027283u
-#define RESCP_APPCONF_SIGNATURE   1373548469u
+#define RESCP_APPCONF_SIGNATURE   2038491941u
 #define VESC700_APPCONF_SER_SIZE 284
-#define RESCP_APPCONF_SER_SIZE   196
+#define RESCP_APPCONF_SER_SIZE   261
 #ifdef RESC_CONF_PROFILE_RESC
 #define VESC_APPCONF_SIGNATURE RESCP_APPCONF_SIGNATURE
 #else
 #define VESC_APPCONF_SIGNATURE VESC700_APPCONF_SIGNATURE
 #endif
 #define VESC_APPCONF_SER_MAX 284
+/* signature RESC et choix dependant de la carte (description de la carte compilee) */
+extern const uint32_t g_rescp_appconf_sig;
+extern const uint8_t g_keepb_imu_conf_type[], g_keepb_imu_conf_type_n;
 
 int32_t vesc700_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c);
 bool    vesc700_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c);

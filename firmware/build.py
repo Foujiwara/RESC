@@ -201,6 +201,7 @@ def tests(board):
         "test_apps": ["tests/test_apps.c", "src/app/apps.c", "src/vesc/vesc_conf.c"],
         "test_sampler": ["tests/test_sampler.c", "src/comm/sampler.c", "src/comm/packet.c"],
         "test_abs_enc": ["tests/test_abs_enc.c"],
+        "test_ahrs": ["tests/test_ahrs.c", "src/app/ahrs.c"],
     }
     rc = 0
     for name, srcs in suites.items():

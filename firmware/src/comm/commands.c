@@ -22,6 +22,7 @@
 #include "conf_desc.h"
 #include "sampler.h"
 #include "stats.h"
+#include "imu.h"
 
 volatile bool g_req_reboot, g_req_bootloader, g_req_poweroff;
 
@@ -265,6 +266,7 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
         g_appconf = tmp;
         resc_conf_apply();
         apps_configure();
+        imu_configure();
         if (id == COMM_SET_APPCONF) resc_conf_store_app();
         b[o++] = id;
         reply(src, b, 1);
@@ -388,6 +390,14 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     case COMM_SET_CHUCK_DATA:
         apps_set_chuck(d, n, systime_ms());
         break;
+    case COMM_GET_IMU_DATA:
+        o = imu_data_reply(b, n >= 2 ? vb_get_u16(d, &i) : 0xFFFFu);
+        reply(src, b, (uint32_t)o);
+        break;
+    case COMM_GET_IMU_CALIBRATION:
+        imu_calibration_start(n >= 4 ? vb_get_f32(d, 1e3f, &i) : 0.0f, src);
+        break;
+
     case COMM_SAMPLE_PRINT:
         sampler_request(src, d, n);
         break;

@@ -208,6 +208,13 @@ void resc_conf_clamp_app(vesc_appconf_t *c)
     c->can_status_msgs_r1 &= 0x3Fu;
     c->can_status_msgs_r2 &= 0x3Fu;
     c->app_adc_conf_buttons &= 0x07u;
+    /* IMU : BMI160 interne (si la carte en a une) ou externe sur le port UART */
+    if (c->imu_conf_type != 0 && c->imu_conf_type != 1 && c->imu_conf_type != 4) c->imu_conf_type = 0;
+    if (c->imu_conf_type == 1 && BOARD_IMU_SDA_PIN == HW_PIN_NONE) c->imu_conf_type = 0;
+    if (c->imu_conf_mode > 2) c->imu_conf_mode = 0;
+    if (c->imu_conf_filter > 2) c->imu_conf_filter = 0;
+    if (c->imu_conf_sample_rate_hz < 10) c->imu_conf_sample_rate_hz = 10;
+    if (c->imu_conf_sample_rate_hz > 1000) c->imu_conf_sample_rate_hz = 1000;
     if (!isfinite(c->controller_id)) c->controller_id = -1.0f;
     if (!isfinite(c->timeout_brake_current) || c->timeout_brake_current < 0.0f) c->timeout_brake_current = 0.0f;
     if (c->controller_id < 0.0f || c->controller_id > 253.0f) c->controller_id = (float)plat_default_controller_id();
