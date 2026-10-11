@@ -67,6 +67,7 @@ typedef struct {
     float dr_int;
     float duty_abs;              /* modulation appliquee (0..1, Vbus/sqrt3 = 1) */
     float i_abs_f;               /* module du courant filtre (limite lente) */
+    float slip_t;                /* duree d'ecart codeur / observateur */
     float fw_id;                 /* defluxage */
     float iq_lpf;                /* iq mesure filtre (MTPA) */
     float lam_eff;               /* lambda courant (adaptatif, temperature, saturation) */
@@ -1653,6 +1654,15 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         } else {
             S.theta = S.enc.theta;
             S.omega = S.enc.omega;
+            /* glissement du codeur : ecart de plus de 30 % avec l'observateur (fiable au-dessus de
+             * deux fois la vitesse de sortie I/f) pendant 0.1 s */
+            if (S.p.enc_slip_fault && !acim()) {
+                float wo = fm_abs(S.obs.omega);
+                bool bad = wo > 2.0f * S.p.st_omega_exit && flux_ratio > 0.7f && flux_ratio < 1.4f &&
+                           fm_abs(S.enc.omega - S.obs.omega) > 0.3f * wo;
+                S.slip_t = bad ? S.slip_t + dt : 0.0f;
+                if (S.slip_t > 0.1f) { trip(RESC_FAULT_ENCODER_SLIP); goto output; }
+            }
         }
         g_foc_telem.angle_from_sensor = !S.use_obs;
         g_foc_telem.angle_src = S.use_hfi ? 3 : S.use_obs ? 0 : S.p.sensor_mode == FOC_SENSOR_HALL ? 1 : 2;

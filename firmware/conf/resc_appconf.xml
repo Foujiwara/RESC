@@ -218,11 +218,7 @@ p, li { white-space: pre-wrap; }
             <longName>CAN Baud Rate</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-family:'Roboto';"&gt;The baud rate of the CAN-Bus. Note that all devices on the bus must have the same baud rate.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;CAN bus speed (all rates supported).&lt;/p&gt;</description>
             <cDefine>APPCONF_CAN_BAUD_RATE</cDefine>
             <valInt>2</valInt>
             <enumNames>CAN_BAUD_125K</enumNames>
@@ -291,23 +287,19 @@ p, li { white-space: pre-wrap; }
             <longName>APP to Use</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;The APP to use. With multiple VESC connected over CAN only the master needs to have an app to use set up. Notice that using the NRF nunchuk needs the NRF app.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Control application. &lt;b&gt;UART&lt;/b&gt; also accepts the VESC Remote through packets (radio module on the permanent UART, BLE). &lt;b&gt;ADC&lt;/b&gt; alone uses the UART TX/RX pins for the cruise and reverse buttons; &lt;b&gt;PAS&lt;/b&gt; uses them for the pedal sensor. Servo input on the PPM pin (TIM4).&lt;/p&gt;</description>
             <cDefine>APPCONF_APP_TO_USE</cDefine>
             <valInt>3</valInt>
             <enumNames>No App</enumNames>
             <enumNames>PPM</enumNames>
-            <enumNames>ADC</enumNames>
+            <enumNames>ADC (buttons on UART pins)</enumNames>
             <enumNames>UART</enumNames>
             <enumNames>PPM and UART</enumNames>
             <enumNames>ADC and UART</enumNames>
-            <enumNames>Nunchuk (I2C, Nyko Kama)</enumNames>
-            <enumNames>NRF</enumNames>
-            <enumNames>Custom User App</enumNames>
-            <enumNames>PAS</enumNames>
+            <enumNames>VESC Remote (packets)</enumNames>
+            <enumNames>VESC Remote (radio module packets)</enumNames>
+            <enumNames>Unused (no app)</enumNames>
+            <enumNames>PAS (sensor on UART pins)</enumNames>
             <enumNames>ADC and PAS</enumNames>
         </app_to_use>
         <app_ppm_conf.ctrl_type>
