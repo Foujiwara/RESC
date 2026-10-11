@@ -24,6 +24,8 @@ const uint8_t *plat_conf_read(uint32_t s, uint32_t *n) { (void)s; *n = 0; return
 uint8_t plat_default_controller_id(void) { return 42; }
 void plat_pwm_set_freq(float f) { (void)f; }
 void plat_sensor_config(uint8_t m, uint32_t c) { (void)m; (void)c; }
+void plat_hall_samples(uint8_t e) { (void)e; }
+void foc_hw_phase_filter(bool on) { (void)on; }
 void foc_hw_kill(void) { }
 void commands_process(const comm_iface_t *s, uint8_t *d, uint32_t n) { (void)s; (void)d; (void)n; }
 void can_vesc_send_buffer(uint8_t t, const uint8_t *d, uint32_t n, uint8_t m) { (void)t; (void)d; (void)n; (void)m; }

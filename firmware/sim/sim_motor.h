@@ -20,6 +20,10 @@ typedef struct {
     double vbus;
     double t_dead;            /* s, temps mort effectif */
     double i_soft;            /* A : en dessous, l'erreur de temps mort est partielle (Coss des MOSFET) */
+    double ld_sat;            /* saturation : Ld incremental = Ld (1 - ld_sat id), id > 0 vers l'aimant */
+    bool   pf_on;             /* filtre RC des tensions de phase commute */
+    double pf_tau;            /* s */
+    double vph_f[3];          /* tensions de phase filtrees */
     double f_pwm;
     double i_lsb;             /* A par LSB (signe = polarite de l'ampli) */
     double v_lsb, vph_lsb;    /* V par LSB */
