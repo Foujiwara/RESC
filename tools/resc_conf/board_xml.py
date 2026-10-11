@@ -25,6 +25,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CONF = os.path.join(ROOT, "firmware", "conf")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_resc_conf import crc32c  # noqa: E402
+import desc_vis  # noqa: E402
 
 SKIP = {"controller_id"}          # propre a chaque controleur (UID) : la valeur lue fait foi
 
@@ -120,7 +121,7 @@ def main():
     files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if prof == "resc" else \
             {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
     lines = ["/* GENERE par tools/resc_conf/board_xml.py pour %s (profil %s) - ne pas editer. */" % (data["board"], prof),
-             '#include "vesc_conf.h"\n']
+             '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
     for k, f in files.items():
         root = ET.parse(os.path.join(CONF, f)).getroot()
         sig0 = signature(root)
@@ -133,13 +134,10 @@ def main():
         if len(sys.argv) > 4:
             os.makedirs(sys.argv[4], exist_ok=True)
             open(os.path.join(sys.argv[4], os.path.basename(f)), "wb").write(raw)
-        q = struct.pack(">I", len(raw)) + zlib.compress(raw, 9)
-        lines.append("const uint8_t conf_xml_%s[] = {" % k)
-        for i in range(0, len(q), 20):
-            lines.append("    " + ", ".join("0x%02X" % b for b in q[i:i + 20]) + ",")
-        lines.append("};")
-        lines.append("const uint32_t conf_xml_%s_len = %d;" % (k, len(q)))
-        print("  %s : %d valeurs par defaut de la carte, XML %d -> %d octets" % (k, n, len(raw), len(q)))
+        vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if prof == "resc" else {}
+        lines += desc_vis.c_lines(raw, root, k, vis)
+        print("  %s : %d valeurs par defaut de la carte, XML %d octets, %d parametres a affichage conditionnel" % (
+            k, n, len(raw), len(vis)))
     open(out, "w", encoding="utf-8", newline="\n").write("\n".join(lines) + "\n")
 
 

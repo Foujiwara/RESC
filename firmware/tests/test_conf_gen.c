@@ -39,6 +39,52 @@ __attribute__((unused)) static void randomize(void *s, const conf_field_t *f, in
     }
 }
 
+/* telechargement complet de la description 'conf' par morceaux, comme RESC Tool */
+static int32_t fetch250(int conf, uint8_t *blob, int32_t *total_out, int *ok_out)
+{
+    uint8_t req[9], out[512];
+    int32_t total = -1, off = 0;
+    int ok = 1;
+    for (int guard = 0; guard < 1000; guard++) {
+        int32_t i = 0;
+        req[i++] = (uint8_t)conf;
+        vb_put_i32(req, off == 0 && total < 0 ? 10 : 400, &i);
+        vb_put_i32(req, off, &i);
+        int32_t n = conf_desc_reply(req, 9, out);
+        int32_t j = 2;
+        int32_t t = vb_get_i32(out, &j), o2 = vb_get_i32(out, &j);
+        if (out[0] != COMM_RESC_GET_CONF_XML || out[1] != conf || o2 != off) { ok = 0; break; }
+        int32_t k = n - 10;
+        if (k < 0 || k > 400 || t > 64 * 1024) { ok = 0; break; }
+        total = t;
+        memcpy(blob + off, out + 10, (size_t)k);
+        off += k;
+        if (off >= total) break;
+    }
+    *total_out = total;
+    *ok_out = ok;
+    return off;
+}
+
+static void save(const char *nm, const uint8_t *b, int32_t n)
+{
+    FILE *fh = fopen(nm, "wb");
+    if (fh) { fwrite(b, 1, (size_t)n, fh); fclose(fh); }
+}
+
+/* les onglets sont en blocs non compresses : recherche directe de <param>nom</param>, d'un nom
+ * d'onglet, ou d'un texte XML */
+__attribute__((unused)) static int has(const uint8_t *b, int32_t n, const char *name)
+{
+    char pat[160];
+    if (strchr(name, '<')) snprintf(pat, sizeof pat, "%s", name);
+    else if (strncmp(name, "foc_", 4) && strncmp(name, "app_", 4)) snprintf(pat, sizeof pat, "<subgroupName>%s<", name);
+    else snprintf(pat, sizeof pat, "<param>%s</param>", name);
+    size_t m = strlen(pat);
+    for (int32_t i = 0; i + (int32_t)m <= n; i++) if (!memcmp(b + i, pat, m)) return 1;
+    return 0;
+}
+
 int main(void)
 {
     static uint8_t a[1024], b[1024];
@@ -115,35 +161,68 @@ int main(void)
 #endif
 
     printf("== Commande 250\n");
+    static uint8_t blob[64 * 1024];
     for (int conf = 0; conf < 2; conf++) {
-        uint8_t req[9], out[512];
-        int32_t total = -1, off = 0;
-        static uint8_t blob[64 * 1024];
-        int ok = 1;
-        for (int guard = 0; guard < 1000; guard++) {
-            int32_t i = 0;
-            req[i++] = (uint8_t)conf;
-            vb_put_i32(req, off == 0 && total < 0 ? 10 : 400, &i);
-            vb_put_i32(req, off, &i);
-            int32_t n = conf_desc_reply(req, 9, out);
-            int32_t j = 2;
-            int32_t t = vb_get_i32(out, &j), o2 = vb_get_i32(out, &j);
-            if (out[0] != COMM_RESC_GET_CONF_XML || out[1] != conf || o2 != off) { ok = 0; break; }
-            int32_t k = n - 10;
-            if (k < 0 || k > 400) { ok = 0; break; }
-            total = t;
-            memcpy(blob + off, out + 10, (size_t)k);
-            off += k;
-            if (off >= total) break;
-        }
-        char nm[64];
-        snprintf(nm, sizeof nm, "build/cmd250_%s.bin", conf ? "app" : "mc");
-        FILE *fh = fopen(nm, "wb");
-        if (fh) { fwrite(blob, 1, (size_t)off, fh); fclose(fh); }
+        int ok;
+        int32_t total, got = fetch250(conf, blob, &total, &ok);
+        save(conf ? "build/cmd250_app.bin" : "build/cmd250_mc.bin", blob, got);
         char t[96];
-        snprintf(t, sizeof t, "conf %d : %d octets reconstitues par morceaux <= 400", conf, (int)off);
-        check(t, ok && off == total && total > 1000);
+        snprintf(t, sizeof t, "conf %d : %d octets reconstitues par morceaux <= 400", conf, (int)got);
+        check(t, ok && got == total && total > 1000);
     }
+#ifdef RESC_CONF_PROFILE_RESC
+    printf("== Commande 250 : onglets selon la configuration\n");
+    {
+        static vesc_mcconf_t mc;
+        static vesc_appconf_t ap;
+        int ok;
+        int32_t total, got;
+        vesc_mcconf_defaults(&mc);
+        vesc_appconf_defaults(&ap);
+        conf_desc_source(&mc, &ap);
+        mc.foc_motor_kind = 0;
+        mc.foc_sensor_mode = 0;
+        got = fetch250(0, blob, &total, &ok);
+        save("build/cmd250_mc_pm.bin", blob, got);
+        check("aimants : flux de l'aimant visible, parametres d'induction absents",
+              ok && has(blob, got, "foc_motor_flux_linkage") && !has(blob, got, "foc_acim_lm") &&
+              has(blob, got, "foc_observer_type") && has(blob, got, "foc_sl_openloop_time_lock"));
+        check("sans capteur : table Hall, codeur et injection absents",
+              !has(blob, got, "foc_hall_table__0") && !has(blob, got, "foc_encoder_offset") &&
+              !has(blob, got, "foc_hfi_voltage_run") && !has(blob, got, "Hall Sensors"));
+        check("type de moteur en tete de General / General",
+              has(blob, got, "<subgroupName>General</subgroupName><subgroupParams><param>foc_motor_kind</param>"));
+        mc.foc_motor_kind = 1;
+        got = fetch250(0, blob, &total, &ok);
+        save("build/cmd250_mc_acim.bin", blob, got);
+        check("induction : parametres d'induction visibles ; flux, saillance, MTPA, defluxage, type d'observateur absents",
+              ok && has(blob, got, "foc_acim_lm") && has(blob, got, "foc_acim_base_erpm") &&
+              !has(blob, got, "foc_motor_flux_linkage") && !has(blob, got, "foc_motor_ld_lq_diff") &&
+              !has(blob, got, "foc_mtpa_mode") && !has(blob, got, "foc_observer_type") &&
+              !has(blob, got, "foc_fw_current_max") && !has(blob, got, "foc_sl_openloop_time_lock"));
+        mc.foc_sensor_mode = 2;     /* Hall : sans effet en induction */
+        got = fetch250(0, blob, &total, &ok);
+        check("induction + Hall demande : pas de table Hall", ok && !has(blob, got, "foc_hall_table__0"));
+        mc.foc_motor_kind = 0;
+        got = fetch250(0, blob, &total, &ok);
+        check("aimants + Hall : table Hall visible, I/f absent", ok && has(blob, got, "foc_hall_table__7") &&
+              has(blob, got, "foc_sl_erpm") && !has(blob, got, "foc_openloop_rpm"));
+        mc.foc_sensor_mode = 1;
+        mc.l_additional_faults = 0;
+        got = fetch250(0, blob, &total, &ok);
+        check("aimants + codeur seul : observateur et I/f absents, codeur visible",
+              ok && has(blob, got, "foc_encoder_ratio") && !has(blob, got, "foc_observer_gain") &&
+              !has(blob, got, "foc_openloop_rpm"));
+        ap.app_ppm_conf_ctrl_type = 9;
+        ap.app_ppm_conf_multi_esc = 0;
+        got = fetch250(1, blob, &total, &ok);
+        save("build/cmd250_app_cond.bin", blob, got);
+        check("PPM marche arriere intelligente : ses reglages visibles, PID et TC absents",
+              ok && has(blob, got, "app_ppm_conf.smart_rev_max_duty") && !has(blob, got, "app_ppm_conf.pid_max_erpm") &&
+              !has(blob, got, "app_ppm_conf.tc_max_diff"));
+        conf_desc_source(0, 0);
+    }
+#endif
     {
         uint8_t req[9], out[512];
         int32_t i = 0, j;

@@ -38,7 +38,7 @@ p, li { white-space: pre-wrap; }
             <longName>Motor Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).&lt;/p&gt;</description>
+            <description>&lt;p&gt;RESC drives motors in FOC only. Transmitted for RESC Tool (FOC page); the visible Motor Type (foc_motor_kind) chooses between permanent magnet and induction motors.&lt;/p&gt;</description>
             <cDefine>MCCONF_DEFAULT_MOTOR_TYPE</cDefine>
             <valInt>2</valInt>
             <enumNames>BLDC</enumNames>

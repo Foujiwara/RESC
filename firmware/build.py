@@ -149,14 +149,34 @@ def check_cmd250(conf):
     import zlib
     files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if conf == "resc" else \
             {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
+    import xml.etree.ElementTree as ET
+
+    def tabs(root):
+        return [(g.findtext("groupName"), sg.findtext("subgroupName"), p.text)
+                for g in root.find("Grouping") for sg in g.findall("subgroup") for p in sg.find("subgroupParams")]
+
     ok = True
-    for k, f in files.items():
-        blob = open(os.path.join(HERE, "build", f"cmd250_{k}.bin"), "rb").read()
+    blobs = [(k, f, f"cmd250_{k}.bin", True) for k, f in files.items()]
+    if conf == "resc":
+        blobs += [("mc", files["mc"], "cmd250_mc_pm.bin", False), ("mc", files["mc"], "cmd250_mc_acim.bin", False),
+                  ("app", files["app"], "cmd250_app_cond.bin", False)]
+    for k, f, bname, full in blobs:
+        blob = open(os.path.join(HERE, "build", bname), "rb").read()
         src = open(os.path.join(HERE, "conf", f), "rb").read()
         n = struct.unpack(">I", blob[:4])[0]
-        xml = zlib.decompress(blob[4:])
-        good = n == len(src) and xml == src
-        print(f"  [{' OK ' if good else 'ECHEC'}] commande 250, {k} : XML decompresse identique a conf/{f}")
+        try:
+            xml = zlib.decompress(blob[4:])
+        except zlib.error:
+            xml = b""
+        i = src.index(b"<Grouping>")
+        sroot, xroot = ET.fromstring(src), ET.fromstring(xml) if xml else None
+        st, xt = tabs(sroot), tabs(xroot) if xml else []
+        # parametres et serialisation identiques ; onglets : sous-ensemble ordonne des onglets de la source
+        it = iter(st)
+        subset = all(any(e == s for s in it) for e in xt)
+        good = n == len(xml) and xml[:i] == src[:i] and subset and (not full or xt == st)
+        what = "onglets identiques" if full else "onglets = sous-ensemble (%d / %d entrees)" % (len(xt), len(st))
+        print(f"  [{' OK ' if good else 'ECHEC'}] commande 250, {bname} : decompression, partie fixe = conf/{f}, {what}")
         ok &= good
     return ok
 

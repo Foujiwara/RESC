@@ -231,7 +231,7 @@ typedef struct {
 } vesc_mcconf_t;
 
 #define VESC700_MCCONF_SIGNATURE 1470992211u
-#define RESCP_MCCONF_SIGNATURE   532982502u
+#define RESCP_MCCONF_SIGNATURE   2046370197u
 #define VESC700_MCCONF_SER_SIZE 488
 #define RESCP_MCCONF_SER_SIZE   381
 #ifdef RESC_CONF_PROFILE_RESC
@@ -395,9 +395,5 @@ bool    vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t
 void    vesc_appconf_defaults(vesc_appconf_t *c);
 extern const conf_field_t vesc_appconf_fields[];
 extern const uint16_t vesc_appconf_nfields;
-
-/* XML compresses du profil compile (commande 250) : u32 taille XML + flux zlib */
-extern const uint8_t conf_xml_mc[], conf_xml_app[];
-extern const uint32_t conf_xml_mc_len, conf_xml_app_len;
 
 #endif
