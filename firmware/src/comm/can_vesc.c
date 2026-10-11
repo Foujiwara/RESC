@@ -12,6 +12,7 @@
 #include "vesc_defaults.h"
 #include "inputs.h"
 #include "apps.h"
+#include "bms.h"
 
 #define EID(cmd, id) (((uint32_t)(cmd) << 8) | (uint8_t)(id))
 
@@ -183,8 +184,29 @@ static void process_packet(uint8_t sender, uint8_t mode, uint8_t *d, uint32_t n)
     commands_process(&reply, d, n);
 }
 
+/* mode pont (can_mode COMM_BRIDGE) : chaque trame recue est relayee a l'outil */
+static const comm_iface_t *s_bridge_iface;
+void can_vesc_set_bridge_iface(const comm_iface_t *iface) { s_bridge_iface = iface; }
+
+static void bridge_frame(const can_frame_t *fr)
+{
+    if (!s_bridge_iface) return;
+    uint8_t b[14];
+    int32_t o = 0;
+    b[o++] = COMM_CAN_FWD_FRAME;
+    vb_put_u32(b, fr->id, &o);
+    b[o++] = fr->std ? 0 : 1;
+    memcpy(b + o, fr->data, fr->len);
+    o += fr->len;
+    packet_send(s_bridge_iface, b, (uint32_t)o);
+}
+
 static void handle_frame(const can_frame_t *fr)
 {
+    /* can_mode : 0 VESC, 2 pont vers l'outil, 3 inutilise (aucun traitement) */
+    uint8_t cm = g_appconf.can_mode;
+    if (cm == 2) bridge_frame(fr);
+    if (cm != 0 || fr->std) return;
     uint8_t id = (uint8_t)(fr->id & 0xFF);
     uint32_t cmd = fr->id >> 8;
     uint8_t me = resc_controller_id();
@@ -196,6 +218,7 @@ static void handle_frame(const can_frame_t *fr)
         return;
     }
     if (cmd == CAN_PACKET_STATUS && fr->len >= 8 && id != me) { peer_update(id, d); return; }
+    if (bms_can_frame((uint8_t)cmd, id, d, fr->len, s_now)) return;
     bool bcast_ok = cmd <= CAN_PACKET_SET_CURRENT_HANDBRAKE_REL || (cmd >= CAN_PACKET_CONF_CURRENT_LIMITS &&
                     cmd <= CAN_PACKET_CONF_STORE_FOC_ERPMS) || cmd == CAN_PACKET_CONF_BATTERY_CUT ||
                     cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT || cmd == CAN_PACKET_SHUTDOWN || cmd == CAN_PACKET_UPDATE_BAUD;
@@ -432,6 +455,7 @@ void can_vesc_poll(uint32_t now)
     can_frame_t f;
     for (int k = 0; k < 32 && can_recv(&f); k++) handle_frame(&f);
 
+    if (g_appconf.can_mode != 0) return;       /* statuts et scan PING : mode VESC seulement */
     /* deux groupes de trames de statut, chacun a sa cadence */
     uint16_t rate = g_appconf.can_status_rate_1;
     if (rate > 0 && now - s_last_status_ms >= 1000u / rate) {

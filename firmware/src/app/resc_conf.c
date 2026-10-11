@@ -142,7 +142,9 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(si_motor_poles); FIN(si_gear_ratio); FIN(si_wheel_diameter); FIN(si_battery_cells);
     FIN(foc_overmod_factor); FIN(foc_mag_vd_max); FIN(foc_current_filter_const); FIN(foc_fw_backoff);
     FIN(foc_hfi_reset_erpm); FIN(foc_hfi_obs_ovr_sec); FIN(l_in_current_map_start); FIN(l_in_current_map_filter);
-    FIN(p_pid_kd_proc); FIN(m_encoder_sin_amp); FIN(m_encoder_cos_amp); FIN(m_encoder_sin_offset);
+    FIN(p_pid_kd_proc); FIN(bms_t_limit_start); FIN(bms_t_limit_end); FIN(bms_soc_limit_start);
+    FIN(bms_soc_limit_end); FIN(bms_vmin_limit_start); FIN(bms_vmin_limit_end); FIN(bms_vmax_limit_start);
+    FIN(bms_vmax_limit_end); FIN(m_encoder_sin_amp); FIN(m_encoder_cos_amp); FIN(m_encoder_sin_offset);
     FIN(m_encoder_cos_offset); FIN(m_encoder_sincos_filter_constant); FIN(m_encoder_sincos_phase_correction);
 #undef FIN
     /* parametres physiques : strictement positifs ou nuls */
@@ -175,6 +177,9 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
          c->m_sensor_port_mode == 15) && BOARD_SPI_SCK_PIN == HW_PIN_NONE) c->m_sensor_port_mode = 1;
     if (c->m_sensor_port_mode == 13 && (BOARD_SERVO_PIN == HW_PIN_NONE || BOARD_ENC_TIM == 4)) c->m_sensor_port_mode = 1;
     if (c->m_sensor_port_mode == 4 && BOARD_ADC_EXT2_CH == HW_ADC_CH_NONE) c->m_sensor_port_mode = 1;
+    if (c->bms_type > 1) c->bms_type = 0;
+    c->bms_limit_mode &= 0x0Fu;
+    if (c->bms_fwd_can_mode > 2) c->bms_fwd_can_mode = 0;
     if (c->foc_control_sample_mode > 2) c->foc_control_sample_mode = 0;
     if (c->foc_control_sample_mode == 1 && BOARD_CS_TOPOLOGY != HW_CS_INLINE_3) c->foc_control_sample_mode = 2;
     if (c->foc_current_sample_mode > 2 || BOARD_CS_TOPOLOGY == HW_CS_LOWSIDE_2) c->foc_current_sample_mode = 0;
@@ -205,6 +210,7 @@ void resc_conf_clamp_app(vesc_appconf_t *c)
     /* apps sans materiel (Nunchuk I2C, NRF24, app personnalisee) : UART (la manette passe par paquets) */
     if (c->app_to_use >= 6 && c->app_to_use <= 8) c->app_to_use = 3;
     if (c->app_to_use > 10) c->app_to_use = 0;
+    if (c->can_mode != 0 && c->can_mode != 2 && c->can_mode != 3) c->can_mode = 0;   /* UAVCAN non pris en charge */
     c->can_status_msgs_r1 &= 0x3Fu;
     c->can_status_msgs_r2 &= 0x3Fu;
     c->app_adc_conf_buttons &= 0x07u;

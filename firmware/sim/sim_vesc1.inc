@@ -172,6 +172,46 @@
         check(t, foc_state() == FOC_ST_RUN && fabs(g_foc_telem.iq - 50) < 2);
     }
 
+    /* ------------------------------------------------------------------ */
+    printf("== 33. Courant batterie : regeneration (l_in_current_min) et limite du BMS\n");
+    p = p0;
+    foc_set_params(&p);
+    {
+        double ibr[2] = { 0, 0 }, ibd[2] = { 0, 0 };
+        for (int lim = 0; lim < 2; lim++) {
+            /* regeneration : lance a vide, puis frein 40 A */
+            ctrl_limits_t L3 = L;
+            if (lim) L3.i_in_min = -5.0f;
+            ctrl_set_limits(&L3);
+            STOP_AT(0.5);
+            M.b = 0.0005; M.t_load = 0.02;
+            ctrl_set_current(30);
+            for (int k = 0; k < 25; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+            ctrl_set_brake(40);
+            for (int k = 0; k < 300; k++) {
+                ctrl_alive(); RUN_CTRL(0.001);
+                if (k > 15 && g_foc_telem.i_bus < ibr[lim]) ibr[lim] = g_foc_telem.i_bus;
+            }
+            ctrl_release(); RUN_CTRL(0.05);
+            ctrl_set_limits(&L);
+            /* decharge : charge forte, 30 A, avec ou sans limite du BMS a 4 A */
+            STOP_AT(0.5);
+            M.b = 0.06; M.t_load = 0.5;
+            if (lim) ctrl_set_bms_limits(-1e9f, 4.0f);
+            ctrl_set_current(30);
+            for (int k = 0; k < 30; k++) {
+                ctrl_alive(); RUN_CTRL(0.1);
+                if (k > 15 && g_foc_telem.i_bus > ibd[lim]) ibd[lim] = g_foc_telem.i_bus;
+            }
+            ctrl_set_bms_limits(-1e9f, 1e9f);
+            ctrl_release(); RUN_CTRL(0.05);
+        }
+        printf("  frein 40 A : courant batterie min %.1f A sans limite, %.1f A limite a -5 A\n", ibr[0], ibr[1]);
+        printf("  30 A en charge : courant batterie max %.1f A sans limite, %.1f A avec le BMS a 4 A\n", ibd[0], ibd[1]);
+        check("regeneration : sans limite au-dela de -10 A, tenue a -5 A (+1 A) avec", ibr[0] < -10.0 && ibr[1] > -6.0 && ibr[1] < -3.0);
+        check("BMS : sans limite au-dela de 6 A, tenu a 4 A (+1 A) avec", ibd[0] > 6.0 && ibd[1] < 5.0 && ibd[1] > 3.0);
+    }
+
     p = p0;
     STOP_AT(0.5);
     foc_set_params(&p);

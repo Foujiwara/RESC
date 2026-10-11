@@ -13,6 +13,8 @@ void can_vesc_set_forward_iface(const comm_iface_t *iface);   /* destination des
 void can_vesc_start_ping_scan(const comm_iface_t *reply);
 uint32_t can_baud_from_enum(uint8_t e);
 
+/* Mode pont (can_mode COMM_BRIDGE) : interface vers laquelle relayer les trames recues */
+void can_vesc_set_bridge_iface(const comm_iface_t *iface);
 /* Trame brute (COMM_CAN_FWD_FRAME) */
 void can_vesc_send_raw(uint32_t id, bool ext, const uint8_t *d, uint8_t n);
 /* Coupure batterie diffusee a tous les controleurs (COMM_SET_BATTERY_CUT) */

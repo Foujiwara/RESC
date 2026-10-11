@@ -188,7 +188,10 @@ void apps_configure(void)
     bool servo = A.ppm_on;
     /* codeur PWM sur l'entree servo (m_sensor_port_mode) : la broche lui appartient */
     bool enc_pwm = g_mcconf.foc_sensor_mode == 1 && g_mcconf.m_sensor_port_mode == 13;
-    inputs_init(servo && !enc_pwm, u, enc_pwm);
+    /* sortie servo (servo_out_enable) : sans application PPM et broche libre */
+    bool servo_out = g_appconf.servo_out_enable && !servo && !enc_pwm;
+    inputs_init(servo && !enc_pwm, u, enc_pwm || servo_out);
+    if (servo_out) inputs_servo_out_init();
     if (u == IN_UART_COMM && A.uart_use != IN_UART_COMM) uart_attach_pins(BOARD_UART_INST, BOARD_UART_TX_PIN, BOARD_UART_RX_PIN);
     A.uart_use = u;
 }

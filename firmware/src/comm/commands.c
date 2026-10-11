@@ -23,6 +23,8 @@
 #include "sampler.h"
 #include "stats.h"
 #include "imu.h"
+#include "bms.h"
+#include "inputs.h"
 
 volatile bool g_req_reboot, g_req_bootloader, g_req_poweroff;
 
@@ -144,6 +146,10 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
 {
     if (len < 1) return;
     uint8_t id = data[0];
+    if (!src->is_can) {
+        bms_set_fwd_iface(src, 0);                    /* trames du BMS relayees vers l'outil */
+        can_vesc_set_bridge_iface(src);               /* pont CAN : derniere interface de l'outil */
+    }
     uint8_t *d = data + 1;
     uint32_t n = len - 1;
     int32_t i = 0;
@@ -390,6 +396,25 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     case COMM_SET_CHUCK_DATA:
         apps_set_chuck(d, n, systime_ms());
         break;
+    case COMM_BMS_GET_VALUES: case COMM_BMS_SET_CHARGE_ALLOWED: case COMM_BMS_SET_BALANCE_OVERRIDE:
+    case COMM_BMS_RESET_COUNTERS: case COMM_BMS_FORCE_BALANCE: case COMM_BMS_ZERO_CURRENT_OFFSET:
+        bms_command(src, data, len, systime_ms());
+        break;
+
+    case COMM_SET_SERVO_POS:
+        if (n >= 2) inputs_servo_out_set(vb_get_f16(d, 1000.0f, &i));
+        break;
+
+    case COMM_SET_CAN_MODE:
+        /* [enregistrer][accuse][mode] */
+        if (n >= 3) {
+            uint8_t m = d[2];
+            g_appconf.can_mode = (m == 0 || m == 2 || m == 3) ? m : 0;
+            if (d[0]) resc_conf_store_app();
+            if (d[1]) { b[o++] = id; reply(src, b, 1); }
+        }
+        break;
+
     case COMM_GET_IMU_DATA:
         o = imu_data_reply(b, n >= 2 ? vb_get_u16(d, &i) : 0xFFFFu);
         reply(src, b, (uint32_t)o);

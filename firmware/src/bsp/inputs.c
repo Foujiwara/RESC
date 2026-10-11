@@ -18,6 +18,7 @@
 #define SERVO_TIM_OK (BOARD_SERVO_PIN != HW_PIN_NONE && BOARD_ENC_TIM != 4)
 
 static bool s_servo;
+static bool s_servo_out;
 static in_uart_use_t s_uart_use;
 static float s_servo_ms;
 static uint32_t s_servo_t;
@@ -26,6 +27,7 @@ static uint8_t s_pas_state;
 
 void inputs_init(bool servo, in_uart_use_t uart_use, bool servo_pin_owned)
 {
+    s_servo_out = false;
     s_servo = servo && SERVO_TIM_OK && !servo_pin_owned;
     s_uart_use = uart_use;
 #if SERVO_TIM_OK
@@ -52,6 +54,39 @@ void inputs_init(bool servo, in_uart_use_t uart_use, bool servo_pin_owned)
         gpio_cfg(BOARD_UART_TX_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
         gpio_cfg(BOARD_UART_RX_PIN, GPIO_MODE_IN, false, 0, GPIO_PUPD_UP, 0);
     }
+}
+
+void inputs_servo_out_init(void)
+{
+#if SERVO_TIM_OK
+    s_servo = false;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
+    __DSB();
+    TIM4->CR1 = 0;
+    TIM4->SMCR = 0;
+    TIM4->CCER = 0;
+    TIM4->PSC = (uint16_t)(2u * APB1_HZ / 1000000u - 1u);   /* 1 MHz */
+    TIM4->ARR = 20000u - 1u;                                 /* 50 Hz */
+    TIM4->CCMR1 = (6u << TIM_CCMR1_OC1M_Pos) | TIM_CCMR1_OC1PE;
+    TIM4->CCR1 = 1500u;
+    TIM4->CCER = TIM_CCER_CC1E;
+    TIM4->EGR = TIM_EGR_UG;
+    TIM4->CR1 = TIM_CR1_ARPE | TIM_CR1_CEN;
+    gpio_cfg(BOARD_SERVO_PIN, GPIO_MODE_AF, false, 1, GPIO_PUPD_NONE, 2);
+    s_servo_out = true;
+#endif
+}
+
+void inputs_servo_out_set(float pos)
+{
+#if SERVO_TIM_OK
+    if (!s_servo_out) return;
+    if (pos < 0.0f) pos = 0.0f;
+    if (pos > 1.0f) pos = 1.0f;
+    TIM4->CCR1 = (uint32_t)(1000.0f + 1000.0f * pos);
+#else
+    (void)pos;
+#endif
 }
 
 bool inputs_servo_ms(float *ms, uint32_t now_ms)

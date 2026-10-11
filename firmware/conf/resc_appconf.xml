@@ -216,6 +216,14 @@ p, li { white-space: pre-wrap; }
             <enumNames>CAN_BAUD_75K</enumNames>
             <enumNames>CAN_BAUD_100K</enumNames>
         </can_baud_rate>
+        <permanent_uart_enabled>
+            <longName>Enable Permanent UART</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Packets accepted on the permanent UART (Bluetooth / NRF module of the board).&lt;/p&gt;</description>
+            <cDefine>APPCONF_PERMANENT_UART_ENABLED</cDefine>
+            <valInt>1</valInt>
+        </permanent_uart_enabled>
         <shutdown_mode>
             <longName>Shutdown Mode</longName>
             <type>4</type>
@@ -234,6 +242,26 @@ p, li { white-space: pre-wrap; }
             <enumNames>OFF_AFTER_1H</enumNames>
             <enumNames>OFF_AFTER_5H</enumNames>
         </shutdown_mode>
+        <can_mode>
+            <longName>CAN Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;&lt;b&gt;VESC&lt;/b&gt;: VESC CAN protocol (status messages, commands, packet forwarding, BMS). &lt;b&gt;COMM Bridge&lt;/b&gt;: every received frame is forwarded to the tool (COMM_CAN_FWD_FRAME), no VESC processing. &lt;b&gt;Unused&lt;/b&gt;: the CAN bus is ignored.&lt;/p&gt;</description>
+            <cDefine>APPCONF_CAN_MODE</cDefine>
+            <valInt>0</valInt>
+            <enumNames>VESC</enumNames>
+            <enumNames>COMM Bridge</enumNames>
+            <enumNames>Unused</enumNames>
+            <maxInt>2</maxInt>
+        </can_mode>
+        <servo_out_enable>
+            <longName>Enable Servo Output</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Servo output on the servo pin (50 Hz, 1 to 2 ms) when no PPM application uses it; position set by COMM_SET_SERVO_POS.&lt;/p&gt;</description>
+            <cDefine>APPCONF_SERVO_OUT_ENABLE</cDefine>
+            <valInt>0</valInt>
+        </servo_out_enable>
         <kill_sw_mode>
             <longName>Kill Switch Mode</longName>
             <type>4</type>
@@ -2282,7 +2310,10 @@ p, li { white-space: pre-wrap; }
         <ser>can_status_msgs_r1</ser>
         <ser>can_status_msgs_r2</ser>
         <ser>can_baud_rate</ser>
+        <ser>permanent_uart_enabled</ser>
         <ser>shutdown_mode</ser>
+        <ser>can_mode</ser>
+        <ser>servo_out_enable</ser>
         <ser>kill_sw_mode</ser>
         <ser>app_to_use</ser>
         <ser>app_ppm_conf.ctrl_type</ser>
@@ -2387,7 +2418,10 @@ p, li { white-space: pre-wrap; }
                     <param>timeout_msec</param>
                     <param>timeout_brake_current</param>
                     <param>can_baud_rate</param>
+                    <param>permanent_uart_enabled</param>
                     <param>shutdown_mode</param>
+                    <param>can_mode</param>
+                    <param>servo_out_enable</param>
                     <param>kill_sw_mode</param>
                     <param>::sep::CAN Messages Rate 1</param>
                     <param>can_status_rate_1</param>

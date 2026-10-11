@@ -116,6 +116,10 @@ float ctrl_pos_set_deg(void);          /* consigne de position (degres), positio
 /* Pas de controle, a appeler a 1 kHz. now_ms : horloge systeme. */
 void ctrl_update(uint32_t now_ms, float dt);
 
+/* Limites du BMS sur le courant batterie (A ; lo <= 0 regeneration, hi >= 0 decharge), appliquees
+ * en plus de i_in_min / i_in_max ; sans BMS : -1e9 / 1e9 */
+void ctrl_set_bms_limits(float lo, float hi);
+
 /* Mesures lentes fournies par la plateforme */
 void ctrl_set_temps(float tfet1, float tfet2, float tfet3, float tmot);
 
