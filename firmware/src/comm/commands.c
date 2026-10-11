@@ -25,6 +25,7 @@
 #include "imu.h"
 #include "bms.h"
 #include "inputs.h"
+#include "detect_all.h"
 
 volatile bool g_req_reboot, g_req_bootloader, g_req_poweroff;
 
@@ -39,6 +40,8 @@ static const comm_iface_t *s_term_iface;
 void commands_init(void) { }
 
 static void reply(const comm_iface_t *src, const uint8_t *d, uint32_t n) { packet_send(src, d, n); }
+
+void commands_set_print_iface(const comm_iface_t *iface) { if (iface) s_term_iface = iface; }
 
 void commands_printf(const char *fmt, ...)
 {
@@ -304,13 +307,8 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
         break;
     }
     case COMM_DETECT_APPLY_ALL_FOC:
-        /* Pas d'auto-detection ni d'auto-configuration dans RESC : detections manuelles uniquement */
-        s_term_iface = src;
-        commands_printf("RESC : detection automatique non supportee. Utiliser les detections manuelles "
-                        "(offsets, R/L, flux, Hall, codeur).");
-        b[o++] = COMM_DETECT_APPLY_ALL_FOC;
-        vb_put_i16(b, -1, &o);
-        reply(src, b, (uint32_t)o);
+        /* assistant de VESC Tool : detection automatique (R/L, flux, capteurs), CAN compris */
+        detect_all_request(src, d, n);
         break;
 
     case COMM_DETECT_HALL_FOC:
@@ -333,6 +331,35 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     case COMM_REBOOT:
         g_req_reboot = true;
         break;
+
+    case COMM_JUMP_TO_BOOTLOADER_ALL_CAN:
+    case COMM_ERASE_NEW_APP_ALL_CAN:
+    case COMM_WRITE_NEW_APP_DATA_ALL_CAN:
+    case COMM_ERASE_BOOTLOADER_ALL_CAN: {
+        /* tous les controleurs du bus : meme commande diffusee (sans reponse), puis execution locale */
+        uint8_t loc = id == COMM_JUMP_TO_BOOTLOADER_ALL_CAN ? COMM_JUMP_TO_BOOTLOADER :
+                      id == COMM_ERASE_NEW_APP_ALL_CAN ? COMM_ERASE_NEW_APP :
+                      id == COMM_WRITE_NEW_APP_DATA_ALL_CAN ? COMM_WRITE_NEW_APP_DATA : COMM_ERASE_BOOTLOADER;
+        data[0] = loc;
+        can_vesc_send_buffer(255, data, len, 2);
+        commands_process(src, data, len);
+        break;
+    }
+    case COMM_WRITE_NEW_APP_DATA_ALL_CAN_LZO:
+        /* compression non supportee (comme pour un seul controleur) : l'outil reessaie sans */
+        b[o++] = COMM_WRITE_NEW_APP_DATA;
+        b[o++] = 0;
+        vb_put_u32(b, n >= 4 ? vb_get_u32(d, &i) : 0, &o);
+        reply(src, b, (uint32_t)o);
+        break;
+    case COMM_ERASE_BOOTLOADER: {
+        bool ok = foc_state() != FOC_ST_RUN && foc_state() != FOC_ST_START && foc_state() != FOC_ST_DETECT;
+        if (ok) { ctrl_release(); ok = flash_erase_bootloader(); }
+        b[o++] = COMM_ERASE_BOOTLOADER;
+        b[o++] = ok ? 1 : 0;
+        reply(src, b, (uint32_t)o);
+        break;
+    }
 
     case COMM_JUMP_TO_BOOTLOADER:
         g_req_bootloader = true;
@@ -639,5 +666,6 @@ static void send_rotor_pos(uint32_t now_ms)
 void commands_poll(uint32_t now_ms)
 {
     detect_app_poll(now_ms);
+    detect_all_poll(now_ms);
     send_rotor_pos(now_ms);
 }
