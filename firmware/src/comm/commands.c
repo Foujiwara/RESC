@@ -193,7 +193,7 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
     case COMM_SET_RPM:           if (n >= 4) ctrl_set_rpm((float)vb_get_i32(d, &i)); break;
     case COMM_SET_HANDBRAKE:     if (n >= 4) ctrl_set_handbrake((float)vb_get_i32(d, &i) / 1e3f); break;
     case COMM_SET_CURRENT_REL:   if (n >= 4) ctrl_set_current_rel((float)vb_get_i32(d, &i) / 1e5f); break;
-    case COMM_SET_POS:           break;   /* pas de capteur de position en sensorless */
+    case COMM_SET_POS:           if (n >= 4) ctrl_set_pos((float)vb_get_i32(d, &i) / 1e6f); break;
     case COMM_ALIVE:             ctrl_alive(); break;
     case COMM_MOTOR_ESTOP:       ctrl_estop(); break;
 

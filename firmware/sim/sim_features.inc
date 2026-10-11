@@ -243,4 +243,33 @@
     RUN_CTRL(0.05);
     p = p0;
     foc_set_params(&p);
+
+    /* ------------------------------------------------------------------ */
+    printf("== 22. Position sur codeur : PID position (kp 0.02, kd 0.0004), consigne +90 deg\n");
+    p.sensor_mode = FOC_SENSOR_ENCODER;
+    foc_set_params(&p);
+    STOP_AT(0.0);
+    M.b = 0.01; M.t_load = 0.05;
+    {
+        ctrl_limits_t L2 = L;
+        L2.p_kp = 0.02f; L2.p_ki = 0.0f; L2.p_kd = 0.0004f; L2.p_kd_filter = 0.2f; L2.p_ang_div = 1.0f;
+        L2.pole_pairs = (float)M.pp;
+        ctrl_set_limits(&L2);
+        for (int k = 0; k < 5; k++) { ctrl_alive(); RUN_CTRL(0.01); }
+        float start = ctrl_stats()->pos_deg;
+        double mech0 = M.theta;
+        ctrl_set_pos(fmodf(start + 90.0f, 360.0f));
+        for (int k = 0; k < 20; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+        double moved = (M.theta - mech0) * 180 / M_PI;
+        double w1 = fabs(sim_omega_e(&M));
+        printf("  rotation mecanique %.1f deg (consigne 90), vitesse residuelle %.0f ERPM\n", moved, ERPM(w1));
+        check("position : +90 deg atteints (+/-3 deg)", fabs(moved - 90.0) < 3.0);
+        check("position : arret sur la consigne (< 30 ERPM)", ERPM(w1) < 30);
+        ctrl_release();
+        RUN_CTRL(0.05);
+        ctrl_set_limits(&L);
+    }
+    p = p0;
+    g_foc_cmd.run = 0; run(0.02);
+    foc_set_params(&p);
 }

@@ -366,7 +366,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     cl->tfet_end = mc->l_temp_fet_end;
     cl->tmot_start = mc->l_temp_motor_start;
     cl->tmot_end = mc->l_temp_motor_end;
-    cl->tmot_enabled = mc->m_motor_temp_sens_type == TEMP_SENSOR_NTC_10K_25C && BOARD_TMOT_CH != HW_ADC_CH_NONE;
+    cl->tmot_enabled = mc->m_motor_temp_sens_type != TEMP_SENSOR_DISABLED && BOARD_TMOT_CH != HW_ADC_CH_NONE;
     cl->duty_max = mc->l_max_duty;
     cl->duty_min = mc->l_min_duty;
     cl->s_kp = mc->s_pid_kp;
@@ -379,6 +379,26 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     cl->timeout_ms = app->timeout_msec;
     cl->timeout_brake = app->timeout_brake_current;
     cl->start_erpm_exit = fp->st_omega_exit * (60.0f / FM_2PI);
+    cl->duty_start = fm_sat(mc->l_duty_start, 0.0f, 1.0f);
+    cl->temp_accel_dec = fm_sat(mc->l_temp_accel_dec, 0.0f, 1.0f);
+    cl->fault_stop_ms = mc->m_fault_stop_time_ms > 0 ? (uint32_t)mc->m_fault_stop_time_ms : 0u;
+    cl->add_faults = mc->l_additional_faults;
+    cl->batt_tau = fm_sat(mc->m_batt_filter_const, 0.0f, 1000.0f) * 1e-3f;
+    {
+        /* sp_pid_loop_rate : 25 .. 10000 Hz ; la couche de controle tourne a 1 kHz au plus */
+        static const uint16_t hz[9] = { 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000 };
+        uint16_t f = hz[mc->sp_pid_loop_rate < 9 ? mc->sp_pid_loop_rate : 5];
+        cl->s_rate_div = (uint8_t)(f >= 1000 ? 1 : 1000 / f);
+    }
+    cl->s_speed_src = mc->s_pid_speed_source <= 2 ? mc->s_pid_speed_source : 0;
+    cl->p_kp = mc->p_pid_kp;
+    cl->p_ki = mc->p_pid_ki;
+    cl->p_kd = mc->p_pid_kd;
+    cl->p_kd_filter = mc->p_pid_kd_filter;
+    cl->p_ang_div = mc->p_pid_ang_div;
+    cl->p_gain_dec = mc->p_pid_gain_dec_angle;
+    cl->p_offset = mc->p_pid_offset;
+    cl->pole_pairs = mc->si_motor_poles >= 2 ? 0.5f * (float)mc->si_motor_poles : 7.0f;
 }
 
 /* Fourni par la plateforme : changement de frequence PWM (pont coupe) */

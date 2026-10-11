@@ -17,6 +17,7 @@ typedef enum {
     CTRL_MODE_DUTY,
     CTRL_MODE_RPM,
     CTRL_MODE_HANDBRAKE,
+    CTRL_MODE_POS,              /* position (degres mecaniques, PID -> courant) */
     CTRL_MODE_OPENLOOP,         /* courant impose, angle a vitesse imposee */
     CTRL_MODE_OPENLOOP_DUTY     /* rapport cyclique impose, angle a vitesse imposee */
 } ctrl_mode_t;
@@ -49,6 +50,21 @@ typedef struct {
     float timeout_brake;
     /* demarrage */
     float start_erpm_exit;           /* frein/roue libre sous cette vitesse */
+    /* limitations supplementaires */
+    float duty_start;                /* motorisation reduite lineairement de duty_start a duty_max */
+    float temp_accel_dec;            /* limitation thermique avancee en motorisation (0..1) */
+    uint32_t fault_stop_ms;          /* duree minimale pont coupe apres un defaut */
+    uint8_t add_faults;              /* bit1 survitesse (110 %), bit3 survitesse absolue (130 %) */
+    float batt_tau;                  /* s : filtre de la tension batterie des limitations */
+    /* PID vitesse : cadence et source de vitesse */
+    uint8_t s_rate_div;              /* execute un pas sur s_rate_div (1 kHz / s_rate_div) */
+    uint8_t s_speed_src;             /* 0 PLL filtree, 1 rapide, 2 tres rapide */
+    /* PID position */
+    float p_kp, p_ki, p_kd, p_kd_filter;
+    float p_ang_div;                 /* l'angle est divise par ce facteur (reduction) */
+    float p_gain_dec;                /* degres : gains reduits en dessous de cette erreur */
+    float p_offset;                  /* degres ajoutes a la consigne */
+    float pole_pairs;
 } ctrl_limits_t;
 
 typedef struct {
@@ -61,6 +77,7 @@ typedef struct {
     float erpm;
     float vbus;
     float i_scale_lim;   /* facteur de limitation actif (0..1), diagnostic */
+    float pos_deg;       /* position mecanique (degres, 0..360 divises par p_ang_div) */
     uint32_t fault;
     bool timeout;
 } ctrl_stats_t;
@@ -77,6 +94,7 @@ void ctrl_set_brake_rel(float rel);
 void ctrl_set_handbrake(float amps);
 void ctrl_set_duty(float duty);
 void ctrl_set_rpm(float erpm);
+void ctrl_set_pos(float deg);
 void ctrl_release(void);
 /* Boucle ouverte (essai) : courant (A) ou duty (0..1), vitesse en ERPM signee */
 void ctrl_set_openloop(float amps, float erpm);

@@ -29,6 +29,7 @@
 #include "commands.h"
 #include "can_vesc.h"
 #include "fault_codes.h"
+#include "vesc_defaults.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
@@ -52,6 +53,54 @@ static float ntc_temp(uint16_t raw, int pos, float r_fixed, float r25, float bet
     return 1.0f / (logf(r / r25) / beta + 1.0f / 298.15f) - 273.15f;
 }
 
+/* Resistance de la sonde moteur a partir de la mesure (pont diviseur de la carte) */
+static float sensor_res(uint16_t raw, int pos, float r_fixed)
+{
+    float a = (float)raw;
+    if (a < 1.0f) a = 1.0f;
+    if (a > 4094.0f) a = 4094.0f;
+    return (pos == HW_TEMP_NTC_TO_VREF) ? r_fixed * (4095.0f - a) / a : r_fixed * a / (4095.0f - a);
+}
+
+/* Temperature moteur selon m_motor_temp_sens_type :
+ *  NTC (beta), PTC 1k a 100 degC et PTC personnalisee (coefficient %/K), KTY83/122 et
+ *  KTY84/130 (polynomes du 2e degre, approximation des tables), PT1000 (IEC 60751). */
+static float motor_temp(uint16_t raw)
+{
+    const vesc_mcconf_t *c = &g_mcconf;
+    float r = sensor_res(raw, BOARD_TMOT_MODEL, BOARD_TMOT_R_FIXED_OHM);
+    float beta = c->m_ntc_motor_beta > 100.0f ? c->m_ntc_motor_beta : 3380.0f;
+    switch (c->m_motor_temp_sens_type) {
+    case TEMP_SENSOR_NTC_10K_25C:  return 1.0f / (logf(r / 10000.0f) / beta + 1.0f / 298.15f) - 273.15f;
+    case TEMP_SENSOR_NTC_100K_25C: return 1.0f / (logf(r / 100000.0f) / beta + 1.0f / 298.15f) - 273.15f;
+    case TEMP_SENSOR_NTCX: {
+        float r0 = c->m_ntcx_ptcx_res > 1.0f ? c->m_ntcx_ptcx_res : 10000.0f;
+        return 1.0f / (logf(r / r0) / beta + 1.0f / (c->m_ntcx_ptcx_temp_base + 273.15f)) - 273.15f;
+    }
+    case TEMP_SENSOR_PTC_1K_100C: {
+        float k = c->m_ptc_motor_coeff > 0.01f ? c->m_ptc_motor_coeff : 0.61f;
+        return 100.0f + (r - 1000.0f) / (1000.0f * k * 0.01f);
+    }
+    case TEMP_SENSOR_PTCX: {
+        float r0 = c->m_ntcx_ptcx_res > 1.0f ? c->m_ntcx_ptcx_res : 1000.0f;
+        float k = c->m_ptc_motor_coeff > 0.01f ? c->m_ptc_motor_coeff : 0.61f;
+        return c->m_ntcx_ptcx_temp_base + (r - r0) / (r0 * k * 0.01f);
+    }
+    case TEMP_SENSOR_KTY83_122: {
+        /* R = 1000 (1 + 7.874e-3 x + 1.874e-5 x^2), x = T - 25 */
+        float a2 = 1.874e-5f, a1 = 7.874e-3f, c0 = 1.0f - r / 1000.0f;
+        return 25.0f + (-a1 + sqrtf(fmaxf(a1 * a1 - 4.0f * a2 * c0, 0.0f))) / (2.0f * a2);
+    }
+    case TEMP_SENSOR_KTY84_130: {
+        /* R = 1000 (1 + 6.12e-3 x + 1.1e-5 x^2), x = T - 100 */
+        float a2 = 1.1e-5f, a1 = 6.12e-3f, c0 = 1.0f - r / 1000.0f;
+        return 100.0f + (-a1 + sqrtf(fmaxf(a1 * a1 - 4.0f * a2 * c0, 0.0f))) / (2.0f * a2);
+    }
+    case TEMP_SENSOR_PT1000:       return (r / 1000.0f - 1.0f) / 0.00385f;
+    default:                       return 25.0f;
+    }
+}
+
 static void update_temps(void)
 {
 #if BOARD_TFET_MODEL == HW_TEMP_MAX_OF_3
@@ -67,10 +116,10 @@ static void update_temps(void)
 #endif
     float tm = 25.0f;
 #if BOARD_TMOT_CH != HW_ADC_CH_NONE
-    tm = ntc_temp(motor_hw_slow_raw(BOARD_TMOT_CH), BOARD_TMOT_MODEL, BOARD_TMOT_R_FIXED_OHM, BOARD_TMOT_NTC_R25_OHM,
-                  g_mcconf.m_ntc_motor_beta > 100.0f ? g_mcconf.m_ntc_motor_beta : 3380.0f);
+    tm = motor_temp(motor_hw_slow_raw(BOARD_TMOT_CH));
 #endif
     ctrl_set_temps(t1, t2, t3, tm);
+    foc_set_motor_temp(ctrl_stats()->tmot);
 }
 
 /* ------------------------------------------------------------ bouton (cartes a alimentation maintenue) */
@@ -97,6 +146,33 @@ static void power_key_tick(void)
 }
 #endif
 
+/* ------------------------------------------------------------ sortie AUX (m_out_aux_mode) */
+static void aux_tick(uint32_t now)
+{
+#if BOARD_AUX_PIN != HW_PIN_NONE
+    const ctrl_stats_t *s = ctrl_stats();
+    bool running = g_foc_telem.state == FOC_ST_RUN || g_foc_telem.state == FOC_ST_START;
+    bool on;
+    switch (g_mcconf.m_out_aux_mode) {
+    case 1:  on = now > 2000u; break;
+    case 2:  on = now > 5000u; break;
+    case 3:  on = now > 10000u; break;
+    case 5:  on = running; break;
+    case 6:  on = !running; break;
+    case 7:  on = s->tmot > 50.0f; break;
+    case 8:  on = s->tfet > 50.0f; break;
+    case 9:  on = s->tmot > 70.0f; break;
+    case 10: on = s->tfet > 70.0f; break;
+    case 11: on = s->tmot > 50.0f || s->tfet > 50.0f; break;
+    case 12: on = s->tmot > 70.0f || s->tfet > 70.0f; break;
+    default: on = false; break;
+    }
+    gpio_write(BOARD_AUX_PIN, on);
+#else
+    (void)now;
+#endif
+}
+
 /* ------------------------------------------------------------ 1 kHz */
 static volatile uint32_t s_main_alive;
 static uint32_t s_last_alive, s_alive_ms, s_last_foc_ticks;
@@ -107,6 +183,7 @@ void app_tick_1khz(void)
     ctrl_set_power_allowed(resc_power_allowed() && resc_motor_configured());
     ctrl_update(now, 0.001f);
     if ((now & 15u) == 0) update_temps();
+    if ((now & 63u) == 0) aux_tick(now);
 #if BOARD_PWR_KEY_PIN != HW_PIN_NONE
     power_key_tick();
 #endif
