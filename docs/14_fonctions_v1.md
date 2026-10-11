@@ -142,6 +142,12 @@ Réglage : `foc_motor_kind` = 1. Procédure :
 
 Il n'y a pas de reprise au vol sans capteur : le flux doit d'abord être rétabli.
 
+Commandes du terminal pour l'induction :
+- **`acim` :** paramètres et, en marche, flux rotorique (en mWb et en % du nominal), glissement et vitesse du rotor. Indique aussi l'étape suivante (`detect_rl`, `detect_acim`, réglage du courant magnétisant, `acim on`).
+- **`acim on` / `acim off` :** passe en moteur à induction ou à aimants.
+- **`detect_acim [A]`** : identification de Lm, Lr et Rr.
+- **`conf` et `status` :** affichent les grandeurs propres à l'induction quand ce mode est actif.
+
 ## 8. Profils de configuration
 
 | | Profil VESC700 (défaut) | Profil RESC |
