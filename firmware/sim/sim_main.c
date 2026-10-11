@@ -19,6 +19,7 @@ static int g_fail = 0;
 static double g_trip_peak = 0;
 
 void foc_hw_kill(void) { OUT.enable = false; }
+void foc_hw_phase_filter(bool on) { M.pf_on = on; }
 
 static void run(double seconds)
 {
@@ -73,6 +74,7 @@ int main(void)
     M.vph_lsb = M.v_lsb;
     M.off[0] = 2041; M.off[1] = 2055; M.off[2] = 2049;
     M.noise_lsb = 1.0;
+    M.pf_tau = 100e-6;
     sim_init(&M);
 
     foc_params_t p;
@@ -89,6 +91,9 @@ int main(void)
     p.m_max = 0.95f;
     p.t_win = 3e-6f;
     p.delay_comp = 1.0f;
+    p.decoupling = 3;                      /* anticipation croisee + FEM */
+    p.st_dec = 1.0f;
+    p.obs_gain_slow = 0.05f;               /* defaut de la reference */
     p.i_abs_trip = 120;
     p.vbus_trip_max = 90; p.vbus_trip_min = 10;
     p.st_i = 15; p.st_t_align = 0.3f; p.st_t_ramp = 1.0f;
@@ -412,6 +417,8 @@ int main(void)
     ctrl_release();
     RUN_CTRL(0.05);
     check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
+
+#include "sim_features.inc"
 
     printf("\nCharge : %s  (%d echec(s))\n", g_fail ? "ECHEC" : "TOUS LES ESSAIS PASSENT", g_fail);
     return g_fail ? 1 : 0;

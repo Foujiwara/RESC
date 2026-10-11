@@ -31,6 +31,24 @@ typedef struct {
 #define FOC_SENSOR_SENSORLESS 0
 #define FOC_SENSOR_ENCODER    1
 #define FOC_SENSOR_HALL       2
+#define FOC_SENSOR_HFI        3   /* injection haute frequence a basse vitesse, observateur au-dessus */
+#define FOC_SENSOR_VSS        4   /* demarrage : position par injection, puis I/f sans calage, observateur */
+
+/* Injection haute frequence (HFI) : creneaux de tension ++-- sur l'axe d estime,
+ * demodulation de la reponse en courant sur l'axe q estime (saillance Lq > Ld). */
+typedef struct {
+    float v_start, v_run, v_max;  /* V : injection au demarrage, en marche, a courant max */
+    float gain;                   /* correction d'angle par mise a jour (0..1) */
+    float max_err;                /* rad : erreur d'angle max prise en compte par mise a jour */
+    uint16_t samples;             /* creneaux (de 4 periodes) moyennes par mise a jour */
+    uint16_t start_updates;       /* mises a jour de convergence avant le test de polarite */
+    uint8_t amb_mode;             /* polarite : 0 six vecteurs, 1 impulsion simple, 2 impulsion double */
+    float amb_current;            /* A */
+    float amb_time;               /* s par impulsion */
+    float sl_omega;               /* rad/s : observateur au-dessus */
+    float hyst;                   /* fraction de sl_omega */
+    float i_ref;                  /* A : courant pour v_max */
+} hfi_cfg_t;
 
 typedef struct {
     float duty[3];       /* phases A, B, C */
@@ -78,6 +96,43 @@ typedef struct {
     hall_cfg_t hall;
     enc_cfg_t enc;
     float sl_omega;       /* rad/s : au-dessus, l'observateur remplace les sondes Hall */
+    /* Observateur (suite) */
+    uint8_t obs_type;     /* foc_observer_type 0..6, voir observer.h */
+    float obs_gain_slow;  /* fraction du gain a modulation nulle */
+    float obs_offset;     /* avance d'angle supplementaire (periodes) */
+    uint8_t speed_source; /* 0 : derivee de l'angle de commande, 1 : PLL de l'observateur */
+    /* Compensations */
+    uint8_t sat_comp_mode; /* 0 aucune, 1 inductances, 2 lambda, 3 les deux */
+    float sat_comp;       /* baisse relative a i_sat_ref */
+    float i_sat_ref;      /* A */
+    bool  temp_comp;      /* R (cuivre) et lambda (aimants) suivant la temperature moteur */
+    float temp_comp_base; /* degC : temperature des valeurs identifiees */
+    uint8_t decoupling;   /* bit0 : termes croises, bit1 : FEM */
+    uint8_t mtpa_mode;    /* 0 off, 1 sur la consigne iq, 2 sur iq mesure */
+    /* Defluxage */
+    float fw_i_max;       /* A (0 = off) */
+    float fw_duty_start;  /* modulation relative a m_max ou il commence */
+    float fw_ramp_time;   /* s pour atteindre fw_i_max */
+    float fw_q_factor;    /* fraction de iq conservee a defluxage maximal */
+    /* Demarrage (suite) */
+    float st_low;         /* vitesse de relais a courant nul, en fraction (0 = fixe) */
+    float st_i_ref;       /* A : courant pleine vitesse de relais (st_low) */
+    float st_t_hold;      /* s a pleine vitesse avant le relais */
+    float st_hyst;        /* s sous la vitesse de sortie avant retour en I/f */
+    float st_dec;         /* fraction du courant autorisee a l'arret (1 = off) */
+    float st_dec_omega;   /* rad/s : courant plein au-dessus */
+    /* Hall (suite) */
+    float sl_omega_start; /* rad/s : debut du melange Hall -> observateur */
+    uint8_t hall_extra;   /* lectures identiques exigees pour un nouvel etat */
+    /* HFI / VSS */
+    hfi_cfg_t hfi;
+    /* Filtres de phase (tension de phase filtree par RC, commutee par la carte) */
+    bool  pf_enable;
+    bool  pf_no_fault;
+    float pf_omega;       /* rad/s : tensions mesurees pour l'observateur en dessous */
+    /* Mode duty : regulateur de descente (frein) */
+    float duty_dr_kp;     /* A par unite de duty */
+    float duty_dr_ki;     /* A/s par unite de duty */
     /* Offsets enregistres (calibration manuelle) */
     bool  use_stored_offsets;
     float stored_off_cs[3];   /* LSB */
@@ -156,6 +211,11 @@ typedef struct {
     float theta;                  /* rad el. (angle de commande) */
     float obs_omega, obs_theta;   /* observateur sensorless seul (diagnostic) */
     float flux_ratio;             /* |flux estime| / lambda */
+    float lambda_est;             /* lambda utilise par l'observateur (adaptatif) */
+    float fw_id;                  /* courant de defluxage (A, <= 0) */
+    float hfi_err;                /* rad, derniere erreur d'angle HFI */
+    bool  hfi_active;
+    uint8_t angle_src;            /* 0 observateur, 1 Hall, 2 codeur, 3 HFI, 4 boucle ouverte */
     float i_phase_max;            /* crete de phase observee (A) */
     uint32_t isr_cycles, isr_cycles_max;
     uint32_t ticks;
@@ -167,6 +227,7 @@ typedef struct {
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST
     float dbg_va, dbg_vb, dbg_ia, dbg_ib;
+    float dbg_amp0, dbg_amp_p, dbg_amp_m, dbg_hfi_th;
 #endif
 } foc_telem_t;
 
@@ -186,6 +247,8 @@ bool foc_calibrated(void);
 
 /* Defaut detecte hors ISR (EXTI, break materiel, controle lent) */
 void foc_raise_fault(uint32_t code);
+/* Temperature moteur (degC) pour la compensation, appelee par la couche lente */
+void foc_set_motor_temp(float t);
 /* Rearmement (uniquement si aucune condition de defaut active) */
 bool foc_clear_fault(void);
 
@@ -194,7 +257,9 @@ bool foc_detect_start(const foc_det_t *req);
 const foc_det_t *foc_detect_status(void);
 void foc_detect_abort(void);
 
-/* Crochet bas niveau : coupure rapide du pont (break logiciel), fourni par bsp/ */
+/* Crochets bas niveau fournis par bsp/ (et par la simulation) :
+ * coupure rapide du pont (break logiciel), commutation du filtre de phase */
 void foc_hw_kill(void);
+void foc_hw_phase_filter(bool on);
 
 #endif /* FOC_H */

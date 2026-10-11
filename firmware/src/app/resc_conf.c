@@ -121,6 +121,15 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(foc_offsets_voltage_undriven_0); FIN(foc_offsets_voltage_undriven_1); FIN(foc_offsets_voltage_undriven_2);
     FIN(s_pid_kp); FIN(s_pid_ki); FIN(s_pid_kd); FIN(s_pid_kd_filter); FIN(s_pid_min_erpm); FIN(s_pid_ramp_erpms_s);
     FIN(cc_min_current); FIN(m_ntc_motor_beta);
+    FIN(foc_observer_gain_slow); FIN(foc_observer_offset); FIN(foc_start_curr_dec); FIN(foc_start_curr_dec_rpm);
+    FIN(foc_sl_openloop_hyst); FIN(foc_sl_openloop_time); FIN(foc_sl_erpm_start); FIN(foc_sat_comp);
+    FIN(foc_temp_comp_base_temp); FIN(foc_hfi_amb_current); FIN(foc_hfi_amb_tres); FIN(foc_hfi_voltage_start);
+    FIN(foc_hfi_voltage_run); FIN(foc_hfi_voltage_max); FIN(foc_hfi_gain); FIN(foc_hfi_max_err); FIN(foc_hfi_hyst);
+    FIN(foc_sl_erpm_hfi); FIN(foc_phase_filter_max_erpm); FIN(foc_fw_current_max); FIN(foc_fw_duty_start);
+    FIN(foc_fw_ramp_time); FIN(foc_fw_q_current_factor); FIN(m_hall_extra_samples); FIN(l_duty_start);
+    FIN(l_temp_accel_dec); FIN(m_batt_filter_const); FIN(m_ptc_motor_coeff); FIN(m_ntcx_ptcx_res);
+    FIN(m_ntcx_ptcx_temp_base); FIN(p_pid_kp); FIN(p_pid_ki); FIN(p_pid_kd); FIN(p_pid_kd_filter);
+    FIN(p_pid_ang_div); FIN(p_pid_gain_dec_angle); FIN(p_pid_offset);
     FIN(si_motor_poles); FIN(si_gear_ratio); FIN(si_wheel_diameter); FIN(si_battery_cells);
 #undef FIN
     /* parametres physiques : strictement positifs ou nuls */
@@ -213,10 +222,70 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->st_t_align = fm_max(mc->foc_sl_openloop_time_lock, 0.2f);
     fp->st_t_ramp = fm_max(mc->foc_sl_openloop_time_ramp, 0.4f);
     fp->st_omega = rpm_to_rad(fm_max(mc->foc_openloop_rpm, 300.0f));
-    float low = mc->foc_openloop_rpm_low > 0.05f && mc->foc_openloop_rpm_low < 0.95f ? mc->foc_openloop_rpm_low : 0.5f;
-    fp->st_omega_exit = low * fp->st_omega;
-    fp->st_timeout = fp->st_t_align + fp->st_t_ramp + 3.0f;
+    /* foc_openloop_rpm_low : vitesse de relais a courant nul, en fraction (0 = vitesse fixe) */
+    fp->st_low = mc->foc_openloop_rpm_low > 0.05f && mc->foc_openloop_rpm_low < 0.95f ? mc->foc_openloop_rpm_low : 0.0f;
+    fp->st_i_ref = i_max_eff;
+    fp->st_omega_exit = 0.5f * fp->st_omega * (fp->st_low > 0.0f ? fp->st_low : 1.0f);
+    fp->st_t_hold = fm_sat(mc->foc_sl_openloop_time, 0.0f, 5.0f);
+    fp->st_hyst = fm_sat(mc->foc_sl_openloop_hyst, 0.0f, 2.0f);
+    fp->st_dec = fm_sat(mc->foc_start_curr_dec, 0.0f, 1.0f);
+    fp->st_dec_omega = rpm_to_rad(fm_max(mc->foc_start_curr_dec_rpm, 0.0f));
+    fp->st_timeout = fp->st_t_align + fp->st_t_ramp + fp->st_t_hold + 3.0f;
     fp->i_slew = 5000.0f;
+
+    /* Observateur et compensations */
+    fp->obs_type = mc->foc_observer_type;
+    fp->obs_gain_slow = fm_sat(mc->foc_observer_gain_slow, 0.0f, 1.0f);
+#ifdef RESC_CONF_PROFILE_RESC
+    fp->obs_offset = fm_sat(mc->foc_observer_offset, -3.0f, 3.0f);
+#else
+    /* profil VESC : -1 (valeur par defaut de la reference) = pas de correction supplementaire */
+    fp->obs_offset = fm_sat(mc->foc_observer_offset + 1.0f, -3.0f, 3.0f);
+#endif
+    fp->speed_source = mc->foc_speed_soure;
+    fp->sat_comp_mode = mc->foc_sat_comp_mode & 3u;
+    fp->sat_comp = fm_sat(mc->foc_sat_comp, 0.0f, 0.7f);
+    fp->i_sat_ref = i_max_eff;
+    fp->temp_comp = mc->foc_temp_comp != 0 && BOARD_TMOT_CH != HW_ADC_CH_NONE && mc->m_motor_temp_sens_type != TEMP_SENSOR_DISABLED;
+    fp->temp_comp_base = mc->foc_temp_comp_base_temp;
+#ifdef RESC_CONF_PROFILE_RESC
+    fp->decoupling = mc->foc_cc_decoupling & 3u;
+#else
+    /* profil VESC : la valeur par defaut de la reference est 'desactive' ; RESC garde au minimum
+     * l'anticipation de FEM, sans laquelle les reprises (relais, reprise au vol) sont moins douces */
+    fp->decoupling = (mc->foc_cc_decoupling & 3u) | 2u;
+#endif
+    fp->mtpa_mode = mc->foc_mtpa_mode <= 2 ? mc->foc_mtpa_mode : 0;
+    fp->fw_i_max = fm_sat(mc->foc_fw_current_max, 0.0f, i_max_eff);
+    fp->fw_duty_start = fm_sat(mc->foc_fw_duty_start, 0.3f, 0.99f);
+    fp->fw_ramp_time = fm_max(mc->foc_fw_ramp_time, 0.0f);
+    fp->fw_q_factor = fm_sat(mc->foc_fw_q_current_factor, 0.0f, 1.0f);
+    fp->duty_dr_kp = fm_max(mc->foc_duty_dowmramp_kp, 0.0f);
+    fp->duty_dr_ki = fm_max(mc->foc_duty_dowmramp_ki, 0.0f);
+
+    /* Filtre de phase (si la carte en a un) */
+    fp->pf_enable = mc->foc_phase_filter_enable != 0 && BOARD_PHASE_FILTER_PIN != HW_PIN_NONE;
+    fp->pf_no_fault = mc->foc_phase_filter_disable_fault != 0;
+    fp->pf_omega = rpm_to_rad(fm_max(mc->foc_phase_filter_max_erpm, 0.0f));
+
+    /* Injection haute frequence (HFI, VSS) */
+    {
+        static const uint16_t ns[3] = { 8, 16, 32 };
+        hfi_cfg_t *h = &fp->hfi;
+        h->v_start = fm_sat(mc->foc_hfi_voltage_start, 0.5f, 60.0f);
+        h->v_run = fm_sat(mc->foc_hfi_voltage_run, 0.5f, 60.0f);
+        h->v_max = fm_sat(mc->foc_hfi_voltage_max, h->v_run, 60.0f);
+        h->gain = fm_sat(mc->foc_hfi_gain, 0.01f, 1.0f);
+        h->max_err = fm_sat(mc->foc_hfi_max_err, 0.05f, 1.5f);
+        h->samples = ns[mc->foc_hfi_samples < 3 ? mc->foc_hfi_samples : 1];
+        h->start_updates = mc->foc_hfi_start_samples;
+        h->amb_mode = mc->foc_hfi_amb_mode;
+        h->amb_current = fm_sat(mc->foc_hfi_amb_current, 0.5f, i_max_eff);
+        h->amb_time = fm_sat(mc->foc_hfi_amb_tres, 2.0f, 200.0f) * 1e-3f;
+        h->sl_omega = rpm_to_rad(fm_max(mc->foc_sl_erpm_hfi, 100.0f));
+        h->hyst = fm_sat(mc->foc_hfi_hyst, 0.0f, 0.5f);
+        h->i_ref = i_max_eff;
+    }
 
     /* Capteurs d'angle */
     {
@@ -230,6 +299,8 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         }
         fp->hall.interp_omega = rpm_to_rad(mc->foc_hall_interp_erpm);
         fp->sl_omega = rpm_to_rad(mc->foc_sl_erpm);
+        fp->sl_omega_start = fm_min(rpm_to_rad(mc->foc_sl_erpm_start), fp->sl_omega);
+        fp->hall_extra = (uint8_t)fm_sat(mc->m_hall_extra_samples, 0.0f, 10.0f);
         fp->enc.cpr = mc->m_encoder_counts;
         fp->enc.ratio = mc->foc_encoder_ratio;
         fp->enc.offset = fm_wrap_pi(mc->foc_encoder_offset * (FM_PI / 180.0f));
@@ -242,6 +313,17 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         case FOC_SENSOR_MODE_ENCODER:
         case FOC_SENSOR_MODE_ENCODER_AB:
             fp->sensor_mode = (fp->enc.cpr >= 4 && fp->enc.ratio > 0.5f) ? FOC_SENSOR_ENCODER : FOC_SENSOR_SENSORLESS;
+            break;
+        case FOC_SENSOR_MODE_HFI:
+        case FOC_SENSOR_MODE_HFI_V2:
+        case FOC_SENSOR_MODE_HFI_V3:
+        case FOC_SENSOR_MODE_HFI_V4:
+        case FOC_SENSOR_MODE_HFI_V5:
+            /* une seule methode HFI dans RESC pour toutes les variantes */
+            fp->sensor_mode = FOC_SENSOR_HFI;
+            break;
+        case FOC_SENSOR_MODE_HFI_START:     /* affiche 'VSS' */
+            fp->sensor_mode = FOC_SENSOR_VSS;
             break;
         default:
             fp->sensor_mode = FOC_SENSOR_SENSORLESS;
@@ -302,6 +384,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 /* Fourni par la plateforme : changement de frequence PWM (pont coupe) */
 void plat_pwm_set_freq(float f_pwm);
 void plat_sensor_config(uint8_t mode, uint32_t cpr);
+void plat_hall_samples(uint8_t extra);
 
 static volatile bool s_apply_pending;
 
@@ -329,6 +412,7 @@ void resc_conf_apply(void)
     if (fp.f_pwm != foc_params()->f_pwm) plat_pwm_set_freq(fp.f_pwm);
     static uint8_t last_mode = 0xFF;
     static uint32_t last_cpr = 0;
+    plat_hall_samples(fp.hall_extra);
     if (fp.sensor_mode != last_mode || fp.enc.cpr != last_cpr) {
         plat_sensor_config(fp.sensor_mode, fp.enc.cpr);
         last_mode = fp.sensor_mode;

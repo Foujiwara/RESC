@@ -46,10 +46,30 @@ static uint16_t s_slow_raw[18];
 static TIM_TypeDef *s_enc_tim;
 
 /* ------------------------------------------------------------ capteurs */
+static uint8_t s_hall_extra;       /* m_hall_extra_samples : lectures supplementaires (vote majoritaire) */
+
 RAMFUNC static uint8_t hall_read(void)
 {
-    return (uint8_t)((gpio_read(BOARD_HALL1_PIN) ? 1u : 0u) | (gpio_read(BOARD_HALL2_PIN) ? 2u : 0u) |
-                     (gpio_read(BOARD_HALL3_PIN) ? 4u : 0u));
+    uint32_t n = 1u + 2u * s_hall_extra, c1 = 0, c2 = 0, c3 = 0;
+    for (uint32_t k = 0; k < n; k++) {
+        c1 += gpio_read(BOARD_HALL1_PIN) ? 1u : 0u;
+        c2 += gpio_read(BOARD_HALL2_PIN) ? 1u : 0u;
+        c3 += gpio_read(BOARD_HALL3_PIN) ? 1u : 0u;
+    }
+    n /= 2u;
+    return (uint8_t)((c1 > n ? 1u : 0u) | (c2 > n ? 2u : 0u) | (c3 > n ? 4u : 0u));
+}
+
+void motor_hw_set_hall_samples(uint8_t extra) { s_hall_extra = extra > 10 ? 10 : extra; }
+
+/* Filtre RC des tensions de phase, commute par le coeur selon la vitesse */
+RAMFUNC void foc_hw_phase_filter(bool on)
+{
+#if BOARD_PHASE_FILTER_PIN != HW_PIN_NONE
+    gpio_write(BOARD_PHASE_FILTER_PIN, on);
+#else
+    (void)on;
+#endif
 }
 
 void motor_hw_sensor_config(uint8_t mode, uint32_t cpr)
@@ -450,3 +470,4 @@ void motor_hw_reset_stats(void) { H.cyc_max = 0; H.overruns = 0; }
 
 void plat_pwm_set_freq(float f) { motor_hw_set_freq(f); }
 void plat_sensor_config(uint8_t mode, uint32_t cpr) { motor_hw_sensor_config(mode, cpr); }
+void plat_hall_samples(uint8_t extra) { motor_hw_set_hall_samples(extra); }

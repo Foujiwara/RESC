@@ -16,4 +16,6 @@ uint32_t motor_hw_overruns(void);
 void motor_hw_reset_stats(void);
 void motor_hw_sensor_config(uint8_t sensor_mode, uint32_t encoder_counts);   /* 1 = codeur ABI */
 
+void motor_hw_set_hall_samples(uint8_t extra);
+
 #endif

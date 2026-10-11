@@ -60,11 +60,19 @@ static void integrate(sim_motor_t *m, double T, const double d[3], bool en)
                 if (dd > 1) dd = 1;
                 v[x] = dd * m->vbus;
             }
+            if (m->pf_on) {
+                /* tensions de phase filtrees (RC) : moyenne glissante de la tension appliquee */
+                double k = 1.0 - exp(-h / m->pf_tau);
+                for (int x = 0; x < 3; x++) m->vph_f[x] += k * (v[x] - m->vph_f[x]);
+            }
             double va = (2 * v[0] - v[1] - v[2]) / 3.0;
             double vb = (v[1] - v[2]) / sqrt(3);
             double vd = c * va + s * vb;
             double vq = -s * va + c * vb;
-            double did = (vd - m->r * m->id + we * m->lq * m->iq) / m->ld;
+            double ldi = m->ld * (1.0 - m->ld_sat * m->id);
+            if (ldi < 0.5 * m->ld) ldi = 0.5 * m->ld;
+            if (ldi > 1.5 * m->ld) ldi = 1.5 * m->ld;
+            double did = (vd - m->r * m->id + we * m->lq * m->iq) / ldi;
             double diq = (vq - m->r * m->iq - we * (m->ld * m->id + m->lambda)) / m->lq;
             m->id += did * h;
             m->iq += diq * h;
@@ -108,7 +116,7 @@ void sim_step(sim_motor_t *m, const foc_pwm_t *out, foc_adc_t *adc)
     double th = m->theta * m->pp, we = m->omega_m * m->pp;
     for (int x = 0; x < 3; x++) {
         double e = -we * m->lambda * sin(th - x * 2 * M_PI / 3);
-        double v = m->en_cur ? 0.0 : e + m->vbus / 2;
+        double v = m->en_cur ? (m->pf_on ? m->vph_f[x] : 0.0) : e + m->vbus / 2;
         adc->vph[x] = to_adc(v / m->vph_lsb + m->noise_lsb * gauss());
     }
     double h = th - m->hall_off;

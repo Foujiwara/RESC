@@ -20,6 +20,8 @@
 #define RESC_FAULT_HIGH_OFFSET_CURR_3   17
 #define RESC_FAULT_UNBALANCED_CURRENTS  18
 #define RESC_FAULT_BRK                  19
+#define RESC_FAULT_PHASE_FILTER         27   /* tensions de phase filtrees incoherentes */
+#define RESC_FAULT_ENCODER_SLIP         30
 #define RESC_FAULT_OVERSPEED            31
 #define RESC_FAULT_UNDERSPEED           32   /* RESC : echec du demarrage / perte de synchro */
 #define RESC_FAULT_ABS_OVERSPEED        33
