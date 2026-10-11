@@ -45,6 +45,10 @@ typedef struct {
     double t;
     double duty_cur[3], duty_next[3];
     bool   en_cur, en_next;
+    /* foc_control_sample_mode : seconde moitie interpolee (2), boucle a 2 x f_pwm (1) */
+    bool   h_ok, hn_ok;           /* rapports de la seconde moitie fournis (foc_isr_half) */
+    double duty_h[3], duty_hn[3];
+    bool   full_delay;            /* V0 et V7 : commande appliquee une periode de boucle apres l'echantillon */
 } sim_motor_t;
 
 void sim_init(sim_motor_t *m);

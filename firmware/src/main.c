@@ -233,7 +233,7 @@ int main(void)
     ctrl_set_power_allowed(false);
 
     motor_hw_sensor_config(fp.sensor_mode, fp.enc.cpr);
-    motor_hw_init(fp.f_pwm);           /* TIM1 + ADC : la calibration des offsets demarre */
+    motor_hw_init(fp.f_pwm, fp.ctl_mode);           /* TIM1 + ADC : la calibration des offsets demarre */
     board_gate_enable(true);           /* driver actif, MOE = 0 : MOSFET bloques */
 
     systime_init();

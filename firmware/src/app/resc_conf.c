@@ -138,6 +138,9 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(foc_acim_lm); FIN(foc_acim_lr); FIN(foc_acim_rr); FIN(foc_acim_im); FIN(foc_acim_base_erpm);
     FIN(foc_resc_cc_bw); FIN(foc_resc_rl_frac);
     FIN(si_motor_poles); FIN(si_gear_ratio); FIN(si_wheel_diameter); FIN(si_battery_cells);
+    FIN(foc_overmod_factor); FIN(foc_mag_vd_max); FIN(foc_current_filter_const); FIN(foc_fw_backoff);
+    FIN(foc_hfi_reset_erpm); FIN(foc_hfi_obs_ovr_sec); FIN(l_in_current_map_start); FIN(l_in_current_map_filter);
+    FIN(p_pid_kd_proc);
 #undef FIN
     /* parametres physiques : strictement positifs ou nuls */
     if (c->foc_motor_r < 0.0f) c->foc_motor_r = d.foc_motor_r;
@@ -162,6 +165,15 @@ void resc_conf_clamp_mc(vesc_mcconf_t *c)
     if (c->m_out_aux_mode == 4 || c->m_out_aux_mode > 12) c->m_out_aux_mode = 0;
     c->l_additional_faults &= 0x0Bu;                                                   /* glissement, survitesses */
     c->foc_offsets_cal_mode &= 0x01u;
+    /* echantillonnage : V0 et V7 seulement avec des shunts en ligne ; modes a trois capteurs */
+    if (c->foc_control_sample_mode > 2) c->foc_control_sample_mode = 0;
+    if (c->foc_control_sample_mode == 1 && BOARD_CS_TOPOLOGY != HW_CS_INLINE_3) c->foc_control_sample_mode = 2;
+    if (c->foc_current_sample_mode > 2 || BOARD_CS_TOPOLOGY == HW_CS_LOWSIDE_2) c->foc_current_sample_mode = 0;
+    c->foc_overmod_factor = fm_sat(c->foc_overmod_factor, 1.0f, 1.5f);
+    c->foc_mag_vd_max = fm_sat(c->foc_mag_vd_max, 0.4f, 1.0f);
+    c->foc_current_filter_const = fm_sat(c->foc_current_filter_const, 0.001f, 1.0f);
+    c->l_in_current_map_start = fm_sat(c->l_in_current_map_start, 0.0f, 1.0f);
+    c->l_in_current_map_filter = fm_sat(c->l_in_current_map_filter, 0.0f, 1.0f);
     c->l_current_max = fm_sat(c->l_current_max, 0.0f, imax);
     c->l_current_min = fm_sat(c->l_current_min, -imax, 0.0f);
     c->l_in_current_max = fm_sat(c->l_in_current_max, 0.0f, iin);
@@ -202,7 +214,10 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     float cap = resc_current_cap_frac();
     memset(fp, 0, sizeof(*fp));
 
-    fp->f_pwm = 0.5f * mc->foc_f_zv;
+    /* foc_f_zv = 2 x f_pwm ; en V0 et V7 la boucle tourne a f_zv (deux fois par periode PWM) */
+    fp->ctl_mode = mc->foc_control_sample_mode <= 2 ? mc->foc_control_sample_mode : 0;
+    if (fp->ctl_mode == 1 && BOARD_CS_TOPOLOGY != HW_CS_INLINE_3) fp->ctl_mode = 2;
+    fp->f_pwm = fp->ctl_mode == 1 ? mc->foc_f_zv : 0.5f * mc->foc_f_zv;
     fp->i_scale = (BOARD_VREF_V / 4095.0f) / (BOARD_CS_SHUNT_OHM * BOARD_CS_AMP_GAIN) * (BOARD_CS_INVERTED ? -1.0f : 1.0f);
     fp->v_scale = (BOARD_VREF_V / 4095.0f) * (BOARD_VBUS_R_TOP_OHM + BOARD_VBUS_R_BOT_OHM) / BOARD_VBUS_R_BOT_OHM;
     fp->vph_scale = (BOARD_VREF_V / 4095.0f) * (BOARD_VPH_R_TOP_OHM + BOARD_VPH_R_BOT_OHM) / BOARD_VPH_R_BOT_OHM;
@@ -241,7 +256,14 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         if (m_win < fp->m_max) fp->m_max = m_win;
         if (fp->m_max < 0.3f) fp->m_max = 0.3f;
     }
-    fp->delay_comp = 1.0f;
+    /* commande appliquee une periode de boucle apres l'echantillon, pendant une periode PWM :
+     * centre a 1 periode PWM (V0), a 1.5 periode de boucle en V0 et V7 */
+    fp->delay_comp = fp->ctl_mode == 1 ? 1.5f : 1.0f;
+    fp->cs_mode = mc->foc_current_sample_mode <= 2 ? mc->foc_current_sample_mode : 0;
+    fp->i_filter = fm_sat(mc->foc_current_filter_const, 0.001f, 1.0f);
+    fp->overmod = fm_sat(mc->foc_overmod_factor, 1.0f, 1.5f);
+    fp->vd_max = fm_sat(mc->foc_mag_vd_max, 0.4f, 1.0f);
+    fp->short_ls = mc->foc_short_ls_on_zero_duty != 0;
 
     float i_abs_cap = (float)HWLIM_I_ABS_TRIP_A * cap;
     fp->i_abs_trip = fm_min(mc->l_abs_current_max, i_abs_cap);
@@ -300,6 +322,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->fw_duty_start = fm_sat(mc->foc_fw_duty_start, 0.3f, 0.99f);
     fp->fw_ramp_time = fm_max(mc->foc_fw_ramp_time, 0.0f);
     fp->fw_q_factor = fm_sat(mc->foc_fw_q_current_factor, 0.0f, 1.0f);
+    fp->fw_backoff = fm_sat(mc->foc_fw_backoff, 0.0f, 10.0f);
     fp->duty_dr_kp = fm_max(mc->foc_duty_dowmramp_kp, 0.0f);
     fp->duty_dr_ki = fm_max(mc->foc_duty_dowmramp_ki, 0.0f);
 
@@ -324,6 +347,8 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         h->amb_time = fm_sat(mc->foc_hfi_amb_tres, 2.0f, 200.0f) * 1e-3f;
         h->sl_omega = rpm_to_rad(fm_max(mc->foc_sl_erpm_hfi, 100.0f));
         h->hyst = fm_sat(mc->foc_hfi_hyst, 0.0f, 0.5f);
+        h->reset_omega = rpm_to_rad(fm_max(mc->foc_hfi_reset_erpm, 0.0f));
+        h->obs_ovr = fm_sat(mc->foc_hfi_obs_ovr_sec, 0.0f, 5.0f);
         h->i_ref = i_max_eff;
     }
 
@@ -441,11 +466,15 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     cl->p_ang_div = mc->p_pid_ang_div;
     cl->p_gain_dec = mc->p_pid_gain_dec_angle;
     cl->p_offset = mc->p_pid_offset;
+    cl->p_kd_proc = mc->p_pid_kd_proc;
+    cl->in_map_start = fm_sat(mc->l_in_current_map_start, 0.0f, 1.0f);
+    cl->in_map_filter = fm_sat(mc->l_in_current_map_filter, 0.0f, 1.0f);
+    cl->f_isr = fp->f_pwm;
     cl->pole_pairs = mc->si_motor_poles >= 2 ? 0.5f * (float)mc->si_motor_poles : 7.0f;
 }
 
 /* Fourni par la plateforme : changement de frequence PWM (pont coupe) */
-void plat_pwm_set_freq(float f_pwm);
+void plat_pwm_set_freq(float f_loop, uint8_t ctl_mode);
 void plat_sensor_config(uint8_t mode, uint32_t cpr);
 void plat_hall_samples(uint8_t extra);
 
@@ -472,7 +501,7 @@ void resc_conf_apply(void)
         return;
     }
     s_apply_pending = false;
-    if (fp.f_pwm != foc_params()->f_pwm) plat_pwm_set_freq(fp.f_pwm);
+    if (fp.f_pwm != foc_params()->f_pwm || fp.ctl_mode != foc_params()->ctl_mode) plat_pwm_set_freq(fp.f_pwm, fp.ctl_mode);
     static uint8_t last_mode = 0xFF;
     static uint32_t last_cpr = 0;
     plat_hall_samples(fp.hall_extra);

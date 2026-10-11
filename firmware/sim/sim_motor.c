@@ -132,10 +132,19 @@ void sim_step(sim_motor_t *m, const foc_pwm_t *out, foc_adc_t *adc)
     double T = 1.0 / m->f_pwm;
     for (int k = 0; k < 3; k++) m->duty_next[k] = out->duty[k];
     m->en_next = out->enable;
-    integrate(m, T / 2, m->duty_cur, m->en_cur);     /* sommet -> creux : ancienne commande */
-    for (int k = 0; k < 3; k++) m->duty_cur[k] = m->duty_next[k];
-    m->en_cur = m->en_next;
-    integrate(m, T / 2, m->duty_cur, m->en_cur);     /* creux -> sommet : nouvelle commande */
+    if (m->full_delay) {
+        integrate(m, T, m->duty_cur, m->en_cur);      /* periode de boucle entiere : commande precedente */
+        for (int k = 0; k < 3; k++) m->duty_cur[k] = m->duty_next[k];
+        m->en_cur = m->en_next;
+    } else {
+        /* sommet -> creux : ancienne commande, ou sa seconde moitie interpolee */
+        integrate(m, T / 2, m->h_ok && m->en_cur ? m->duty_h : m->duty_cur, m->en_cur);
+        for (int k = 0; k < 3; k++) m->duty_cur[k] = m->duty_next[k];
+        m->en_cur = m->en_next;
+        integrate(m, T / 2, m->duty_cur, m->en_cur);  /* creux -> sommet : nouvelle commande */
+        m->h_ok = m->hn_ok;
+        for (int k = 0; k < 3; k++) m->duty_h[k] = m->duty_hn[k];
+    }
 
     double i[3];
     sim_phase_currents(m, i);

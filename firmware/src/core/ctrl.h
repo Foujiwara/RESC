@@ -64,7 +64,12 @@ typedef struct {
     float p_ang_div;                 /* l'angle est divise par ce facteur (reduction) */
     float p_gain_dec;                /* degres : gains reduits en dessous de cette erreur */
     float p_offset;                  /* degres ajoutes a la consigne */
+    float p_kd_proc;                 /* derivee sur la position mesuree (amortissement sans a-coup de consigne) */
     float pole_pairs;
+    /* courant d'entree cartographie (l_in_current_map_start, l_in_current_map_filter) */
+    float in_map_start;              /* fraction de i_in_max ; au-dessus, courant moteur max reduit lineairement */
+    float in_map_filter;             /* filtre du courant d'entree par periode PWM */
+    float f_isr;                     /* Hz, frequence de la boucle FOC (conversion du filtre) */
 } ctrl_limits_t;
 
 typedef struct {

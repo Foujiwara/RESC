@@ -100,6 +100,42 @@ p, li { white-space: pre-wrap; }
             <suffix> A</suffix>
             <vTx>9</vTx>
         </l_in_current_min>
+        <l_in_current_map_start>
+            <longName>Input Current Limit Map Start</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Above this fraction of Battery Current Max, the motor current limit is reduced linearly to zero at Battery Current Max (smoother than the input current regulation). 1 = off.&lt;/p&gt;</description>
+            <cDefine>MCCONF_L_IN_CURRENT_MAP_START</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </l_in_current_map_start>
+        <l_in_current_map_filter>
+            <longName>Input Current Map Filter</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Low-pass filter of the input current used by the map (per PWM period).&lt;/p&gt;</description>
+            <cDefine>MCCONF_L_IN_CURRENT_MAP_FILTER</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.005</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </l_in_current_map_filter>
         <l_abs_current_max>
             <longName>Absolute Maximum Current</longName>
             <type>1</type>
@@ -1454,6 +1490,30 @@ p, li { white-space: pre-wrap; }
             <suffix />
             <vTx>9</vTx>
         </foc_sl_erpm>
+        <foc_control_sample_mode>
+            <longName>Control Sample Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;&lt;b&gt;V0 Only&lt;/b&gt;: one current sample and one control update per PWM period (zero vector V0, all low-side FETs on).&lt;/p&gt;&lt;p&gt;&lt;b&gt;V0 and V7 Interpolation&lt;/b&gt;: same sampling; at the opposite end of the period (V7) the modulation is updated again with the angle advanced by half a period. Smoother at high electrical speed.&lt;/p&gt;&lt;p&gt;&lt;b&gt;V0 and V7&lt;/b&gt;: sampling and full control at both ends of the period (control loop at twice the PWM frequency). Only on boards with in-line or phase shunts (not shown otherwise).&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_CONTROL_SAMPLE_MODE</cDefine>
+            <valInt>0</valInt>
+            <enumNames>V0 Only</enumNames>
+            <enumNames>V0 and V7 Interpolation</enumNames>
+            <enumNames>V0 and V7</enumNames>
+            <maxInt>2</maxInt>
+        </foc_control_sample_mode>
+        <foc_current_sample_mode>
+            <longName>Current Sample Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;&lt;b&gt;Longest Zero Time&lt;/b&gt;: the phase with the shortest low-side window is rebuilt from the two others when its window approaches the minimum. &lt;b&gt;All Sensors Combined&lt;/b&gt;: every valid phase is used. &lt;b&gt;High Current&lt;/b&gt;: the phase with the highest current is rebuilt from the two others (more range from the current amplifiers). Phases without a valid window are always rebuilt.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_CURRENT_SAMPLE_MODE</cDefine>
+            <valInt>0</valInt>
+            <enumNames>Longest Zero Time</enumNames>
+            <enumNames>All Sensors Combined</enumNames>
+            <enumNames>High Current</enumNames>
+            <maxInt>2</maxInt>
+        </foc_current_sample_mode>
         <foc_sat_comp_mode>
             <longName>Saturation Compensation Mode</longName>
             <type>4</type>
@@ -1548,6 +1608,24 @@ p, li { white-space: pre-wrap; }
             <suffix> °C</suffix>
             <vTx>7</vTx>
         </foc_temp_comp_base_temp>
+        <foc_current_filter_const>
+            <longName>Current Filter Constant</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Low-pass filter of the d/q currents used for display, limits and power (per PWM period, 1 = none). The current loop always uses the unfiltered samples.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_CURRENT_FILTER_CONST</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.1</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </foc_current_filter_const>
         <foc_cc_decoupling>
             <longName>Current Controller Decoupling</longName>
             <type>4</type>
@@ -1784,6 +1862,24 @@ p, li { white-space: pre-wrap; }
             <suffix />
             <vTx>9</vTx>
         </foc_sl_erpm_hfi>
+        <foc_hfi_reset_erpm>
+            <longName>HFI Reset ERPM</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;HFI and VSS: when the motor is restarted while still turning above this speed, it restarts from the observer angle; below, the position and polarity search is done again.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_HFI_RESET_ERPM</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1e+06</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>100</stepDouble>
+            <valDouble>500</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </foc_hfi_reset_erpm>
         <foc_hfi_start_samples>
             <longName>HFI Start Samples</longName>
             <type>2</type>
@@ -1800,6 +1896,24 @@ p, li { white-space: pre-wrap; }
             <suffix />
             <vTx>3</vTx>
         </foc_hfi_start_samples>
+        <foc_hfi_obs_ovr_sec>
+            <longName>HFI Observer Override Time</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;HFI: after slowing down below Sensorless ERPM HFI, the injection angle follows the observer during this time (the observer is still good just below the switch speed).&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_HFI_OBS_OVR_SEC</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1000</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>5000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>0.001</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> ms</suffix>
+            <vTx>9</vTx>
+        </foc_hfi_obs_ovr_sec>
         <foc_hfi_samples>
             <longName>HFI Samples</longName>
             <type>4</type>
@@ -2154,6 +2268,24 @@ p, li { white-space: pre-wrap; }
             <suffix> %</suffix>
             <vTx>7</vTx>
         </foc_fw_q_current_factor>
+        <foc_fw_backoff>
+            <longName>Backoff Gain</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Field weakening backoff: when iq exceeds its target (not enough voltage left on q), the maximum field weakening current is reduced by gain x (iq - iq target) / FW current max. 0 = off.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_FW_BACKOFF</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>10</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> </suffix>
+            <vTx>7</vTx>
+        </foc_fw_backoff>
         <foc_fw_ramp_time>
             <longName>Field Weakening Ramp Time</longName>
             <type>1</type>
@@ -2197,6 +2329,50 @@ p, li { white-space: pre-wrap; }
             <enumNames>Corrected Position</enumNames>
             <enumNames>Observer</enumNames>
         </foc_speed_soure>
+        <foc_short_ls_on_zero_duty>
+            <longName>Short Low-Side FETs on Zero Duty</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;When the voltage is zero (braking at low speed, zero duty), keep all low-side FETs on instead of a modulated short: less losses, no dead-time error and more braking torque at low speed, down to standstill.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_SHORT_LS_ON_ZERO_DUTY</cDefine>
+            <valInt>0</valInt>
+        </foc_short_ls_on_zero_duty>
+        <foc_overmod_factor>
+            <longName>Overmodulation Factor</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Radius of the voltage circle: linear limit x this factor. Above 1 the phase duty cycles are clipped (overmodulation): more voltage at top speed, more current ripple and harmonics, and shorter low-side windows (more rebuilt current samples).&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_OVERMOD_FACTOR</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1.5</maxDouble>
+            <minDouble>1</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.005</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </foc_overmod_factor>
+        <foc_mag_vd_max>
+            <longName>Maximum VD Magnitude</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Part of the voltage circle the d axis may use. The d axis has priority (field weakening, stability); q gets the rest.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_MAG_VD_MAX</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0.4</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.005</stepDouble>
+            <valDouble>0.98</valDouble>
+            <vTxDoubleScale>10000</vTxDoubleScale>
+            <suffix />
+            <vTx>7</vTx>
+        </foc_mag_vd_max>
         <sp_pid_loop_rate>
             <longName>PID Loop Rate</longName>
             <type>4</type>
@@ -2468,6 +2644,24 @@ p, li { white-space: pre-wrap; }
             <suffix> °</suffix>
             <vTx>9</vTx>
         </p_pid_offset>
+        <p_pid_kd_proc>
+            <longName>Position PID Kd Process</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Derivative on the measured position (damping without kick when the setpoint changes).&lt;/p&gt;</description>
+            <cDefine>MCCONF_P_PID_KD_PROC</cDefine>
+            <editorDecimalsDouble>5</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>10000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.0001</stepDouble>
+            <valDouble>0.00035</valDouble>
+            <vTxDoubleScale>1e+06</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </p_pid_kd_proc>
         <p_pid_kd_filter>
             <longName>Position PID Kd Filter</longName>
             <type>1</type>
@@ -3088,6 +3282,8 @@ p, li { white-space: pre-wrap; }
         <ser>l_current_min</ser>
         <ser>l_in_current_max</ser>
         <ser>l_in_current_min</ser>
+        <ser>l_in_current_map_start</ser>
+        <ser>l_in_current_map_filter</ser>
         <ser>l_abs_current_max</ser>
         <ser>l_min_erpm</ser>
         <ser>l_max_erpm</ser>
@@ -3152,10 +3348,13 @@ p, li { white-space: pre-wrap; }
         <ser>foc_hall_interp_erpm</ser>
         <ser>foc_sl_erpm_start</ser>
         <ser>foc_sl_erpm</ser>
+        <ser>foc_control_sample_mode</ser>
+        <ser>foc_current_sample_mode</ser>
         <ser>foc_sat_comp_mode</ser>
         <ser>foc_sat_comp</ser>
         <ser>foc_temp_comp</ser>
         <ser>foc_temp_comp_base_temp</ser>
+        <ser>foc_current_filter_const</ser>
         <ser>foc_cc_decoupling</ser>
         <ser>foc_observer_type</ser>
         <ser>foc_hfi_amb_mode</ser>
@@ -3168,7 +3367,9 @@ p, li { white-space: pre-wrap; }
         <ser>foc_hfi_max_err</ser>
         <ser>foc_hfi_hyst</ser>
         <ser>foc_sl_erpm_hfi</ser>
+        <ser>foc_hfi_reset_erpm</ser>
         <ser>foc_hfi_start_samples</ser>
+        <ser>foc_hfi_obs_ovr_sec</ser>
         <ser>foc_hfi_samples</ser>
         <ser>foc_offsets_cal_mode</ser>
         <ser>foc_offsets_current__0</ser>
@@ -3188,7 +3389,11 @@ p, li { white-space: pre-wrap; }
         <ser>foc_fw_duty_start</ser>
         <ser>foc_fw_ramp_time</ser>
         <ser>foc_fw_q_current_factor</ser>
+        <ser>foc_fw_backoff</ser>
         <ser>foc_speed_soure</ser>
+        <ser>foc_short_ls_on_zero_duty</ser>
+        <ser>foc_overmod_factor</ser>
+        <ser>foc_mag_vd_max</ser>
         <ser>sp_pid_loop_rate</ser>
         <ser>s_pid_kp</ser>
         <ser>s_pid_ki</ser>
@@ -3201,6 +3406,7 @@ p, li { white-space: pre-wrap; }
         <ser>p_pid_kp</ser>
         <ser>p_pid_ki</ser>
         <ser>p_pid_kd</ser>
+        <ser>p_pid_kd_proc</ser>
         <ser>p_pid_kd_filter</ser>
         <ser>p_pid_ang_div</ser>
         <ser>p_pid_gain_dec_angle</ser>
@@ -3263,6 +3469,8 @@ p, li { white-space: pre-wrap; }
                     <param>::sep::Battery</param>
                     <param>l_in_current_max</param>
                     <param>l_in_current_min</param>
+                    <param>l_in_current_map_start</param>
+                    <param>l_in_current_map_filter</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -3409,7 +3617,9 @@ p, li { white-space: pre-wrap; }
                     <param>foc_hfi_max_err</param>
                     <param>foc_hfi_hyst</param>
                     <param>foc_sl_erpm_hfi</param>
+                    <param>foc_hfi_reset_erpm</param>
                     <param>foc_hfi_start_samples</param>
+                    <param>foc_hfi_obs_ovr_sec</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -3454,6 +3664,7 @@ p, li { white-space: pre-wrap; }
                     <param>foc_fw_duty_start</param>
                     <param>foc_fw_ramp_time</param>
                     <param>foc_fw_q_current_factor</param>
+                    <param>foc_fw_backoff</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>
@@ -3465,12 +3676,18 @@ p, li { white-space: pre-wrap; }
                     <param>foc_pll_ki</param>
                     <param>foc_duty_dowmramp_kp</param>
                     <param>foc_duty_dowmramp_ki</param>
+                    <param>foc_control_sample_mode</param>
+                    <param>foc_current_sample_mode</param>
                     <param>foc_observer_gain_slow</param>
+                    <param>foc_current_filter_const</param>
                     <param>foc_cc_decoupling</param>
                     <param>foc_observer_type</param>
                     <param>foc_mtpa_mode</param>
                     <param>foc_observer_offset</param>
                     <param>foc_speed_soure</param>
+                    <param>foc_short_ls_on_zero_duty</param>
+                    <param>foc_overmod_factor</param>
+                    <param>foc_mag_vd_max</param>
                     <param>::sep::RESC</param>
                     <param>foc_resc_cc_bw</param>
                     <param>foc_resc_rl_frac</param>
@@ -3498,6 +3715,7 @@ p, li { white-space: pre-wrap; }
                     <param>p_pid_kp</param>
                     <param>p_pid_ki</param>
                     <param>p_pid_kd</param>
+                    <param>p_pid_kd_proc</param>
                     <param>p_pid_kd_filter</param>
                     <param>p_pid_ang_div</param>
                     <param>p_pid_gain_dec_angle</param>
