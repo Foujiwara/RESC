@@ -36,7 +36,10 @@ uint32_t can_baud_from_enum(uint8_t e)
     case CAN_BAUD_250K: return 250000;
     case CAN_BAUD_1M:   return 1000000;
     case CAN_BAUD_100K: return 100000;
+    case CAN_BAUD_75K:  return 75000;
     case CAN_BAUD_50K:  return 50000;
+    case CAN_BAUD_20K:  return 20000;
+    case CAN_BAUD_10K:  return 10000;
     default:            return 500000;
     }
 }

@@ -69,6 +69,17 @@ def html(*paras):
 
 # --------------------------------------------------- textes et choix propres a RESC
 MC_EDIT = {
+    "motor_type": dict(enums=["BLDC (not supported, FOC used)", "DC (not supported, FOC used)", "FOC"], description=html(
+        "RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).")),
+    "l_additional_faults": dict(enums=["Encoder Slip", "Overspeed", "Unused", "Absolute Overspeed",
+                                       "Unused", "Unused", "Unused", "Unused"], description=html(
+        "<b>Encoder Slip</b>: fault when the encoder speed differs from the observer speed by more than 30 % "
+        "for 0.1 s (above twice the I/f exit speed). <b>Overspeed</b>: above 110 % of the ERPM limit. "
+        "<b>Absolute Overspeed</b>: above 130 %.")),
+    "sp_pid_loop_rate": dict(enums=["25 Hz", "50 Hz", "100 Hz", "250 Hz", "500 Hz", "1000 Hz",
+                                    "1000 Hz (2500 not available)", "1000 Hz (5000 not available)",
+                                    "1000 Hz (10000 not available)"], description=html(
+        "Rate of the speed and position PID. The RESC control layer runs at 1 kHz at most.")),
     "foc_observer_type": dict(
         enums=["Active flux, non-linear correction", "Active flux, radial correction (gain 2|w|)",
                "Active flux non-linear + lambda adaptation", "Active flux radial + lambda adaptation",
@@ -109,7 +120,7 @@ MC_EDIT = {
         "Minimum time at hand-over speed with the observer locked before switching to it (min 50 ms).")),
     "foc_sl_openloop_hyst": dict(description=html(
         "Time below the exit speed (half of the hand-over speed) before going back to I/f.")),
-    "foc_hfi_amb_mode": dict(description=html(
+    "foc_hfi_amb_mode": dict(enums=["Six Vectors (= Double Pulse)", "Id Single Pulse", "Id Double Pulse"], description=html(
         "Polarity test (north/south) at HFI start: current pulses on the d axis; saturation makes the "
         "response stronger towards the magnet. <b>Single</b>: +I compared with no bias. "
         "<b>Double</b> and <b>Six vectors</b>: +I compared with -I.")),
@@ -126,7 +137,8 @@ MC_EDIT = {
         "Duty mode: when the duty request decreases, a PI from duty error to braking current brings the duty "
         "down within the current limits. Proportional gain (A per unit of duty).")),
     "foc_duty_dowmramp_ki": dict(description=html("Duty mode, decreasing duty: integral gain (A/s per unit of duty).")),
-    "foc_offsets_cal_mode": dict(description=html(
+    "foc_offsets_cal_mode": dict(enums=["Calibrate on Boot", "Unused", "Unused", "Unused", "Unused", "Unused",
+                                        "Unused", "Unused"], description=html(
         "Bit 0 set: offsets measured at every boot. Bit 0 clear: the offsets of the manual calibration "
         "(offsets_cal) are used when they agree with the boot measurement.")),
     "l_slow_abs_current": dict(description=html(
@@ -134,6 +146,13 @@ MC_EDIT = {
         "analog watchdog is then set 50 % higher).")),
 }
 APP_EDIT = {
+    "app_to_use": dict(enums=["No App", "PPM", "ADC (buttons on UART pins)", "UART", "PPM and UART", "ADC and UART",
+                              "VESC Remote (packets)", "VESC Remote (radio module packets)", "Unused (no app)",
+                              "PAS (sensor on UART pins)", "ADC and PAS"], description=html(
+        "Control application. <b>UART</b> also accepts the VESC Remote through packets (radio module on the "
+        "permanent UART, BLE). <b>ADC</b> alone uses the UART TX/RX pins for the cruise and reverse buttons; "
+        "<b>PAS</b> uses them for the pedal sensor. Servo input on the PPM pin (TIM4).")),
+    "can_baud_rate": dict(description=html("CAN bus speed (all rates supported).")),
     "shutdown_mode": dict(description=html(
         "Power button. <b>ALWAYS_OFF</b>: the board turns off 0.5 s after the button is released (use only with "
         "a latching switch). <b>ALWAYS_ON</b>: never turned off by the firmware. <b>TOGGLE_BUTTON_ONLY</b>: "

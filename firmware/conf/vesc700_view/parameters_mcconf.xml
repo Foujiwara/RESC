@@ -38,21 +38,7 @@ p, li { white-space: pre-wrap; }
             <longName>Motor Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;BLDC&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Trapezoidal commutation mode for PMSM motors.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;DC&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;DC motor. A DC motor is connected to phase 1 and phase 3.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;FOC&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Field Oriented Control (FOC) for PMSM (or BLDC) motors. The motor is commutated with sine waves instead of a trapezoidal waveform as is the case for BLDC commutation. FOC runs the motors more quietly (especially at low speed and high load), is slightly more efficient and provides automatic optimal timing.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;GPD&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;General Purpose Drive between phase 1 and 3. Should be used with a custom application on the VESC, or on the computer with the VESC Tool backend providing samples.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;RESC drives motors in FOC only (permanent magnet or induction, see Motor Kind).&lt;/p&gt;</description>
             <cDefine>MCCONF_DEFAULT_MOTOR_TYPE</cDefine>
             <valInt>2</valInt>
             <enumNames>BLDC</enumNames>
@@ -758,21 +744,7 @@ p, li { white-space: pre-wrap; }
             <longName>Additional Faults</longName>
             <type>6</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Encoder Slip&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Check for mechanical slip by comparing the FOC observer phase against the physical encoder phase. If enabled, a fault will be triggered if the phase gap exceeds 15 degrees for more than 500ms while spinning. This check will only be performed while the ERPM is higher than the Openloop ERPM setting.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Overspeed&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Triggers a fault code if the ERPM exceeds the Max ERPM limit.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Underspeed&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Triggers a fault code if the reverse ERPM exceeds the Max ERPM Reverse limit.&lt;/p&gt;
-&lt;p style="-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;&lt;span style=" font-weight:600;"&gt;Absolute Overspeed&lt;/span&gt;&lt;/p&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Triggers a fault code if absolute ERPM exceeds the highest of the Max ERPM and Max ERPM reverse limits.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;&lt;b&gt;Encoder Slip&lt;/b&gt;: fault when the encoder speed differs from the observer speed by more than 30 % for 0.1 s (above twice the I/f exit speed). &lt;b&gt;Overspeed&lt;/b&gt;: above 110 % of the ERPM limit. &lt;b&gt;Absolute Overspeed&lt;/b&gt;: above 130 %.&lt;/p&gt;</description>
             <cDefine>MCCONF_L_ADDITIONAL_FAULTS</cDefine>
             <valInt>0</valInt>
             <enumNames>Encoder Slip</enumNames>
@@ -2905,11 +2877,7 @@ p, li { white-space: pre-wrap; }
             <longName>PID Loop Rate</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN" "http://www.w3.org/TR/REC-html40/strict.dtd"&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name="qrichtext" content="1" /&gt;&lt;style type="text/css"&gt;
-p, li { white-space: pre-wrap; }
-&lt;/style&gt;&lt;/head&gt;&lt;body style=" font-family:'Roboto'; ; font-weight:400; font-style:normal;"&gt;
-&lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;Rate at which the position and speed controllers run.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
+            <description>&lt;p&gt;Rate of the speed and position PID. The RESC control layer runs at 1 kHz at most.&lt;/p&gt;</description>
             <cDefine>MCCONF_SP_PID_LOOP_RATE</cDefine>
             <valInt>5</valInt>
             <enumNames>25 Hz</enumNames>
