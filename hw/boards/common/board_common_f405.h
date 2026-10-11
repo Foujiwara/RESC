@@ -193,6 +193,16 @@
 #define BOARD_UART2_RX_PIN      HW_PIN_NONE
 #endif
 /* I2C2 sur les memes broches que l'UART (149 cartes) : usage exclusif */
+/* IMU interne (I2C logiciel) : aucune par defaut */
+#ifndef BOARD_IMU_SDA_PIN
+#define BOARD_IMU_SDA_PIN       HW_PIN_NONE
+#endif
+#ifndef BOARD_IMU_SCL_PIN
+#define BOARD_IMU_SCL_PIN       HW_PIN_NONE
+#endif
+#ifndef BOARD_IMU_FLIP
+#define BOARD_IMU_FLIP          0
+#endif
 #ifndef BOARD_I2C_SCL_PIN
 #define BOARD_I2C_SCL_PIN       BOARD_UART_TX_PIN
 #endif

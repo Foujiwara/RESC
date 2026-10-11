@@ -126,15 +126,15 @@ def main():
     for k, f in files.items():
         root = ET.parse(os.path.join(CONF, f)).getroot()
         emap = json.load(open(os.path.join(CONF, "resc_enum_map.json"))) if prof == "resc" else {}
-        if prof == "resc" and k == "mc":
+        if prof == "resc":
             # choix absents sur cette carte : retires de la liste (signature et table de la carte)
-            emap = board_enum.reduce(root, emap, set(data.get("caps", [])))
+            emap = board_enum.reduce(root, emap, set(data.get("caps", [])), k)
         sig0 = signature(root)
         n = patch(root, data[k], data["limits"], emap)
         if signature(root) != sig0:
             raise SystemExit("signature modifiee : interdit")
-        if prof == "resc" and k == "mc":
-            lines += board_enum.c_lines(emap, sig0)
+        if prof == "resc":
+            lines += board_enum.c_lines(k, emap, sig0)
         ET.indent(root, space="    ")
         raw = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
         if len(sys.argv) > 4:

@@ -15,6 +15,8 @@ static const uint8_t KEEP_CAN_STATUS_MSGS_R1[] = { 0, 1, 2, 3, 4, 5 };
 static const uint8_t KEEP_CAN_STATUS_MSGS_R2[] = { 0, 1, 2, 3, 4, 5 };
 static const uint8_t KEEP_FOC_HFI_AMB_MODE[] = { 1, 2 };
 static const uint8_t KEEP_FOC_OFFSETS_CAL_MODE[] = { 0 };
+static const uint8_t KEEP_IMU_CONF_FILTER[] = { 0, 1, 2 };
+static const uint8_t KEEP_IMU_CONF_MODE[] = { 0, 1, 2 };
 static const uint8_t KEEP_L_ADDITIONAL_FAULTS[] = { 0, 1, 3 };
 static const uint8_t KEEP_M_OUT_AUX_MODE[] = { 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12 };
 static const uint8_t KEEP_SP_PID_LOOP_RATE[] = { 0, 1, 2, 3, 4, 5 };
@@ -1515,7 +1517,7 @@ bool vesc700_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t
 int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
 {
     int32_t i = 0;
-    vb_put_u32(buf, RESCP_APPCONF_SIGNATURE, &i);
+    vb_put_u32(buf, g_rescp_appconf_sig, &i);
     buf[i++] = (uint8_t)c->controller_id;
     vb_put_u32(buf, c->timeout_msec, &i);
     vb_put_f32_auto(buf, c->timeout_brake_current, &i);
@@ -1596,14 +1598,35 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     vb_put_f16(buf, c->app_pas_conf_ramp_time_pos, 100, &i);
     vb_put_f16(buf, c->app_pas_conf_ramp_time_neg, 100, &i);
     vb_put_u16(buf, c->app_pas_conf_update_rate_hz, &i);
+    buf[i++] = map_out((uint8_t)c->imu_conf_type, g_keepb_imu_conf_type, g_keepb_imu_conf_type_n);
+    buf[i++] = map_out((uint8_t)c->imu_conf_mode, KEEP_IMU_CONF_MODE, 3);
+    buf[i++] = map_out((uint8_t)c->imu_conf_filter, KEEP_IMU_CONF_FILTER, 3);
+    vb_put_f16(buf, c->imu_conf_accel_lowpass_filter_x, 1, &i);
+    vb_put_f16(buf, c->imu_conf_accel_lowpass_filter_y, 1, &i);
+    vb_put_f16(buf, c->imu_conf_accel_lowpass_filter_z, 1, &i);
+    vb_put_f16(buf, c->imu_conf_gyro_lowpass_filter, 1, &i);
+    vb_put_u16(buf, c->imu_conf_sample_rate_hz, &i);
+    vb_put_f32_auto(buf, c->imu_conf_accel_confidence_decay, &i);
+    vb_put_f32_auto(buf, c->imu_conf_mahony_kp, &i);
+    vb_put_f32_auto(buf, c->imu_conf_mahony_ki, &i);
+    vb_put_f32_auto(buf, c->imu_conf_madgwick_beta, &i);
+    vb_put_f32_auto(buf, c->imu_conf_rot_roll, &i);
+    vb_put_f32_auto(buf, c->imu_conf_rot_pitch, &i);
+    vb_put_f32_auto(buf, c->imu_conf_rot_yaw, &i);
+    vb_put_f32_auto(buf, c->imu_conf_accel_offsets_0, &i);
+    vb_put_f32_auto(buf, c->imu_conf_accel_offsets_1, &i);
+    vb_put_f32_auto(buf, c->imu_conf_accel_offsets_2, &i);
+    vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_0, &i);
+    vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_1, &i);
+    vb_put_f32_auto(buf, c->imu_conf_gyro_offsets_2, &i);
     return i;
 }
 
 bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
 {
     int32_t i = 0;
-    if (len < 196) return false;
-    if (vb_get_u32(buf, &i) != RESCP_APPCONF_SIGNATURE) return false;
+    if (len < 261) return false;
+    if (vb_get_u32(buf, &i) != g_rescp_appconf_sig) return false;
     c->controller_id = (float)buf[i++];
     c->timeout_msec = vb_get_u32(buf, &i);
     c->timeout_brake_current = vb_get_f32_auto(buf, &i);
@@ -1684,6 +1707,27 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->app_pas_conf_ramp_time_pos = vb_get_f16(buf, 100, &i);
     c->app_pas_conf_ramp_time_neg = vb_get_f16(buf, 100, &i);
     c->app_pas_conf_update_rate_hz = vb_get_u16(buf, &i);
+    c->imu_conf_type = (uint8_t)map_in(buf[i++], g_keepb_imu_conf_type, g_keepb_imu_conf_type_n);
+    c->imu_conf_mode = (uint8_t)map_in(buf[i++], KEEP_IMU_CONF_MODE, 3);
+    c->imu_conf_filter = (uint8_t)map_in(buf[i++], KEEP_IMU_CONF_FILTER, 3);
+    c->imu_conf_accel_lowpass_filter_x = vb_get_f16(buf, 1, &i);
+    c->imu_conf_accel_lowpass_filter_y = vb_get_f16(buf, 1, &i);
+    c->imu_conf_accel_lowpass_filter_z = vb_get_f16(buf, 1, &i);
+    c->imu_conf_gyro_lowpass_filter = vb_get_f16(buf, 1, &i);
+    c->imu_conf_sample_rate_hz = vb_get_u16(buf, &i);
+    c->imu_conf_accel_confidence_decay = vb_get_f32_auto(buf, &i);
+    c->imu_conf_mahony_kp = vb_get_f32_auto(buf, &i);
+    c->imu_conf_mahony_ki = vb_get_f32_auto(buf, &i);
+    c->imu_conf_madgwick_beta = vb_get_f32_auto(buf, &i);
+    c->imu_conf_rot_roll = vb_get_f32_auto(buf, &i);
+    c->imu_conf_rot_pitch = vb_get_f32_auto(buf, &i);
+    c->imu_conf_rot_yaw = vb_get_f32_auto(buf, &i);
+    c->imu_conf_accel_offsets_0 = vb_get_f32_auto(buf, &i);
+    c->imu_conf_accel_offsets_1 = vb_get_f32_auto(buf, &i);
+    c->imu_conf_accel_offsets_2 = vb_get_f32_auto(buf, &i);
+    c->imu_conf_gyro_offsets_0 = vb_get_f32_auto(buf, &i);
+    c->imu_conf_gyro_offsets_1 = vb_get_f32_auto(buf, &i);
+    c->imu_conf_gyro_offsets_2 = vb_get_f32_auto(buf, &i);
     return true;
 }
 
@@ -1949,7 +1993,7 @@ const conf_field_t vesc_appconf_fields[] = {
 const uint16_t vesc_appconf_nfields = 121;
 
 
-/* choix dependant de la carte (tools/resc_conf/board_enum.py) */
+/* choix dependant de la carte (mcconf, tools/resc_conf/board_enum.py) */
 __attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 480116984u;
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
@@ -1957,3 +2001,8 @@ __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode_n = 3;
 __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 1, 2, 3, 4, 7, 8, 10, 13, 15, 16 };
 __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 10;
+
+/* choix dependant de la carte (appconf, tools/resc_conf/board_enum.py) */
+__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 2038491941u;
+__attribute__((weak)) const uint8_t g_keepb_imu_conf_type[] = { 0, 1, 4 };
+__attribute__((weak)) const uint8_t g_keepb_imu_conf_type_n = 3;

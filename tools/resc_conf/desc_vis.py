@@ -148,6 +148,15 @@ VIS_APP = {
     "app_chuk_conf.tc": "app->app_chuk_conf_multi_esc",
     "app_chuk_conf.tc_max_diff": "(app->app_chuk_conf_multi_esc && app->app_chuk_conf_tc)",
 }
+IMU_ON = "(app->imu_conf_type != 0)"
+for _p in ("mode", "filter", "accel_lowpass_filter_x", "accel_lowpass_filter_y", "accel_lowpass_filter_z",
+           "gyro_lowpass_filter", "sample_rate_hz", "accel_confidence_decay", "rot_roll", "rot_pitch", "rot_yaw",
+           "accel_offsets__0", "accel_offsets__1", "accel_offsets__2", "gyro_offsets__0", "gyro_offsets__1",
+           "gyro_offsets__2"):
+    VIS_APP["imu_conf." + _p] = IMU_ON
+VIS_APP["imu_conf.mahony_kp"] = both(IMU_ON, "app->imu_conf_mode == 1")
+VIS_APP["imu_conf.mahony_ki"] = both(IMU_ON, "app->imu_conf_mode == 1")
+VIS_APP["imu_conf.madgwick_beta"] = both(IMU_ON, "app->imu_conf_mode != 1")
 
 SUFFIX = b"</Grouping>\n</ConfigParams>\n"
 

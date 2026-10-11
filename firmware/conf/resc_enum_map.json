@@ -79,6 +79,30 @@
    12
   ]
  },
+ "imu_conf_type": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   4
+  ]
+ },
+ "imu_conf_mode": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   2
+  ]
+ },
+ "imu_conf_filter": {
+  "bits": false,
+  "keep": [
+   0,
+   1,
+   2
+  ]
+ },
  "can_status_msgs_r1": {
   "bits": true,
   "keep": [

@@ -33,12 +33,14 @@ int main(void)
     resc_conf_defaults_app(&g_appconf);
     printf("{\n  \"board\": \"%s\",\n", BOARD_NAME);
     /* capacites de la carte pour les choix qui en dependent (tools/resc_conf/board_enum.py) */
-    printf("  \"caps\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],\n",
+    printf("  \"caps\": [\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],\n",
            BOARD_CS_TOPOLOGY == HW_CS_INLINE_3 ? "inline" : "",
            BOARD_CS_TOPOLOGY != HW_CS_LOWSIDE_2 ? "three" : "",
            (BOARD_SPI_SCK_PIN != HW_PIN_NONE && BOARD_SPI_MISO_PIN != HW_PIN_NONE) ? "spi" : "",
            (BOARD_SERVO_PIN != HW_PIN_NONE && BOARD_ENC_TIM != 4) ? "servo" : "",
-           (BOARD_ADC_EXT1_CH != HW_ADC_CH_NONE && BOARD_ADC_EXT2_CH != HW_ADC_CH_NONE) ? "adc2" : "");
+           (BOARD_ADC_EXT1_CH != HW_ADC_CH_NONE && BOARD_ADC_EXT2_CH != HW_ADC_CH_NONE) ? "adc2" : "",
+           (BOARD_IMU_SDA_PIN != HW_PIN_NONE && BOARD_IMU_SCL_PIN != HW_PIN_NONE) ? "imu" : "",
+           (BOARD_I2C_SDA_PIN != HW_PIN_NONE && BOARD_I2C_SCL_PIN != HW_PIN_NONE) ? "i2c" : "");
     printf("  \"limits\": {\"i_motor\": %g, \"i_input\": %g, \"i_abs\": %g, \"vbus_min\": %g, \"vbus_max\": %g, "
            "\"erpm\": %g, \"f_pwm_min\": %g, \"f_pwm_max\": %g, \"duty_max\": %g, \"t_fet\": %g, \"cap\": %g},\n",
            (double)HWLIM_I_MOTOR_A, (double)HWLIM_I_INPUT_A, (double)HWLIM_I_ABS_TRIP_A, (double)HWLIM_VBUS_MIN_V,
