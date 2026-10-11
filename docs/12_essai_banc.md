@@ -26,11 +26,25 @@ Le fichier fait exactement 1 048 576 octets. Il contient le firmware VESC, sa co
 
 ## 2. Flasher RESC
 
+**Mise à jour en gardant la configuration** (R, L, flux, limites, apps). Recommandée dès qu'une configuration existe : on flashe les vecteurs, puis l'application. Les secteurs de configuration (1-2) ne sont pas touchés.
+
+```bash
+"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/release/resc_ubox_single_85_200_vec.bin 0x08000000 -V
+```
+
+```bash
+"/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/release/resc_ubox_single_85_200_app.bin 0x0800C000 -V -Rst
+```
+
+Au premier démarrage d'une nouvelle version, la configuration est relue champ par champ. Celle de RESC 0.1 est convertie : la commande `status` affiche « MIGRÉE ».
+
+**Installation complète**, qui remet la configuration aux valeurs par défaut :
+
 ```bash
 "/c/Program Files (x86)/STMicroelectronics/STM32 ST-LINK Utility/ST-LINK Utility/ST-LINK_CLI.exe" -c SWD UR -P firmware/release/resc_ubox_single_85_200.bin 0x08000000 -V -Rst
 ```
 
-Le `.bin` doit être écrit **à l'adresse 0x08000000**. Il couvre 0x08000000 à 0x08023DF8 (secteurs 0 à 5) ; la zone de configuration (secteurs 1-2) y est à 0xFF, donc RESC démarre sur ses valeurs par défaut. Le bootloader VESC du secteur 11 n'est pas touché.
+Le `.bin` complet doit être écrit **à l'adresse 0x08000000**. Il couvre les secteurs 0 à 5. La zone de configuration (secteurs 1-2) y est à 0xFF : RESC démarre donc sur ses valeurs par défaut. Le bootloader VESC du secteur 11 n'est pas touché.
 
 Avec l'interface graphique de ST-LINK Utility : *Target → Program & Verify*, fichier `resc_ubox_single_85_200.bin`, adresse de départ `0x08000000`, case *Reset after programming* cochée.
 

@@ -1,24 +1,26 @@
 # RESC — Firmware FOC haute performance pour STM32F405RGT6
 
-Firmware de commande moteur PMSM/BLDC **entièrement nouveau**. Il n'est pas dérivé de VESC.
+Firmware de commande moteur PMSM/BLDC et asynchrone **entièrement nouveau**. Il n'est pas dérivé de VESC.
 Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs existants, RESC reprend de VESC (`release_7_00`) les **protocoles CAN/UART**, le **format et les valeurs par défaut de la configuration**, et des **données de cartes** (brochages, valeurs). Le détail est dans [NOTICE.md](NOTICE.md). Le cœur de commande (FOC, observateurs, contrôle, protections, détections) est un développement indépendant.
 
-> **État : firmware v0.1, premier essai sur carte réussi** (connexion USB et VESC Tool, données temps réel, paramètres, rotation du moteur après détection du flux). Détection R/L corrigée, à revalider sur la carte.
-> Carte de test : **Ubox SINGLE 85_200**. Procédure : [docs/12_essai_banc.md](docs/12_essai_banc.md).
+> **État : firmware 1.0, validé en simulation et par tests PC, pas encore essayé sur la carte.** La v0.1 a été essayée sur carte (USB, VESC Tool, données temps réel, rotation après détection du flux).
+> Carte de test : **Ubox SINGLE 85_200**. Procédure : [docs/12_essai_banc.md](docs/12_essai_banc.md). Fonctions et réglages : [docs/14_fonctions_v1.md](docs/14_fonctions_v1.md).
 
 ## Firmware
 
 | Élément | Où | État |
 |---|---|---|
-| Cœur FOC RESC (PI d/q découplé, anti-windup, SVPWM, compensation du retard, reconstruction 3 shunts) | `firmware/src/core/foc.c` | simulation OK |
-| Observateur de flux actif non linéaire + PLL | `firmware/src/core/observer.c` | simulation OK |
-| Hall (interpolation bornée au secteur) et codeur ABI, bascule vers l'observateur | `firmware/src/core/angle_sensors.c` | simulation OK |
-| Démarrage I/f avec relais sans à-coup, reprise au vol | `foc.c` | simulation OK |
-| Détections manuelles RESC : offsets, R/L, flux, Hall, codeur (pas d'auto-configuration) | `foc.c`, `app/detect_app.c` | simulation OK |
-| Applications de contrôle : courant, frein, duty, vitesse, timeout, déclassements | `firmware/src/core/ctrl.c` | simulation OK |
-| Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break | `foc.c`, `bsp/motor_hw.c` | partiellement simulé |
-| STM32F405 : TIM1, ADC triple, UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **à valider sur carte** |
-| Protocole (USB/UART/CAN), configuration VESC Tool 7.00, terminal | `firmware/src/comm/`, `firmware/src/vesc/` | tests PC OK |
+| Cœur FOC RESC (PI d/q, anticipation configurable, anti-windup, SVPWM, compensation du retard, reconstruction 3 shunts) | `firmware/src/core/foc.c` | simulation OK |
+| 7 observateurs : flux actif non linéaire, rappel radial, FEM de Luenberger, hybride ; λ adaptatif | `firmware/src/core/observer.c` | simulation OK |
+| Capteurs : Hall (mélange vers l'observateur, vote majoritaire), codeur ABI, HFI, VSS | `core/foc.c`, `core/angle_sensors.c` | simulation OK |
+| Démarrage I/f amorti, options sensorless VESC, compensation saturation et température, MTPA, défluxage, filtres de phase | `foc.c` | simulation OK |
+| Moteur à induction : flux rotorique orienté, codeur ou sans capteur, identification Lm/Lr/Rr | `foc.c`, `app/detect_app.c` | simulation OK |
+| Détections manuelles : offsets courant et tension, R/L (3 paliers), flux, Hall, codeur, induction | `foc.c`, `app/detect_app.c` | simulation OK |
+| Contrôle : courant, frein, duty (frein de descente), vitesse, position, boucle ouverte, limitations | `firmware/src/core/ctrl.c` | simulation OK |
+| Applications : PPM, ADC, VESC Remote, PAS, multi-contrôleurs CAN avec antipatinage, arrêt d'urgence | `firmware/src/app/apps.c`, `bsp/inputs.c` | tests PC OK |
+| Configuration : profils VESC700 / RESC générés depuis les XML, commande 250, stockage par nom avec migration | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/` | tests PC OK |
+| Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break, survitesse | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partiellement simulé |
+| STM32F405 : TIM1, ADC triple, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **à valider sur carte** |
 
 ```bash
 python firmware/build.py
@@ -28,7 +30,13 @@ python firmware/build.py
 python firmware/build.py --sim
 ```
 
-Images prêtes à flasher : `firmware/release/resc_ubox_single_85_200.hex` / `.bin`. Console : `python tools/resc_cli.py`.
+```bash
+python firmware/build.py --tests
+```
+
+Profil RESC (pour RESC Tool, à ne pas distribuer avant la version de l'outil qui lit la description) : `python firmware/build.py --conf resc`.
+
+Images prêtes à flasher (profil VESC700) : `firmware/release/resc_ubox_single_85_200.bin` / `.hex`. Console : `python tools/resc_cli.py`.
 
 ## Convention de fiabilité (utilisée dans tous les documents)
 
@@ -54,6 +62,7 @@ Images prêtes à flasher : `firmware/release/resc_ubox_single_85_200.hex` / `.b
 | 10 | [Feuille de route](docs/10_feuille_de_route.md) | Étapes, critères de passage, validation |
 | 11 | [Cartes supportées](docs/11_cartes_vesc.md) | Configuration matérielle compatible VESC, recensement, carte Ubox de référence |
 | 12 | [Premier essai au banc](docs/12_essai_banc.md) | Sauvegarde, flashage, vérifications, détections, premiers tours |
+| 14 | [Fonctions RESC 1.0](docs/14_fonctions_v1.md) | Observateurs, capteurs, sensorless, filtres de phase, applications, induction, profils |
 
 ## Configuration matérielle
 

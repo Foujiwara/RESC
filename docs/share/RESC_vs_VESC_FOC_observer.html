@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RESC vs VESC - FOC and observer</title>
+<style>
+  @page { size: A4; margin: 14mm 13mm 14mm 13mm; }
+  :root { --ink:#1b1f24; --muted:#5a6370; --line:#d5dae1; --head:#eef2f6; --accent:#1f5fa8; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: var(--ink); font-size: 9.2pt; line-height: 1.38; margin: 0; background:#fff; }
+  h1 { font-size: 17pt; margin: 0 0 2pt; color: var(--accent); }
+  .sub { color: var(--muted); font-size: 9pt; margin-bottom: 9pt; }
+  h2 { font-size: 11.5pt; margin: 12pt 0 5pt; padding-bottom: 2pt; border-bottom: 1.5pt solid var(--accent); color: var(--accent); break-after: avoid; }
+  p { margin: 0 0 5pt; }
+  .summary { background: var(--head); border-left: 3pt solid var(--accent); padding: 6pt 9pt; margin: 4pt 0 6pt; }
+  table { width: 100%; border-collapse: collapse; margin: 2pt 0 4pt; break-inside: auto; }
+  tr { break-inside: avoid; }
+  th, td { border: 0.6pt solid var(--line); padding: 3.5pt 5pt; vertical-align: top; text-align: left; }
+  th { background: var(--head); font-weight: 600; }
+  td:first-child { font-weight: 600; width: 17%; }
+  table.three td:nth-child(2) { width: 30%; color: #3b4450; }
+  code { font-family: Consolas, monospace; font-size: 8.6pt; background: #f3f5f8; padding: 0 2pt; border-radius: 2pt; }
+  ul { margin: 2pt 0 5pt 14pt; padding: 0; }
+  li { margin: 1pt 0; }
+  .two { display: flex; gap: 10pt; }
+  .two > div { flex: 1; }
+  .box { border: 0.6pt solid var(--line); border-radius: 3pt; padding: 5pt 8pt; }
+  .box h3 { font-size: 9.6pt; margin: 0 0 3pt; }
+  .ok { color: #1e7a3c; font-weight: 600; }
+  .open { color: #a35a00; font-weight: 600; }
+  .foot { margin-top: 10pt; color: var(--muted); font-size: 8pt; border-top: 0.6pt solid var(--line); padding-top: 4pt; }
+</style>
+</head>
+<body>
+
+<h1>RESC vs VESC — FOC core and observer</h1>
+<div class="sub">RESC v0.1 · STM32F405 · reference compared: VESC firmware <code>release_7_00</code> · October 2026</div>
+
+<div class="summary">
+<b>In short.</b> RESC and VESC share the same textbook building blocks: amplitude-invariant Clarke/Park, d/q PI current
+loop, SVPWM, nonlinear flux observer with PLL. The <b>implementation and the logic around them are RESC's own</b>
+(an independent audit found no copied FOC code). RESC keeps VESC <b>interfaces</b> (protocol, configuration format,
+meaning of gains) so VESC Tool, displays and controllers keep working. VESC currently has many more features.
+</div>
+
+<h2>1. Observer</h2>
+<table class="three">
+<tr><th>Topic</th><th>VESC 7.00</th><th>RESC</th></tr>
+<tr><td>Base method</td><td>Nonlinear flux observer (Lee / Ortega et al., 2010), several selectable variants</td><td>Same family, written as an <b>active-flux</b> observer (Boldea): magnitude constraint <code>λ + (Ld − Lq)·id</code>; one equation for non-salient and salient (IPM) motors</td></tr>
+<tr><td>Gain meaning</td><td><code>foc_observer_gain</code> ≈ γ, γλ² ≈ 1000 rad/s after detection</td><td><b>Same meaning, kept on purpose</b> so VESC Tool values stay valid</td></tr>
+<tr><td>Discrete stability</td><td>Gain used as configured</td><td>Correction <b>clamped</b> (γλ²·dt ≤ 0.2, step ≤ 0.5): an excessive gain cannot make the update diverge</td></tr>
+<tr><td>Voltage input</td><td>Applied voltage from the modulation</td><td><b>Average of the two duty sets actually applied</b> during the sampled interval, minus a current-sign dead-time term; bridge off: measured phase voltages (flying start)</td></tr>
+<tr><td>Speed output</td><td>PLL speed</td><td><b>Derivative of the PLL angle</b> (<code>ω_int + kp·e</code>). With default PLL gains the integrator alone lagged ~30 % under acceleration in simulation</td></tr>
+<tr><td>Health check</td><td>—</td><td>Estimated / expected flux ratio monitored: outside 0.5–2 for 20 ms → sync-loss fault</td></tr>
+<tr><td>Variants, extras</td><td>Several observer types, low-speed gain, offset, R/λ temperature compensation, HFI</td><td>One observer, no temperature compensation, no HFI yet. Parallel observer comparison is planned but not implemented</td></tr>
+</table>
+
+<h2>2. Start-up and handover</h2>
+<table class="three">
+<tr><th>Topic</th><th>VESC 7.00</th><th>RESC</th></tr>
+<tr><td>Sensorless start</td><td>Open loop at <code>foc_openloop_rpm</code>, lock / ramp times, start current</td><td><b>I/f</b>: current on the q axis of the open-loop frame, alignment, then speed ramp</td></tr>
+<tr><td>Switch to observer</td><td>Speed thresholds</td><td><b>Only when the observer is locked</b>: flux ratio 0.75–1.3 and observer speed within 25 % of open-loop speed, for 20 ms</td></tr>
+<tr><td>Continuity</td><td>—</td><td>At handover, current references <b>and PI integrators are rotated</b> into the observer frame (back-EMF removed from integrators): no current or torque step</td></tr>
+<tr><td>Failure</td><td>—</td><td>Timeout → start fault; below exit speed while running → back to I/f</td></tr>
+<tr><td>Hall sensors</td><td>Table + interpolation</td><td>Edge angle = <b>circular midpoint</b> of sector centres; speed from same-direction edges; extrapolation <b>bounded to the current sector</b></td></tr>
+<tr><td>Hall ↔ observer</td><td>Transition around <code>foc_sl_erpm</code></td><td><b>Hysteresis switch</b> at 0.9 / 1.1 × <code>foc_sl_erpm</code> (no blending: small angle step possible if the Hall table is inaccurate)</td></tr>
+<tr><td>Encoder</td><td>ABI, SPI, sin/cos</td><td>ABI only (timer in x4 mode)</td></tr>
+</table>
+
+<h2>3. Current loop</h2>
+<table class="three">
+<tr><th>Topic</th><th>VESC 7.00</th><th>RESC</th></tr>
+<tr><td>Structure</td><td>d/q PI, decoupling optional</td><td>d/q PI with decoupling and back-EMF feedforward <b>always on</b>, computed from <b>reference</b> currents (less noise)</td></tr>
+<tr><td>Gains</td><td><code>kp = L·bw</code>, <code>ki = R·bw</code></td><td><b>Same meaning</b>; computed automatically after R/L detection (bw = 1000 rad/s)</td></tr>
+<tr><td>Voltage limit</td><td>Voltage limiting</td><td>Circle <code>m_max·Vbus/√3</code>, <b>d axis first</b>, q in the remaining voltage</td></tr>
+<tr><td>Anti-windup</td><td>Integrator limiting</td><td><b>Tracking</b>: on saturation the integrator is recomputed to match the saturated output</td></tr>
+<tr><td>Delay compensation</td><td>Yes, in its own form</td><td>Inverse Park at <code>θ + ω·1.0·Ts</code>: new duty starts at the valley after the sample and is held one period</td></tr>
+<tr><td>Duty mode</td><td>Duty / voltage control</td><td><b>Always through the current loop</b> (PI on duty → iq): current limits stay active</td></tr>
+</table>
+
+<h2>4. Current sensing (3 low-side shunts)</h2>
+<table class="three">
+<tr><th>Topic</th><th>VESC 7.00</th><th>RESC</th></tr>
+<tr><td>ADC trigger</td><td>TIM8 slaved to TIM1</td><td>TIM1 OC4REF → TRGO, <b>centred</b> on the zero-vector window at the counter peak</td></tr>
+<tr><td>Conversions</td><td>DMA regular group + injected currents</td><td><b>Injected only</b>: 3 ADCs simultaneous; slow channels rotate on ranks 3–4</td></tr>
+<tr><td>Phase validity</td><td>Modes with a fixed duty threshold in timer ticks</td><td>Per phase from the <b>actual low-side window time</b> vs <code>T_win</code>; rebuilt from 2 valid phases; predicted if fewer</td></tr>
+<tr><td>Modulation</td><td>Max duty setting</td><td>Also <b>bounded so two phases are always measurable</b> in linear SVPWM</td></tr>
+<tr><td>Fast overcurrent</td><td>Software check in the ISR</td><td>Software check + <b>ADC analog watchdog</b>, armed each period only on valid phases: cut ~1.5 µs after the sample, before the FOC computation</td></tr>
+</table>
+
+<h2>5. Motor identification (manual)</h2>
+<table class="three">
+<tr><th>Measure</th><th>VESC 7.00</th><th>RESC</th></tr>
+<tr><td>R</td><td>Current stepped until the resistive drop is large enough</td><td>Current ×1.5 until <b>≥ 1 V drop</b>, then <b>R = ΔV/ΔI between ½·I and I</b> (constant dead-time error cancels); warning if &lt; 1 V</td></tr>
+<tr><td>Ld / Lq</td><td>Own inductance measurement</td><td><b>± voltage pulses on d, then q</b>, at a DC bias; only constant-voltage intervals used; adaptive amplitude</td></tr>
+<tr><td>λ (flux)</td><td>Open-loop spin, then measurement</td><td>Ramp to a target duty; back-EMF <b>bridge on and bridge off</b>; rejected if they differ by more than 35 % (rotor slipped)</td></tr>
+<tr><td>Hall / encoder</td><td>Own procedures</td><td>Slow rotation at fixed d current, 3 turns forward / back / forward, circular averages; encoder: ratio and direction, then offset</td></tr>
+<tr><td>Auto wizard</td><td>Full automatic detection and configuration</td><td><b>Disabled on purpose</b>: manual detections only, each followed by automatic computation of dependent gains</td></tr>
+</table>
+
+<h2>6. Status</h2>
+<div class="two">
+  <div class="box">
+    <h3>Not yet in RESC (present in VESC)</h3>
+    <ul>
+      <li>Field weakening, MTPA, HFI, position control</li>
+      <li>R/λ temperature compensation, observer ↔ sensor blending</li>
+      <li>Parallel observer comparison</li>
+      <li>SPI and sin/cos encoders, dual motor</li>
+    </ul>
+  </div>
+  <div class="box">
+    <h3>Validation</h3>
+    <ul>
+      <li><span class="ok">Simulation:</span> 45/45 closed-loop checks (motor, inverter, Ubox ADC model)</li>
+      <li><span class="ok">Real board:</span> USB, VESC Tool, real-time data, smooth rotation after flux detection</li>
+      <li><span class="open">To validate on hardware:</span> new R/L procedure, higher power</li>
+      <li><span class="open">Open:</span> no hardware-independent overcurrent cut on the Ubox board</li>
+    </ul>
+  </div>
+</div>
+
+<div class="foot">
+RESC — independent FOC firmware for STM32F405 boards compatible with VESC hardware · GPL v3 ·
+github.com/Foujiwara/RESC · VESC reference: github.com/vedderb/bldc (release_7_00, GPL v3).
+Experimental power-electronics firmware; bench use with current-limited supply.
+</div>
+
+</body>
+</html>
