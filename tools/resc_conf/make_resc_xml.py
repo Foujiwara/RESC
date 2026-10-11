@@ -369,6 +369,35 @@ VIEW_EDIT_MC = {
 }
 
 
+# Toujours transmis mais jamais affiches : RESC Tool lit leur valeur pour choisir ses pages
+# (motor_type = FOC -> page FOC), l'utilisateur n'a rien a y choisir.
+MC_HIDE = ["motor_type"]
+
+
+def drop_unserialized(root):
+    """Retire les fiches que le firmware ne recoit pas (marque, modele, poids, qualite du moteur...)."""
+    params, ser = root.find("Params"), {s.text for s in root.find("SerOrder")}
+    names = [p.tag for p in list(params) if p.tag not in ser]
+    for n in names:
+        params.remove(params.find(n))
+    for sub in root.iter("subgroupParams"):
+        for p in list(sub):
+            if p.text in names:
+                sub.remove(p)
+
+
+def drop_empty_tabs(root):
+    """Retire de <Grouping> les onglets sans parametre (separateurs seuls) et les groupes vides."""
+    grouping = root.find("Grouping")
+    for g in list(grouping):
+        for sg in list(g.findall("subgroup")):
+            sp = sg.find("subgroupParams")
+            if sp is None or not [p for p in sp if not p.text.startswith("::sep::")]:
+                g.remove(sg)
+        if not g.findall("subgroup"):
+            grouping.remove(g)
+
+
 def main():
     mc = ET.parse(os.path.join(SRC, "parameters_mcconf.xml")).getroot()
     app = ET.parse(os.path.join(SRC, "parameters_appconf.xml")).getroot()
@@ -377,6 +406,11 @@ def main():
     add(mc, MC_ADD)
     remove(app, APP_REMOVE)
     edit(app, APP_EDIT)
+    remove(mc, MC_HIDE, hide_only=True)
+    drop_unserialized(mc)
+    drop_unserialized(app)
+    drop_empty_tabs(mc)
+    drop_empty_tabs(app)
     emap = {}
     apply_keep(mc, ENUM_KEEP, emap)
     apply_keep(app, APP_ENUM_KEEP, emap)
