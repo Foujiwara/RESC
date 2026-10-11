@@ -165,11 +165,9 @@ static void set_state(foc_state_t s)
 
 static void obs_cfg_from_params(void)
 {
-    obs_kind_from_type(S.p.obs_type, &S.oc.kind, &S.oc.lambda_adapt);
+    S.oc.kind = S.p.obs_type < OBS_COUNT ? (obs_kind_t)S.p.obs_type : OBS_RESC_ACTIVE_FLUX;
     S.oc.gain_slow = fm_sat(S.p.obs_gain_slow, 0.0f, 1.0f);
     S.oc.offset = S.p.obs_offset;
-    S.oc.hyb_w1 = S.p.st_omega;
-    S.oc.hyb_w2 = 3.0f * S.p.st_omega;
     S.oc.r = S.p.r;
     S.oc.ld = S.p.ld;
     S.oc.lq = S.p.lq;
@@ -188,6 +186,7 @@ static void apply_params(const foc_params_t *p)
     S.dt = 1.0f / S.p.f_pwm;
     obs_cfg_from_params();
     if (!(S.obs.lambda > 0.5f * S.oc.lambda && S.obs.lambda < 1.5f * S.oc.lambda)) S.obs.lambda = S.oc.lambda;
+    if (!(S.obs.lambda_est > 0.3f * S.oc.lambda && S.obs.lambda_est < 2.5f * S.oc.lambda)) S.obs.lambda_est = S.oc.lambda;
     S.lam_eff = S.obs.lambda;
 }
 
@@ -251,8 +250,7 @@ RAMFUNC static void motor_comp(void)
         /* flux actif d'un moteur asynchrone : (Lm/Lr) psi_r, module donne par le modele en courant */
         float nom = S.p.acim_lm * S.p.acim_lm / S.p.acim_lr * S.p.acim_im;
         S.oc.lambda = fm_max(S.p.acim_lm / S.p.acim_lr * S.psir, 0.05f * nom);
-        S.oc.lambda_adapt = false;
-        if (S.oc.kind != OBS_FLUX_PROJ) S.oc.kind = OBS_FLUX_NL;
+        S.oc.kind = OBS_RESC_ACTIVE_FLUX;     /* flux actif a module variable (modele en courant) */
     }
     float gmax = 0.2f / (S.oc.lambda * S.oc.lambda * S.dt);
     S.oc.gamma = S.p.obs_gamma < gmax ? S.p.obs_gamma : gmax;
@@ -1265,7 +1263,8 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             g_foc_telem.acim_slip = S.ws;
         }
         motor_comp();
-        S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* lambda reestime seulement en marche observee */
+        S.oc.id = S.id;
+        S.oc.iq = S.iq;
         float va, vb;
         applied_voltage(vph, &va, &vb);
 #ifdef RESC_HOST
@@ -1274,7 +1273,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         /* niveau de tension pour le gain a basse vitesse : modulation appliquee ou FEM
          * (pont coupe, la modulation est nulle mais la FEM renseigne la vitesse) */
         float m_obs = fm_max(S.duty_abs, fm_abs(S.obs.omega) * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f));
-        obs_update(&S.obs, &S.oc, va, vb, S.i_a, S.i_b, S.id, m_obs, dt);
+        obs_update(&S.obs, &S.oc, va, vb, S.i_a, S.i_b, m_obs, dt);
         S.lam_eff = S.obs.lambda;
     }
     float flux_ratio = S.obs.flux / S.lam_eff;
@@ -1556,7 +1555,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             else S.ol_omega = fm_max(S.ol_omega - acc * dt, target);
             /* amortissement : si l'observateur (plausible) voit le rotor plus rapide que la rampe,
              * l'angle impose le rattrape au lieu de le laisser depasser puis recaler en arriere */
-            if (S.oc.kind != OBS_BEMF && flux_ratio > 0.6f && flux_ratio < 1.5f &&
+            if (flux_ratio > 0.6f && flux_ratio < 1.5f &&
                 S.obs.omega * (float)S.dir > S.ol_omega * (float)S.dir)
                 S.ol_omega += (S.obs.omega - S.ol_omega) * fm_min(200.0f * dt, 1.0f);
             S.ol_iq = (float)S.dir * fm_max(S.p.st_i, fm_abs(g_foc_cmd.iq_ref));

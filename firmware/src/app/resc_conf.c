@@ -274,7 +274,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->i_slew = 5000.0f;
 
     /* Observateur et compensations */
-    fp->obs_type = mc->foc_observer_type;
+    fp->obs_type = mc->foc_observer_type <= 7 ? mc->foc_observer_type : 7;
     fp->obs_gain_slow = fm_sat(mc->foc_observer_gain_slow, 0.0f, 1.0f);
 #ifdef RESC_CONF_PROFILE_RESC
     fp->obs_offset = fm_sat(mc->foc_observer_offset, -3.0f, 3.0f);
@@ -631,7 +631,7 @@ void resc_conf_init(void)
     if (s_load_mc == RESC_LOAD_MIGRATED) {
         /* RESC 0.x ignorait ces champs (comportement fixe) : la migration conserve le comportement
          * essaye ; les nouvelles fonctions s'activent ensuite une par une. */
-        mc.foc_observer_type = 0;             /* flux actif non lineaire */
+        mc.foc_observer_type = 7;             /* RESC_ACTIVE_FLUX, celui de RESC 0.x */
         mc.foc_observer_gain_slow = 1.0f;     /* gain plein a l'arret */
         mc.foc_cc_decoupling = 3;             /* anticipation croisee + FEM */
         mc.foc_phase_filter_enable = 0;       /* filtre de phase non utilise */

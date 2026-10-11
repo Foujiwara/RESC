@@ -1,30 +1,43 @@
+/*
+ * observer.c — Observateurs de position sensorless.
+ *
+ * Les observateurs 0 a 6 reprennent les equations des observateurs de VESC 7.00
+ * (motor/foc_math.c, foc_observer_update, Benjamin Vedder, GPL v3), memes coefficients et
+ * memes bornes, reecrits avec les structures RESC. References :
+ *  - Lee, Hong, Nam, Ortega, Praly, Astolfi, IEEE TPEL 2010 (observateur non lineaire)
+ *  - Bernard, Praly, IFAC 2017 (estimation du flux de l'aimant)
+ *
+ * MXLEMMING, note de licence de son auteur (reproduite comme elle le demande) :
+ *   "This function deviates slightly from the BSD 3 clause licence.
+ *    The work here is entirely original to the MESC FOC project, and not based
+ *    on any appnotes, or borrowed from another project. This work is free to
+ *    use, as granted in BSD 3 clause, with the exception that this note must
+ *    be included in where this code is implemented/modified to use your
+ *    variable names, structures containing variables or other minor
+ *    rearrangements in place of the original names I have chosen, and credit
+ *    to David Molony as the original author must be noted."
+ *   Auteur de l'observateur MXLEMMING : David Molony (projet MESC FOC).
+ *
+ * L'observateur 7 (RESC_ACTIVE_FLUX) est propre a RESC.
+ */
 #include "observer.h"
 #include "fmath.h"
 #include "platform.h"
 
-void obs_kind_from_type(uint8_t type, obs_kind_t *kind, bool *lambda_adapt)
+bool obs_lambda_comp(obs_kind_t k)
 {
-    static const uint8_t k[7] = { OBS_FLUX_NL, OBS_FLUX_PROJ, OBS_FLUX_NL, OBS_FLUX_PROJ, OBS_BEMF, OBS_BEMF, OBS_HYBRID };
-    static const bool    a[7] = { false, false, true, true, false, true, true };
-    if (type > 6) type = 0;
-    *kind = (obs_kind_t)k[type];
-    *lambda_adapt = a[type];
+    return k == OBS_ORTEGA_LAMBDA_COMP || k == OBS_MXLEMMING_LAMBDA_COMP || k == OBS_MXV_LAMBDA_COMP ||
+           k == OBS_MXV_LAMBDA_COMP_LIN;
 }
 
 void obs_reset(obs_t *o, const obs_cfg_t *c, float theta, float omega)
 {
     float s, co;
     fm_sincos(theta, &s, &co);
-    o->eta_a = c->lambda * co;
-    o->eta_b = c->lambda * s;
-    o->psi_a = o->eta_a;
-    o->psi_b = o->eta_b;
-    o->ea = -omega * c->lambda * s;
-    o->eb = omega * c->lambda * co;
-    o->ia_hat = o->ib_hat = 0.0f;
-    o->e_gain = 1.0f;
-    o->e_omega = omega;
-    o->e_theta = theta;
+    o->x1 = c->lambda * co;          /* courant nul : flux statorique = flux de l'aimant */
+    o->x2 = c->lambda * s;
+    o->ia_last = o->ib_last = 0.0f;
+    o->lambda_est = c->lambda;
     o->theta = theta;
     o->flux = c->lambda;
     o->lambda = c->lambda;
@@ -33,132 +46,118 @@ void obs_reset(obs_t *o, const obs_cfg_t *c, float theta, float omega)
     o->omega = omega;
 }
 
-/* Flux actif par le modele en tension ; correction non lineaire ou projection */
-RAMFUNC static void flux_step(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib,
-                              float id_est, float mod, float dt)
+/* Observateur RESC : flux actif eta = psi_s - Lq i, contrainte |eta| = lambda + (Ld - Lq) id */
+RAMFUNC static void resc_active_flux(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib,
+                                     float gamma, float dt)
 {
-    float lam_a = o->lambda + (c->ld - c->lq) * id_est;
-    if (lam_a < 0.1f * o->lambda) lam_a = 0.1f * o->lambda;
-
-    o->psi_a += (va - c->r * ia) * dt;
-    o->psi_b += (vb - c->r * ib) * dt;
-    float eta_a = o->psi_a - c->lq * ia;
-    float eta_b = o->psi_b - c->lq * ib;
-
-    if (c->kind == OBS_FLUX_PROJ) {
-        /* rappel radial lineaire vers lambda_a, gain 2|w| (min 200 rad/s) : une projection
-         * instantanee (gain infini) ne ramenerait l'erreur d'angle qu'au second ordre */
-        float m = fm_sqrt(eta_a * eta_a + eta_b * eta_b);
-        if (m > 1e-9f) {
-            float k = fm_min(fm_max(2.0f * fm_abs(o->omega), 200.0f) * dt, 1.0f);
-            float f = 1.0f + k * (lam_a / m - 1.0f);
-            eta_a *= f;
-            eta_b *= f;
-        } else {
-            eta_a = lam_a;
-            eta_b = 0.0f;
-        }
-    } else {
-        float slow = c->gain_slow + (1.0f - c->gain_slow) * fm_min(fm_abs(mod) * 2.0f, 1.0f);
-        float err = lam_a * lam_a - (eta_a * eta_a + eta_b * eta_b);
-        /* correction radiale, bornee pour rester stable en discret */
-        float corr = fm_sat_sym(0.5f * c->gamma * slow * err * dt, 0.5f);
-        eta_a += corr * eta_a;
-        eta_b += corr * eta_b;
-    }
-    o->psi_a = eta_a + c->lq * ia;
-    o->psi_b = eta_b + c->lq * ib;
-    o->eta_a = eta_a;
-    o->eta_b = eta_b;
+    float lam_a = c->lambda + (c->ld - c->lq) * c->id;
+    if (lam_a < 0.1f * c->lambda) lam_a = 0.1f * c->lambda;
+    o->x1 += (va - c->r * ia) * dt;
+    o->x2 += (vb - c->r * ib) * dt;
+    float eta_a = o->x1 - c->lq * ia;
+    float eta_b = o->x2 - c->lq * ib;
+    float err = lam_a * lam_a - (eta_a * eta_a + eta_b * eta_b);
+    float corr = fm_sat_sym(0.5f * gamma * err * dt, 0.5f);   /* bornee pour rester stable en discret */
+    eta_a += corr * eta_a;
+    eta_b += corr * eta_b;
+    o->x1 = eta_a + c->lq * ia;
+    o->x2 = eta_b + c->lq * ib;
+    o->theta = fm_atan2(eta_b, eta_a);
+    o->flux = fm_sqrt(eta_a * eta_a + eta_b * eta_b);
+    o->lambda = c->lambda;
 }
 
-/* Observateur de Luenberger sur le courant (pas de derivee du courant mesure) :
- *   L di^/dt = v - R i^ - e^ + L l1 (i - i^)      de^/dt = -k (i - i^)
- * poles : s^2 + 2 z wn s + wn^2, wn = max(3 |w|, 600) borne a 0.25/dt, z = 0.7.
- * e^ suit e avec la fonction de transfert H = wn^2 / (s^2 + 2 z wn s + wn^2) :
- * a la pulsation |w|, retard atan2(2 z wn |w|, wn^2 - w^2) et gain |H|, compenses. */
-#define BEMF_Z 0.7f
-RAMFUNC static void bemf_step(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib, float dt)
+RAMFUNC void obs_update(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib, float mod, float dt)
 {
-    float l = 0.5f * (c->ld + c->lq);
-    /* vitesse propre a l'observateur de FEM : rotation du vecteur e^ (independante de la PLL,
-     * sinon la compensation de retard, fonction de la vitesse, boucle sur elle-meme) */
-    float aw = fm_abs(o->e_omega);
-    float wn = fm_sat(3.0f * aw, 600.0f, 0.25f / dt);
-    float pa = o->ea, pb = o->eb;
-    float l1 = fm_max(2.0f * BEMF_Z * wn - c->r / l, 0.0f);
-    float k = l * wn * wn;
-    float ea_ = ia - o->ia_hat, eb_ = ib - o->ib_hat;          /* erreur d'estimation du courant */
-    o->ia_hat += (va - c->r * o->ia_hat - o->ea) * (dt / l) + l1 * ea_ * dt;
-    o->ib_hat += (vb - c->r * o->ib_hat - o->eb) * (dt / l) + l1 * eb_ * dt;
-    o->ea -= k * ea_ * dt;
-    o->eb -= k * eb_ * dt;
+    float slow = c->gain_slow + (1.0f - c->gain_slow) * fm_min(fm_abs(mod) * 2.0f, 1.0f);
+    float gamma = c->gamma * slow;
+    float lambda = c->lambda;
 
-    float re = wn * wn - aw * aw, im = 2.0f * BEMF_Z * wn * aw;
-    float hmag = wn * wn / fm_max(fm_sqrt(re * re + im * im), 1e-6f);
-    o->e_gain = hmag;
-    float e2 = o->ea * o->ea + o->eb * o->eb;
-    float emag = fm_sqrt(e2);
-    /* FEM trop faible devant le bruit : angle conserve (la PLL extrapole) */
-    if (emag < 0.05f * c->lambda * 300.0f) {
-        o->e_omega *= 0.999f;
-        return;
-    }
-    float wr = (pa * o->eb - pb * o->ea) / (e2 * dt);           /* rotation de e^ (rad/s) */
-    o->e_omega += (fm_sat_sym(wr, 0.5f / dt) - o->e_omega) * fm_min(50.0f * dt, 1.0f);
-    /* e = w lambda (-sin, cos) : angle = atan2(-ea, eb) au signe de w pres */
-    float sg = o->e_omega >= 0.0f ? 1.0f : -1.0f;
-    float th = fm_atan2(-sg * o->ea, sg * o->eb) + sg * fm_atan2(im, re);
-    o->e_theta = fm_wrap_pi(th);
-}
-
-RAMFUNC void obs_update(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib, float id_est, float mod, float dt)
-{
-    bool need_flux = c->kind != OBS_BEMF;
-    bool need_bemf = c->kind == OBS_BEMF || c->kind == OBS_HYBRID || c->lambda_adapt;
-
-    if (need_flux) flux_step(o, c, va, vb, ia, ib, id_est, mod, dt);
-    if (need_bemf) bemf_step(o, c, va, vb, ia, ib, dt);
-
-    float aw = c->kind == OBS_BEMF ? fm_abs(o->e_omega) : fm_abs(o->omega);
-    float emag = need_bemf ? fm_sqrt(o->ea * o->ea + o->eb * o->eb) / fm_max(o->e_gain, 0.3f) : 0.0f;
-
-    /* lambda adaptatif : |e| / |w| quand la FEM domine (|w| lambda > 4 x chute ohmique estimee) */
-    if (c->lambda_adapt && need_bemf) {
-        float i_mag = fm_sqrt(ia * ia + ib * ib);
-        if (c->adapt_on && aw * c->lambda > 4.0f * c->r * i_mag + 0.5f) {
-            float meas = emag / aw;
-            o->lambda += (meas - o->lambda) * fm_min(dt, 1.0f);
-            o->lambda = fm_sat(o->lambda, 0.7f * c->lambda, 1.3f * c->lambda);
-        }
+    if (c->kind == OBS_RESC_ACTIVE_FLUX) {
+        resc_active_flux(o, c, va, vb, ia, ib, gamma, dt);
     } else {
-        o->lambda = c->lambda;
+        /* inductance vue par l'observateur : moyenne corrigee de la saillance (comme VESC) */
+        float L = 0.5f * (c->ld + c->lq);
+        float diff = c->lq - c->ld;
+        float i2 = c->id * c->id + c->iq * c->iq;
+        if (fm_abs(c->id) > 0.1f || fm_abs(c->iq) > 0.1f) L = L - 0.5f * diff + diff * c->iq * c->iq / i2;
+        float lia = L * ia, lib = L * ib;
+        const float ria = c->r * ia, rib = c->r * ib;
+        const float gh = 0.5f * gamma;
+        if (!(o->lambda_est > 0.0f)) o->lambda_est = lambda;
+
+        switch (c->kind) {
+        case OBS_ORTEGA_ORIGINAL:
+        case OBS_ORTEGA_LAMBDA_COMP: {
+            float lr = c->kind == OBS_ORTEGA_LAMBDA_COMP ? o->lambda_est : lambda;
+            float err = lr * lr - ((o->x1 - lia) * (o->x1 - lia) + (o->x2 - lib) * (o->x2 - lib));
+            if (c->kind == OBS_ORTEGA_LAMBDA_COMP) {
+                o->lambda_est += 0.2f * gh * o->lambda_est * -err * dt;
+                o->lambda_est = fm_sat(o->lambda_est, 0.3f * lambda, 2.5f * lambda);
+            }
+            if (err > 0.0f) err = 0.0f;          /* terme force negatif : meilleure convergence */
+            o->x1 += (va - ria + gh * (o->x1 - lia) * err) * dt;
+            o->x2 += (vb - rib + gh * (o->x2 - lib) * err) * dt;
+            break;
+        }
+        case OBS_MXLEMMING:
+        case OBS_MXLEMMING_LAMBDA_COMP:
+            /* MXLEMMING (David Molony, MESC) : flux de l'aimant integre, composantes bornees */
+            o->x1 += (va - ria) * dt - L * (ia - o->ia_last);
+            o->x2 += (vb - rib) * dt - L * (ib - o->ib_last);
+            if (c->kind == OBS_MXLEMMING_LAMBDA_COMP) {
+                float err = o->lambda_est * o->lambda_est - (o->x1 * o->x1 + o->x2 * o->x2);
+                o->lambda_est += 0.1f * gh * o->lambda_est * -err * dt;
+                o->lambda_est = fm_sat(o->lambda_est, 0.3f * lambda, 2.5f * lambda);
+                o->x1 = fm_sat_sym(o->x1, o->lambda_est);
+                o->x2 = fm_sat_sym(o->x2, o->lambda_est);
+            } else {
+                o->x1 = fm_sat_sym(o->x1, lambda);
+                o->x2 = fm_sat_sym(o->x2, lambda);
+            }
+            lia = lib = 0.0f;                    /* x est deja le flux de l'aimant */
+            break;
+        default: {                               /* MXV et variantes */
+            o->x1 += (va - ria) * dt;
+            o->x2 += (vb - rib) * dt;
+            float mag = fm_sqrt((o->x1 - lia) * (o->x1 - lia) + (o->x2 - lib) * (o->x2 - lib));
+            float lim = lambda;
+            if (c->kind == OBS_MXV_LAMBDA_COMP_LIN) {
+                float k = fm_min(0.1f * gh * dt * o->lambda_est * o->lambda_est, 1.0f);
+                o->lambda_est += (mag - o->lambda_est) * k;
+                o->lambda_est = fm_sat(o->lambda_est, 0.3f * lambda, 2.5f * lambda);
+                lim = o->lambda_est;
+            } else if (c->kind == OBS_MXV_LAMBDA_COMP) {
+                float err = o->lambda_est * o->lambda_est - mag * mag;
+                o->lambda_est += 0.2f * gh * o->lambda_est * -err * dt;
+                o->lambda_est = fm_sat(o->lambda_est, 0.3f * lambda, 2.5f * lambda);
+                lim = o->lambda_est;
+            }
+            if (mag > lim) {
+                /* comme la reference : x (et non x - L i) est mis a l'echelle */
+                o->x1 = (o->x1 / mag) * lim;
+                o->x2 = (o->x2 / mag) * lim;
+            }
+            break;
+        }
+        }
+        o->ia_last = ia;
+        o->ib_last = ib;
+        if (!(o->x1 == o->x1)) o->x1 = 0.0f;     /* NaN -> 0 */
+        if (!(o->x2 == o->x2)) o->x2 = 0.0f;
+        /* module trop faible : angle instable, on le fait remonter */
+        float m = fm_sqrt(o->x1 * o->x1 + o->x2 * o->x2);
+        if (m < 0.5f * lambda) {
+            o->x1 *= 1.1f;
+            o->x2 *= 1.1f;
+        }
+        float fa = o->x1 - lia, fb = o->x2 - lib;
+        o->theta = fm_atan2(fb, fa);
+        o->flux = fm_sqrt(fa * fa + fb * fb);
+        o->lambda = obs_lambda_comp(c->kind) ? o->lambda_est : lambda;
     }
 
-    float th;
-    switch (c->kind) {
-    case OBS_BEMF:
-        th = o->e_theta;
-        o->flux = aw > 1.0f ? emag / aw : o->lambda;
-        break;
-    case OBS_HYBRID: {
-        float w = c->hyb_w2 > c->hyb_w1 ? fm_sat((aw - c->hyb_w1) / (c->hyb_w2 - c->hyb_w1), 0.0f, 1.0f) : 0.0f;
-        float fa = o->eta_a, fb = o->eta_b;
-        float fm_ = fm_sqrt(fa * fa + fb * fb);
-        float s, co;
-        fm_sincos(o->e_theta, &s, &co);
-        float ua = (1.0f - w) * (fm_ > 1e-9f ? fa / fm_ : 1.0f) + w * co;
-        float ub = (1.0f - w) * (fm_ > 1e-9f ? fb / fm_ : 0.0f) + w * s;
-        th = fm_atan2(ub, ua);
-        o->flux = (1.0f - w) * fm_ + w * (aw > 1.0f ? emag / aw : o->lambda);
-        break;
-    }
-    default:
-        th = fm_atan2(o->eta_b, o->eta_a);
-        o->flux = fm_sqrt(o->eta_a * o->eta_a + o->eta_b * o->eta_b);
-        break;
-    }
-    o->theta = fm_wrap_pi(th + c->offset * o->omega * dt);
+    o->theta = fm_wrap_pi(o->theta + c->offset * o->omega * dt);
 
     /* PLL de type 2 sur l'angle observe */
     float e = fm_wrap_pi(o->theta - o->pll_theta);

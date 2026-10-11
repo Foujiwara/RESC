@@ -6,18 +6,21 @@ Ce document décrit ce que fait chaque fonction ajoutée en version 1.0 et le pa
 
 ## 1. Observateurs (`foc_observer_type`)
 
-| Valeur | Nom VESC | Observateur RESC | Usage |
-|---|---|---|---|
-| 0 | ORTEGA_ORIGINAL | Flux actif, correction non linéaire (celui de RESC 0.1) | Recommandé, testé sur la carte |
-| 1 | MXLEMMING | Flux actif, rappel radial linéaire de gain 2\|ω\| | Sans gain à régler |
-| 2 | ORTEGA_LAMBDA_COMP | Flux actif non linéaire + λ adaptatif | λ mal connu, échauffement des aimants |
-| 3 | MXLEMMING_LAMBDA_COMP | Rappel radial + λ adaptatif | Idem |
-| 4 | MXV | Observateur de FEM (Luenberger sur le courant, sans dérivée) | Vitesses moyennes et hautes ; angle indépendant de λ |
-| 5 | MXV_LAMBDA_COMP | FEM + λ adaptatif | |
-| 6 | MXV_LAMBDA_COMP_LIN | Hybride : flux actif à basse vitesse, FEM à haute vitesse | |
+| Valeur | Observateur | Origine |
+|---|---|---|
+| 0 | ORTEGA_ORIGINAL : observateur non linéaire sur le flux statorique (Lee, Ortega et al. 2010) | VESC 7.00, réimplémenté (mêmes équations, coefficients et bornes) |
+| 1 | MXLEMMING : intégrateur du flux de l'aimant, composantes bornées à λ | VESC 7.00 (auteur David Molony, MESC) |
+| 2 | ORTEGA_LAMBDA_COMP : Ortega + λ estimé (0,3 à 2,5 × λ) | VESC 7.00 |
+| 3 | MXLEMMING_LAMBDA_COMP : MXLemming + λ estimé | VESC 7.00 |
+| 4 | MXV : intégrateur, module ramené à λ s'il le dépasse | VESC 7.00 |
+| 5 | MXV_LAMBDA_COMP : MXV + λ estimé (comme Ortega) | VESC 7.00 |
+| 6 | MXV_LAMBDA_COMP_LIN : MXV + λ suivi par filtre passe-bas du module | VESC 7.00 |
+| 7 | RESC_ACTIVE_FLUX : flux actif avec correction non linéaire, module λ + (Ld − Lq)·id (moteurs saillants) | RESC, celui essayé sur la carte ; défaut du profil RESC |
+
+En profil VESC 7.00, la liste de VESC Tool s'arrête à 6. L'observateur RESC se choisit alors au terminal : `set foc_observer_type 7`.
 
 **Migration depuis RESC 0.1.** RESC 0.1 ignorait le type d'observateur, le gain réduit à l'arrêt, le découplage, le filtre de phase et le mélange Hall : son comportement était fixe. Au premier démarrage de la 1.0, la migration de la configuration règle donc ces champs sur le comportement que tu as essayé :
-- observateur 0 ;
+- observateur 7 (RESC_ACTIVE_FLUX) ;
 - gain plein à l'arrêt ;
 - anticipation croisée et FEM ;
 - filtre de phase désactivé ;

@@ -1,31 +1,21 @@
 /*
- * observer.h — Observateurs de position sensorless RESC + PLL.
+ * observer.h — Observateurs de position sensorless + PLL.
  *
- * Plusieurs observateurs interchangeables (foc_observer_type), tous ecrits pour RESC.
- * Ils partagent le modele en tension (repere alpha/beta) :
- *   d(psi_s)/dt = v - R i                         (flux statorique)
- *   eta         = psi_s - Lq i                    (flux actif, aligne sur l'axe d)
- *   |eta|       = lambda + (Ld - Lq) id           (module attendu)
+ * foc_observer_type (valeurs du protocole) :
+ *  0 ORTEGA_ORIGINAL        \
+ *  1 MXLEMMING               |  observateurs de VESC 7.00 (motor/foc_math.c, foc_observer_update),
+ *  2 ORTEGA_LAMBDA_COMP      |  reimplementes avec les memes equations, coefficients et bornes
+ *  3 MXLEMMING_LAMBDA_COMP   |  (voir observer.c)
+ *  4 MXV                     |
+ *  5 MXV_LAMBDA_COMP         |
+ *  6 MXV_LAMBDA_COMP_LIN    /
+ *  7 RESC_ACTIVE_FLUX       observateur RESC : flux actif (Boldea) avec la correction non lineaire
+ *                           de Lee, Ortega et al. 2010 ; module attendu lambda + (Ld - Lq) id,
+ *                           valable pour les moteurs a poles lisses comme saillants
  *
- *  OBS_FLUX_NL   flux actif, correction non lineaire a gradient (Lee, Hong, Nam, Ortega
- *                et al. 2010, ecrite sur le flux actif de Boldea 2008) :
- *                  d(psi_s)/dt = v - R i + (gamma/2) eta (lambda_a^2 - |eta|^2)
- *  OBS_FLUX_PROJ flux actif integre puis projete sur le cercle de rayon lambda_a a chaque
- *                pas (contrainte imposee, sans gain) : tres robuste, aucune derive
- *  OBS_BEMF      observateur de FEM (Luenberger sur le courant, FEM integree, sans
- *                derivee du courant mesure), bande adaptee a la vitesse, retard et gain
- *                compenses ; ne depend pas de lambda pour l'angle
- *  OBS_HYBRID    flux actif a basse vitesse, FEM a haute vitesse, melange lineaire des
- *                vecteurs unitaires entre hyb_w1 et hyb_w2
- *
- * Option lambda adaptatif : lambda est reestime en marche a partir de |e| / |w|
- * (constante de temps 1 s, borne a +-30 % de la valeur configuree, au-dessus d'une
- * vitesse ou la FEM domine la chute ohmique). Il remplace lambda dans la contrainte de
- * module, l'anticipation de la boucle de courant et la surveillance de synchronisme.
- *
- * Gain a basse vitesse : gamma_eff = gamma * (gain_slow + (1 - gain_slow) * min(1, |m| / 0.5)),
- * m = max(modulation appliquee, FEM / (Vbus/sqrt3)) (0..1). Decalage : l'angle est avance de offset x w x dt (retard du filtre
- * de mesure, en periodes).
+ * Modele commun (repere alpha/beta) : d(psi_s)/dt = v - R i, flux de l'aimant = psi_s - L i.
+ * Gain a basse vitesse : gamma_eff = gamma * (gain_slow + (1 - gain_slow) * min(1, 2 |m|)),
+ * m = max(modulation appliquee, FEM / (Vbus/sqrt3)). Decalage : angle avance de offset x w x dt.
  */
 #ifndef OBSERVER_H
 #define OBSERVER_H
@@ -34,26 +24,25 @@
 #include <stdint.h>
 
 typedef enum {
-    OBS_FLUX_NL = 0,
-    OBS_FLUX_PROJ,
-    OBS_BEMF,
-    OBS_HYBRID
+    OBS_ORTEGA_ORIGINAL = 0,
+    OBS_MXLEMMING,
+    OBS_ORTEGA_LAMBDA_COMP,
+    OBS_MXLEMMING_LAMBDA_COMP,
+    OBS_MXV,
+    OBS_MXV_LAMBDA_COMP,
+    OBS_MXV_LAMBDA_COMP_LIN,
+    OBS_RESC_ACTIVE_FLUX,
+    OBS_COUNT
 } obs_kind_t;
 
 typedef struct {
-    /* modele en tension */
-    float psi_a, psi_b;     /* flux statorique estime */
-    float eta_a, eta_b;     /* flux actif estime */
-    /* estimateur de FEM */
-    float ia_hat, ib_hat;   /* courant estime (observateur de FEM) */
-    float ea, eb;           /* FEM estimee */
-    float e_gain;           /* gain |H| de l'observateur de FEM a la vitesse actuelle */
-    float e_omega;          /* vitesse de rotation de e^ (rad/s, filtree) */
-    float e_theta;
+    float x1, x2;           /* etat (flux statorique ou flux de l'aimant selon l'observateur) */
+    float ia_last, ib_last; /* courant precedent (MXLEMMING) */
+    float lambda_est;       /* lambda estime (variantes LAMBDA_COMP) */
     /* sorties */
     float theta;            /* angle rotor */
-    float flux;             /* module du flux estime (Wb) */
-    float lambda;           /* lambda utilise (adaptatif ou configure) */
+    float flux;             /* module du flux de l'aimant estime (Wb) */
+    float lambda;           /* lambda utilise (estime ou configure) */
     float pll_theta;
     float pll_omega;        /* integrateur de la PLL */
     float omega;            /* vitesse estimee = derivee de l'angle PLL */
@@ -61,21 +50,18 @@ typedef struct {
 
 typedef struct {
     obs_kind_t kind;
-    bool  lambda_adapt;
-    bool  adapt_on;         /* reestimation autorisee maintenant (marche sur l'observateur) */
     float r, ld, lq, lambda;
+    float id, iq;           /* courants d/q (inductance de saillance) */
     float gamma;
     float gain_slow;        /* fraction du gain a modulation nulle (0..1) */
     float offset;           /* periodes */
-    float hyb_w1, hyb_w2;   /* rad/s : melange flux -> FEM */
     float pll_kp, pll_ki;
 } obs_cfg_t;
 
 void obs_reset(obs_t *o, const obs_cfg_t *c, float theta, float omega);
-/* mod : modulation appliquee (0..1), pour le gain a basse vitesse */
-void obs_update(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib, float id_est, float mod, float dt);
-
-/* Correspondance foc_observer_type (valeurs du protocole) -> observateur RESC */
-void obs_kind_from_type(uint8_t type, obs_kind_t *kind, bool *lambda_adapt);
+/* mod : niveau de tension (0..1) pour le gain a basse vitesse */
+void obs_update(obs_t *o, const obs_cfg_t *c, float va, float vb, float ia, float ib, float mod, float dt);
+/* true : lambda estime par l'observateur */
+bool obs_lambda_comp(obs_kind_t k);
 
 #endif /* OBSERVER_H */

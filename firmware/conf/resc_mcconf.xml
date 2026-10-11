@@ -1564,16 +1564,18 @@ p, li { white-space: pre-wrap; }
             <longName>Observer Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Sensorless position observer (all written for RESC).&lt;/p&gt;&lt;p&gt;&lt;b&gt;Active flux, non-linear&lt;/b&gt;: voltage model on the active flux with a gradient correction of its magnitude (Lee, Ortega et al., written on Boldea's active flux). Works for surface and interior magnet motors. Recommended.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Radial correction&lt;/b&gt;: same model, linear pull of the magnitude with a gain of 2|w|; no gain to tune.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Back-EMF observer&lt;/b&gt;: Luenberger current observer, back-EMF integrated (no current derivative), bandwidth following the speed; angle independent of lambda; for medium and high speed.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Hybrid&lt;/b&gt;: active flux at low speed, back-EMF at high speed, linear blend.&lt;/p&gt;&lt;p&gt;&lt;b&gt;Lambda adaptation&lt;/b&gt;: flux linkage re-estimated while running from |e|/|w| (time constant 1 s, limited to +-30 % of the configured value).&lt;/p&gt;</description>
+            <description>&lt;p&gt;Sensorless position observer. 0 to 6: the VESC 7.00 observers (same equations, coefficients and limits). 7: the RESC observer.&lt;/p&gt;&lt;p&gt;&lt;b&gt;ORTEGA_ORIGINAL&lt;/b&gt;: non-linear flux observer (Lee, Ortega et al. 2010) on the stator flux.&lt;/p&gt;&lt;p&gt;&lt;b&gt;MXLEMMING&lt;/b&gt;: magnet flux integrator, components limited to lambda (David Molony, MESC).&lt;/p&gt;&lt;p&gt;&lt;b&gt;MXV&lt;/b&gt;: flux integrator, magnitude scaled back to lambda when exceeded.&lt;/p&gt;&lt;p&gt;&lt;b&gt;..._LAMBDA_COMP&lt;/b&gt;: same with the flux linkage estimated while running (0.3 to 2.5 x lambda); &lt;b&gt;MXV_LAMBDA_COMP_LIN&lt;/b&gt;: estimate by low-pass filter of the flux magnitude.&lt;/p&gt;&lt;p&gt;&lt;b&gt;RESC_ACTIVE_FLUX&lt;/b&gt;: active flux observer (Boldea) with the non-linear correction, magnitude lambda + (Ld - Lq) id: for surface and interior magnet motors. Default, tested on the bench.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_OBSERVER_TYPE</cDefine>
-            <valInt>0</valInt>
-            <enumNames>Active flux, non-linear correction</enumNames>
-            <enumNames>Active flux, radial correction (gain 2|w|)</enumNames>
-            <enumNames>Active flux non-linear + lambda adaptation</enumNames>
-            <enumNames>Active flux radial + lambda adaptation</enumNames>
-            <enumNames>Back-EMF observer (Luenberger)</enumNames>
-            <enumNames>Back-EMF observer + lambda adaptation</enumNames>
-            <enumNames>Hybrid flux / back-EMF + lambda adaptation</enumNames>
+            <valInt>7</valInt>
+            <enumNames>ORTEGA_ORIGINAL</enumNames>
+            <enumNames>MXLEMMING</enumNames>
+            <enumNames>ORTEGA_LAMBDA_COMP</enumNames>
+            <enumNames>MXLEMMING_LAMBDA_COMP</enumNames>
+            <enumNames>MXV</enumNames>
+            <enumNames>MXV_LAMBDA_COMP</enumNames>
+            <enumNames>MXV_LAMBDA_COMP_LIN</enumNames>
+            <enumNames>RESC_ACTIVE_FLUX</enumNames>
+            <maxInt>7</maxInt>
         </foc_observer_type>
         <foc_hfi_amb_mode>
             <longName>HFI Ambiguity Resolve Mode</longName>
