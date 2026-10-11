@@ -148,13 +148,21 @@ Il n'y a pas de reprise au vol sans capteur : le flux doit d'abord être rétabl
 |---|---|---|
 | Compilation | `python firmware/build.py` | `python firmware/build.py --conf resc` |
 | Outil | VESC Tool officiel, Android | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 149 + 80 : sans BLDC, DC, sin/cos, DRV8301, BMS, UAVCAN, NRF24, IMU ; avec aides RESC, induction, bande passante, courant de mesure R |
+| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 149 + 80 : sans BLDC, DC, sin/cos, DRV8301, BMS, UAVCAN, NRF24, IMU ; avec aides RESC, induction, bande passante, courant de mesure R |
 | Version annoncée | 7.00 | 1.00 |
 
 Points communs aux deux profils :
 - **Description de la configuration :** la commande 250 envoie le XML du profil compilé.
 - **Stockage en flash :** champ par champ, par nom. On peut passer d'un profil à l'autre, ou changer de version, sans perdre les réglages.
 - **Ancien format de RESC 0.1 :** relu au premier démarrage, puis réécrit. `status` affiche « MIGRÉE ».
+
+**Paramètres visibles.**
+- **Profil RESC :** 149 paramètres moteur et 80 paramètres d'application, tous utilisés par le firmware et tous visibles.
+- **Profil VESC700 :** la description envoyée à RESC Tool par la commande 250 est l'officielle, avec la même sérialisation et la même signature. Seule différence : les paramètres inutilisés sont retirés des onglets, donc invisibles (141/202 et 80/121 visibles), et les aides décrivent le comportement de RESC.
+- **VESC Tool officiel :** il ne demande pas la description et affiche toujours tous les paramètres de VESC 7.00. On ne peut rien y cacher sans casser la compatibilité.
+- **Onglets BLDC, DC et GPD :** ils restent présents, mais vides.
+
+Le contrôle est automatique dans `python firmware/build.py --tests`, via `tools/resc_conf/audit_params.py`.
 
 **Ne pas distribuer le profil RESC avant la version de RESC Tool qui lit la description.**
 

@@ -176,6 +176,7 @@ void resc_conf_clamp_app(vesc_appconf_t *c)
     if (!isfinite(c->timeout_brake_current) || c->timeout_brake_current < 0.0f) c->timeout_brake_current = 0.0f;
     if (c->controller_id < 0.0f || c->controller_id > 253.0f) c->controller_id = (float)plat_default_controller_id();
     if (c->can_status_rate_1 > 1000) c->can_status_rate_1 = 1000;
+    if (c->can_status_rate_2 > 1000) c->can_status_rate_2 = 1000;
 }
 
 /* --------------------------------------------------------- traduction */

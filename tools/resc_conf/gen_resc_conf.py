@@ -155,6 +155,12 @@ def main():
         sig = prof["vesc700"][k][2]
         if sig != REF_SIG[k]:
             raise SystemExit("signature VESC700 %s calculee %u != reference %u : XML non officiel ?" % (k, sig, REF_SIG[k]))
+    # vue RESC Tool du profil VESC700 : embarquee pour la commande 250, meme signature exigee
+    view = {k: load(os.path.join(CONF, "vesc700_view", f)) for k, f in
+            (("mc", "parameters_mcconf.xml"), ("app", "parameters_appconf.xml"))}
+    for k in ("mc", "app"):
+        if view[k][2] != REF_SIG[k] or [p.name for p in view[k][1]] != [p.name for p in prof["vesc700"][k][1]]:
+            raise SystemExit("vue VESC700 %s : signature ou ordre de serialisation different de l'officiel" % k)
 
     h, c = [], []
     h.append("/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */")
@@ -273,7 +279,7 @@ def main():
     for pname, macro in (("resc", "#ifdef RESC_CONF_PROFILE_RESC"), ("vesc700", "#else")):
         x.append(macro)
         for k in ("mc", "app"):
-            raw = prof[pname][k][0]
+            raw = view[k][0] if pname == "vesc700" else prof[pname][k][0]
             q = struct.pack(">I", len(raw)) + zlib.compress(raw, 9)
             sizes["%s_%s" % (pname, k)] = (len(raw), len(q))
             x += arr("conf_xml_" + k, q)
