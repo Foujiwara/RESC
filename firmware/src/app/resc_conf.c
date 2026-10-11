@@ -229,6 +229,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 
     float i_abs_cap = (float)HWLIM_I_ABS_TRIP_A * cap;
     fp->i_abs_trip = fm_min(mc->l_abs_current_max, i_abs_cap);
+    fp->i_abs_slow = mc->l_slow_abs_current != 0;
     fp->vbus_trip_max = mc->l_max_vin;
     fp->vbus_trip_min = mc->l_min_vin;
 

@@ -269,7 +269,10 @@ int main(void)
         /* Watchdog analogique : seuils a partir des offsets mesures, mis a jour toutes les 100 ms */
         if (foc_calibrated() && (!awd_set || now - awd_ms > 100u)) {
             const foc_params_t *p = foc_params();
-            motor_hw_set_awd(g_foc_telem.off_cs, p->i_abs_trip, p->i_scale);
+            /* limite lente : le watchdog analogique (echantillon par echantillon) est releve de 50 %,
+             * seulement sur une carte validee (plafond de courant a 100 %) */
+            bool slow = p->i_abs_slow && resc_current_cap_frac() >= 1.0f;
+            motor_hw_set_awd(g_foc_telem.off_cs, slow ? 1.5f * p->i_abs_trip : p->i_abs_trip, p->i_scale);
             awd_set = true;
             awd_ms = now;
         }
