@@ -2119,7 +2119,7 @@ p, li { white-space: pre-wrap; }
             <longName>Observer Type</longName>
             <type>4</type>
             <transmittable>1</transmittable>
-            <description>&lt;p&gt;Sensorless position observer. RESC uses its own observers in these slots: &lt;b&gt;ORTEGA_ORIGINAL&lt;/b&gt; = active flux with non-linear correction (recommended); &lt;b&gt;MXLEMMING&lt;/b&gt; = active flux with radial correction (gain 2|w|); &lt;b&gt;..._LAMBDA_COMP&lt;/b&gt; = same with flux linkage re-estimated while running; &lt;b&gt;MXV&lt;/b&gt; = back-EMF observer (Luenberger, no current derivative); &lt;b&gt;MXV_LAMBDA_COMP_LIN&lt;/b&gt; = hybrid active flux / back-EMF.&lt;/p&gt;</description>
+            <description>&lt;p&gt;Sensorless position observer: the VESC observers, re-implemented with the same equations. The RESC active flux observer (type 7) is selected from the terminal: set foc_observer_type 7. Former text: &lt;b&gt;ORTEGA_ORIGINAL&lt;/b&gt; = active flux with non-linear correction (recommended); &lt;b&gt;MXLEMMING&lt;/b&gt; = active flux with radial correction (gain 2|w|); &lt;b&gt;..._LAMBDA_COMP&lt;/b&gt; = same with flux linkage re-estimated while running; &lt;b&gt;MXV&lt;/b&gt; = back-EMF observer (Luenberger, no current derivative); &lt;b&gt;MXV_LAMBDA_COMP_LIN&lt;/b&gt; = hybrid active flux / back-EMF.&lt;/p&gt;</description>
             <cDefine>MCCONF_FOC_OBSERVER_TYPE</cDefine>
             <valInt>3</valInt>
             <enumNames>FOC_OBSERVER_ORTEGA_ORIGINAL</enumNames>

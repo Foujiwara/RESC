@@ -79,22 +79,19 @@ MC_EDIT = {
     "sp_pid_loop_rate": dict(description=html(
         "Rate of the speed and position PID. The RESC control layer runs at 1 kHz at most.")),
     "foc_observer_type": dict(
-        enums=["Active flux, non-linear correction", "Active flux, radial correction (gain 2|w|)",
-               "Active flux non-linear + lambda adaptation", "Active flux radial + lambda adaptation",
-               "Back-EMF observer (Luenberger)", "Back-EMF observer + lambda adaptation",
-               "Hybrid flux / back-EMF + lambda adaptation"],
-        valInt="0",
+        enums=["ORTEGA_ORIGINAL", "MXLEMMING", "ORTEGA_LAMBDA_COMP", "MXLEMMING_LAMBDA_COMP", "MXV",
+               "MXV_LAMBDA_COMP", "MXV_LAMBDA_COMP_LIN", "RESC_ACTIVE_FLUX"],
+        valInt="7", maxInt="7",
         description=html(
-            "Sensorless position observer (all written for RESC).",
-            "<b>Active flux, non-linear</b>: voltage model on the active flux with a gradient correction "
-            "of its magnitude (Lee, Ortega et al., written on Boldea's active flux). Works for surface and "
-            "interior magnet motors. Recommended.",
-            "<b>Radial correction</b>: same model, linear pull of the magnitude with a gain of 2|w|; no gain to tune.",
-            "<b>Back-EMF observer</b>: Luenberger current observer, back-EMF integrated (no current derivative), "
-            "bandwidth following the speed; angle independent of lambda; for medium and high speed.",
-            "<b>Hybrid</b>: active flux at low speed, back-EMF at high speed, linear blend.",
-            "<b>Lambda adaptation</b>: flux linkage re-estimated while running from |e|/|w| (time constant 1 s, "
-            "limited to +-30 % of the configured value).")),
+            "Sensorless position observer. 0 to 6: the VESC 7.00 observers (same equations, coefficients and "
+            "limits). 7: the RESC observer.",
+            "<b>ORTEGA_ORIGINAL</b>: non-linear flux observer (Lee, Ortega et al. 2010) on the stator flux.",
+            "<b>MXLEMMING</b>: magnet flux integrator, components limited to lambda (David Molony, MESC).",
+            "<b>MXV</b>: flux integrator, magnitude scaled back to lambda when exceeded.",
+            "<b>..._LAMBDA_COMP</b>: same with the flux linkage estimated while running (0.3 to 2.5 x lambda); "
+            "<b>MXV_LAMBDA_COMP_LIN</b>: estimate by low-pass filter of the flux magnitude.",
+            "<b>RESC_ACTIVE_FLUX</b>: active flux observer (Boldea) with the non-linear correction, magnitude "
+            "lambda + (Ld - Lq) id: for surface and interior magnet motors. Default, tested on the bench.")),
     "foc_sensor_mode": dict(
         enums=["Sensorless", "Encoder", "Hall Sensors", "HFI", "VSS (HFI start, I/f, observer)"],
         description=html(
@@ -351,7 +348,8 @@ def write(root, path):
 # Profil VESC700, vue RESC Tool : aides seulement (les choix et les defauts restent ceux de 7.00)
 VIEW_EDIT_MC = {
     "foc_observer_type": dict(description=html(
-        "Sensorless position observer. RESC uses its own observers in these slots: "
+        "Sensorless position observer: the VESC observers, re-implemented with the same equations. The RESC "
+        "active flux observer (type 7) is selected from the terminal: set foc_observer_type 7. Former text: "
         "<b>ORTEGA_ORIGINAL</b> = active flux with non-linear correction (recommended); "
         "<b>MXLEMMING</b> = active flux with radial correction (gain 2|w|); "
         "<b>..._LAMBDA_COMP</b> = same with flux linkage re-estimated while running; "

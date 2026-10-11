@@ -999,7 +999,7 @@ void vesc_mcconf_defaults(vesc_mcconf_t *c)
     /* defauts propres au profil RESC (valeurs du XML RESC) */
     c->foc_observer_offset = (float)(0);
     c->foc_cc_decoupling = (uint8_t)(3);
-    c->foc_observer_type = (uint8_t)(0);
+    c->foc_observer_type = (uint8_t)(7);
 #endif
 }
 
