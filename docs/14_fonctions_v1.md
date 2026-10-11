@@ -168,6 +168,17 @@ Points communs aux deux profils :
 - **VESC Tool officiel :** il ne demande pas la description et affiche toujours tous les paramètres de VESC 7.00. On ne peut rien y cacher sans casser la compatibilité.
 - **Onglets BLDC, DC et GPD :** ils restent présents, mais vides.
 
+**Valeurs affichées.** La description envoyée à l'outil est générée pour la carte compilée :
+- **valeurs par défaut :** les vraies valeurs du firmware, avec les réglages prudents de la carte ;
+- **plages :** limitées au matériel (courants, tension, ERPM, fréquence PWM, duty, température) ;
+- **plafond de courant :** une note l'indique tant que la carte n'est pas validée.
+
+Le script est `tools/resc_conf/board_xml.py`. Il est lancé par `build.py`, à partir des valeurs relevées par `tests/dump_defaults.c`.
+
+**Binaires dans `firmware/release/` :**
+- `resc_ubox_single_85_200.bin` : profil VESC700. Fonctionne avec VESC Tool et avec RESC Tool.
+- `resc_ubox_single_85_200_profil_resc.bin` : profil RESC. Uniquement avec un RESC Tool qui lit la description, c'est-à-dire compilé depuis le source qui contient la commande 250.
+
 Le contrôle est automatique dans `python firmware/build.py --tests`, via `tools/resc_conf/audit_params.py`.
 
 **Ne pas distribuer le profil RESC avant la version de RESC Tool qui lit la description.**

@@ -63,6 +63,26 @@ def run(cmd, fatal=True):
     return r.returncode == 0
 
 
+def board_description(board, conf, out):
+    """Description de configuration (commande 250) avec les vraies valeurs par defaut et plages
+    de la carte : defauts releves en executant le code de configuration du firmware sur PC."""
+    gcc = find_tool("gcc", HOST_DIRS)
+    defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"', "-DRESC_HOST"] + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else [])
+    exe = os.path.join(out, "dump_defaults.exe")
+    srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+            "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
+    run([gcc, "-std=gnu11", "-O1"] + defs + ["-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm",
+                                             "-Isrc/bsp"] + srcs + ["-lm", "-o", exe])
+    js = subprocess.run([exe], cwd=HERE, capture_output=True, text=True, check=True).stdout
+    jpath = os.path.join(out, "defaults.json")
+    open(jpath, "w").write(js)
+    c = os.path.join(out, "conf_xml_board.c")
+    print("Description de configuration de la carte (commande 250) :")
+    run([sys.executable, "-I", os.path.join(ROOT, "tools", "resc_conf", "board_xml.py"), jpath, conf, c,
+         os.path.join(out, "conf_xml")])
+    return c
+
+
 def build(board, conf):
     gcc = find_tool("arm-none-eabi-gcc", ARM_DIRS)
     objcopy = find_tool("arm-none-eabi-objcopy", ARM_DIRS)
@@ -73,8 +93,11 @@ def build(board, conf):
     incs = ["-I" + i for i in INC]
     objs = []
     failed = []
+    board_xml = board_description(board, conf, out)
     for d in SRC_DIRS:
-        for c in sorted(glob.glob(os.path.join(HERE, d, "*.c"))):
+        for c in sorted(glob.glob(os.path.join(HERE, d, "*.c"))) + ([board_xml] if d == "src/vesc" else []):
+            if os.path.basename(c) == "conf_xml.c":
+                continue                    # remplace par la description propre a la carte
             o = os.path.join(out, os.path.relpath(c, HERE).replace(os.sep, "_")[:-2] + ".o")
             if not run([gcc] + CFLAGS + defs + incs + ["-c", c, "-o", o], fatal=False):
                 failed.append(os.path.relpath(c, HERE))
