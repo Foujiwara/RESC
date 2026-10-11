@@ -419,6 +419,7 @@ int main(void)
     check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
 
 #include "sim_features.inc"
+#include "sim_acim.inc"
 
     printf("\nCharge : %s  (%d echec(s))\n", g_fail ? "ECHEC" : "TOUS LES ESSAIS PASSENT", g_fail);
     return g_fail ? 1 : 0;

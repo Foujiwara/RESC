@@ -57,6 +57,9 @@ uint8_t resc_controller_id(void) { return (uint8_t)g_appconf.controller_id; }
 bool resc_motor_configured(void)
 {
     const vesc_mcconf_t *c = &g_mcconf;
+    if (c->foc_motor_kind == 1)
+        return c->foc_motor_r > 0.0f && c->foc_motor_l > 0.0f && c->foc_acim_lm > 0.0f && c->foc_acim_lr > c->foc_acim_lm &&
+               c->foc_acim_rr > 0.0f && c->foc_acim_im > 0.1f;
     bool is_default = c->foc_motor_r == (float)MCCONF_FOC_MOTOR_R &&
                       c->foc_motor_l == (float)MCCONF_FOC_MOTOR_L &&
                       c->foc_motor_flux_linkage == (float)MCCONF_FOC_MOTOR_FLUX_LINKAGE;
@@ -75,6 +78,8 @@ void resc_conf_derive_current_gains(vesc_mcconf_t *c, float bw)
 void resc_conf_derive_observer_gain(vesc_mcconf_t *c)
 {
     float lam = c->foc_motor_flux_linkage;
+    if (c->foc_motor_kind == 1 && c->foc_acim_lr > 0.0f)
+        lam = c->foc_acim_lm * c->foc_acim_lm / c->foc_acim_lr * c->foc_acim_im;   /* flux actif nominal */
     if (lam > 1e-6f) c->foc_observer_gain = 1e3f / (lam * lam);
 }
 
@@ -130,6 +135,8 @@ static void sanitize_mc(vesc_mcconf_t *c)
     FIN(l_temp_accel_dec); FIN(m_batt_filter_const); FIN(m_ptc_motor_coeff); FIN(m_ntcx_ptcx_res);
     FIN(m_ntcx_ptcx_temp_base); FIN(p_pid_kp); FIN(p_pid_ki); FIN(p_pid_kd); FIN(p_pid_kd_filter);
     FIN(p_pid_ang_div); FIN(p_pid_gain_dec_angle); FIN(p_pid_offset);
+    FIN(foc_acim_lm); FIN(foc_acim_lr); FIN(foc_acim_rr); FIN(foc_acim_im); FIN(foc_acim_base_erpm);
+    FIN(foc_resc_cc_bw); FIN(foc_resc_rl_frac);
     FIN(si_motor_poles); FIN(si_gear_ratio); FIN(si_wheel_diameter); FIN(si_battery_cells);
 #undef FIN
     /* parametres physiques : strictement positifs ou nuls */
@@ -192,6 +199,16 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->ld = mc->foc_motor_l - 0.5f * mc->foc_motor_ld_lq_diff;
     if (fp->ld < 0.1f * mc->foc_motor_l) fp->ld = 0.1f * mc->foc_motor_l;
     fp->lambda = mc->foc_motor_flux_linkage;
+    /* moteur a induction : L = inductance transitoire sigma Ls (mesuree par R/L), sans saillance */
+    fp->motor_kind = mc->foc_motor_kind == 1 ? 1 : 0;
+    if (fp->motor_kind == 1) {
+        fp->ld = fp->lq = mc->foc_motor_l;
+        fp->acim_lm = fm_max(mc->foc_acim_lm, 0.0f);
+        fp->acim_lr = fm_max(mc->foc_acim_lr, 0.0f);
+        fp->acim_rr = fm_max(mc->foc_acim_rr, 0.0f);
+        fp->acim_base_omega = mc->foc_acim_base_erpm * (FM_2PI / 60.0f);
+        if (fp->acim_lr > 0.0f) fp->lambda = fp->acim_lm * fp->acim_lm / fp->acim_lr * fm_max(mc->foc_acim_im, 0.0f);
+    }
     fp->kp = mc->foc_current_kp;
     fp->ki = mc->foc_current_ki;
     fp->obs_gamma = mc->foc_observer_gain;
@@ -219,6 +236,11 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->st_i = mc->foc_sl_openloop_boost_q > 0.5f ? mc->foc_sl_openloop_boost_q : 0.3f * i_max_eff;
     if (mc->foc_sl_openloop_max_q > mc->cc_min_current) fp->st_i = fm_min(fp->st_i, mc->foc_sl_openloop_max_q);
     fp->st_i = fm_max(fp->st_i, 1.0f);
+    if (fp->motor_kind == 1) {
+        fp->acim_im = fm_sat(mc->foc_acim_im, 0.0f, 0.9f * i_max_eff);
+        /* demarrage : le courant total (magnetisant + couple) reste dans la limite */
+        fp->st_i = fm_min(fp->st_i, fm_sqrt(fm_max(i_max_eff * i_max_eff - fp->acim_im * fp->acim_im, 1.0f)));
+    }
     fp->st_t_align = fm_max(mc->foc_sl_openloop_time_lock, 0.2f);
     fp->st_t_ramp = fm_max(mc->foc_sl_openloop_time_ramp, 0.4f);
     fp->st_omega = rpm_to_rad(fm_max(mc->foc_openloop_rpm, 300.0f));
@@ -305,7 +327,10 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
         fp->enc.ratio = mc->foc_encoder_ratio;
         fp->enc.offset = fm_wrap_pi(mc->foc_encoder_offset * (FM_PI / 180.0f));
         fp->enc.inverted = mc->foc_encoder_inverted != 0;
-        switch (mc->foc_sensor_mode) {
+        /* moteur a induction : codeur ou sans capteur (pas de sondes Hall ni d'injection) */
+        uint8_t smode = mc->foc_sensor_mode;
+        if (mc->foc_motor_kind == 1 && smode != FOC_SENSOR_MODE_ENCODER && smode != FOC_SENSOR_MODE_ENCODER_AB) smode = 0;
+        switch (smode) {
         case FOC_SENSOR_MODE_HALL:
             /* table incomplete : jamais d'angle faux, on reste en sensorless */
             fp->sensor_mode = nvalid == 6 ? FOC_SENSOR_HALL : FOC_SENSOR_SENSORLESS;

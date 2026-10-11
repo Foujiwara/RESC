@@ -133,6 +133,11 @@ typedef struct {
     /* Mode duty : regulateur de descente (frein) */
     float duty_dr_kp;     /* A par unite de duty */
     float duty_dr_ki;     /* A/s par unite de duty */
+    /* Moteur a induction (motor_kind = 1) : r = Rs, ld = lq = sigma Ls (inductance transitoire) */
+    uint8_t motor_kind;   /* 0 aimants permanents, 1 induction */
+    float acim_lm, acim_lr, acim_rr;   /* H, H, Ohm (rotor ramene au stator) */
+    float acim_im;        /* A : courant magnetisant (axe d) */
+    float acim_base_omega;/* rad/s el. : defluxage au-dessus (0 = non) */
     /* Offsets enregistres (calibration manuelle) */
     bool  use_stored_offsets;
     float stored_off_cs[3];   /* LSB */
@@ -172,7 +177,8 @@ typedef enum {
     FOC_DET_LAMBDA,    /* flux en boucle ouverte */
     FOC_DET_OFFSETS,   /* offsets courant (pont coupe puis vecteur nul) et tensions de phase */
     FOC_DET_HALL,      /* table des sondes Hall */
-    FOC_DET_ENCODER    /* rapport, sens et offset du codeur */
+    FOC_DET_ENCODER,   /* rapport, sens et offset du codeur */
+    FOC_DET_ACIM       /* moteur a induction : Lm, Lr, Rr par echelon de courant continu */
 } foc_det_kind_t;
 
 typedef struct {
@@ -196,6 +202,8 @@ typedef struct {
     float r_i_low, r_i_high, r_v_high;   /* paliers utilises pour R, chute ohmique entre eux */
     float r_v_dt;              /* V : tension perdue a courant constant (temps mort, diodes) */
     int   warn;                /* 1 : chute ohmique faible ; 2 : temps mort non sature au palier bas */
+    float acim_k, acim_tr;     /* induction : Lm^2/Lr (H), constante de temps rotorique (s) */
+    float acim_lm, acim_lr, acim_rr;
 } foc_det_t;
 
 /* ------------------------------------------------------------ Telemetrie */
@@ -214,6 +222,8 @@ typedef struct {
     float obs_omega, obs_theta;   /* observateur sensorless seul (diagnostic) */
     float flux_ratio;             /* |flux estime| / lambda */
     float lambda_est;             /* lambda utilise par l'observateur (adaptatif) */
+    float acim_psir;              /* induction : flux rotorique du modele (Wb) */
+    float acim_slip;              /* induction : glissement (rad/s el.) */
     float fw_id;                  /* courant de defluxage (A, <= 0) */
     float hfi_err;                /* rad, derniere erreur d'angle HFI */
     bool  hfi_active;

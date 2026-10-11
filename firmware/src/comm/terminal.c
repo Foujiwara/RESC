@@ -163,6 +163,7 @@ static void cmd_help(void)
     P("  status | rt | conf | hw | faults | clear");
     P("  detect_rl [A]                  : R (paliers 1/2, 3/4, 1 x A ; defaut 50 %% de l_current_max) puis L");
     P("  detect_lambda <A> [duty]       : flux (moteur LIBRE, il va tourner)");
+    P("  detect_acim [A]                : moteur a induction : Lm, Lr, Rr (apres detect_rl, moteur a l'arret)");
     P("  offsets_cal                    : calibration des offsets (moteur a l'arret, sauvegarde)");
     P("  detect_hall [A]                : table des sondes Hall (le moteur tourne, sauvegarde)");
     P("  detect_enc [A]                 : codeur ABI : rapport, sens, offset (sauvegarde)");
@@ -204,6 +205,7 @@ void terminal_process(char *line)
         P("Defaut efface");
     }
     else if (!strcmp(c, "detect_rl")) detect_app_start_rl(0, argc >= 2 ? (float)atof(argv[1]) : 0.0f);
+    else if (!strcmp(c, "detect_acim")) detect_app_start_acim(0, argc >= 2 ? (float)atof(argv[1]) : 0.0f);
     else if (!strcmp(c, "detect_lambda") && argc >= 2) {
         detect_app_start_lambda(0, (float)atof(argv[1]), 1800.0f, argc >= 3 ? (float)atof(argv[2]) : 0.3f,
                                 g_mcconf.foc_motor_r, g_mcconf.foc_motor_l);
