@@ -274,7 +274,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->i_slew = 5000.0f;
 
     /* Observateur et compensations */
-    fp->obs_type = mc->foc_observer_type <= 7 ? mc->foc_observer_type : 7;
+    fp->obs_type = mc->foc_observer_type <= 13 ? mc->foc_observer_type : 7;
     fp->obs_gain_slow = fm_sat(mc->foc_observer_gain_slow, 0.0f, 1.0f);
 #ifdef RESC_CONF_PROFILE_RESC
     fp->obs_offset = fm_sat(mc->foc_observer_offset, -3.0f, 3.0f);

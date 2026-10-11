@@ -166,6 +166,8 @@ static void set_state(foc_state_t s)
 static void obs_cfg_from_params(void)
 {
     S.oc.kind = S.p.obs_type < OBS_COUNT ? (obs_kind_t)S.p.obs_type : OBS_RESC_ACTIVE_FLUX;
+    S.oc.hyb_w1 = S.p.st_omega;
+    S.oc.hyb_w2 = 3.0f * S.p.st_omega;
     S.oc.gain_slow = fm_sat(S.p.obs_gain_slow, 0.0f, 1.0f);
     S.oc.offset = S.p.obs_offset;
     S.oc.r = S.p.r;
@@ -1265,6 +1267,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         motor_comp();
         S.oc.id = S.id;
         S.oc.iq = S.iq;
+        S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* RESC _LAMBDA : seulement en marche observee */
         float va, vb;
         applied_voltage(vph, &va, &vb);
 #ifdef RESC_HOST
@@ -1555,7 +1558,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             else S.ol_omega = fm_max(S.ol_omega - acc * dt, target);
             /* amortissement : si l'observateur (plausible) voit le rotor plus rapide que la rampe,
              * l'angle impose le rattrape au lieu de le laisser depasser puis recaler en arriere */
-            if (flux_ratio > 0.6f && flux_ratio < 1.5f &&
+            if (S.oc.kind != OBS_RESC_BEMF && S.oc.kind != OBS_RESC_BEMF_LAMBDA && flux_ratio > 0.6f && flux_ratio < 1.5f &&
                 S.obs.omega * (float)S.dir > S.ol_omega * (float)S.dir)
                 S.ol_omega += (S.obs.omega - S.ol_omega) * fm_min(200.0f * dt, 1.0f);
             S.ol_iq = (float)S.dir * fm_max(S.p.st_i, fm_abs(g_foc_cmd.iq_ref));

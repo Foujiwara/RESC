@@ -11,8 +11,8 @@ RESC est distribue sous licence **GNU GPL v3** (voir `LICENSE`).
 
 ## Fichiers derives du projet VESC (bldc, branche release_7_00, GPL v3, Benjamin Vedder)
 
-Le coeur de commande RESC (FOC, controle, protections, detections, observateur
-RESC_ACTIVE_FLUX) est un developpement independant. Pour l'interoperabilite avec VESC Tool, les ecrans
+Le coeur de commande RESC (FOC, controle, protections, detections, observateurs
+RESC_..., types 7 a 13) est un developpement independant. Pour l'interoperabilite avec VESC Tool, les ecrans
 et les controleurs existants, les elements suivants reprennent des **formats et des
 donnees** du projet VESC :
 

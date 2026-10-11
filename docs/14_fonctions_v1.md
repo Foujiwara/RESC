@@ -16,8 +16,14 @@ Ce document décrit ce que fait chaque fonction ajoutée en version 1.0 et le pa
 | 5 | MXV_LAMBDA_COMP : MXV + λ estimé (comme Ortega) | VESC 7.00 |
 | 6 | MXV_LAMBDA_COMP_LIN : MXV + λ suivi par filtre passe-bas du module | VESC 7.00 |
 | 7 | RESC_ACTIVE_FLUX : flux actif avec correction non linéaire, module λ + (Ld − Lq)·id (moteurs saillants) | RESC, celui essayé sur la carte ; défaut du profil RESC |
+| 8 | RESC_RADIAL : même flux actif, module ramené linéairement vers λ avec un gain de 2·\|ω\| (rien à régler) | RESC |
+| 9 | RESC_ACTIVE_FLUX_LAMBDA : 7 + λ réestimé en marche à partir de \|e\|/\|ω\| (1 s, ±30 %) | RESC |
+| 10 | RESC_RADIAL_LAMBDA : 8 + λ réestimé | RESC |
+| 11 | RESC_BEMF : observateur de FEM (Luenberger sur le courant, sans dérivée du courant, retard compensé), angle indépendant de λ | RESC |
+| 12 | RESC_BEMF_LAMBDA : 11 + λ réestimé | RESC |
+| 13 | RESC_HYBRID_LAMBDA : flux actif à basse vitesse, FEM à haute vitesse, λ réestimé | RESC |
 
-En profil VESC 7.00, la liste de VESC Tool s'arrête à 6. L'observateur RESC se choisit alors au terminal : `set foc_observer_type 7`.
+En profil VESC 7.00, la liste de VESC Tool s'arrête à 6. Les observateurs RESC se choisissent alors au terminal, par exemple `set foc_observer_type 7`.
 
 **Migration depuis RESC 0.1.** RESC 0.1 ignorait le type d'observateur, le gain réduit à l'arrêt, le découplage, le filtre de phase et le mélange Hall : son comportement était fixe. Au premier démarrage de la 1.0, la migration de la configuration règle donc ces champs sur le comportement que tu as essayé :
 - observateur 7 (RESC_ACTIVE_FLUX) ;
