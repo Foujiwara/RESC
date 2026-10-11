@@ -5,6 +5,12 @@ Construit les descriptions de configuration du profil RESC a partir des XML VESC
   entree : firmware/conf/vesc700/parameters_{mcconf,appconf}.xml   (officiels, non modifies)
   sortie : firmware/conf/resc_mcconf.xml, firmware/conf/resc_appconf.xml
 
+Il ecrit aussi la vue RESC Tool du profil VESC 7.00 (firmware/conf/vesc700_view/) : memes
+<Params>/<SerOrder>/choix que l'officiel (signature et octets identiques), mais les parametres
+inutilises sont retires des onglets (invisibles) et les aides decrivent le comportement de RESC.
+C'est la description envoyee par la commande 250 en profil VESC700 ; VESC Tool officiel, qui
+ne la demande pas, garde sa propre description.
+
 Une fois generes, les XML RESC sont la source unique : gen_resc_conf.py en tire les
 structures, la serialisation, la signature, les defauts et les tableaux de la commande 250.
 Ce script documente et rejoue la derivation (retraits, renommages, ajouts) ; on peut aussi
@@ -195,12 +201,15 @@ def ser_names(root):
     return [s.text for s in root.find("SerOrder")]
 
 
-def remove(root, names):
+def remove(root, names, hide_only=False):
+    """Retire les parametres ; hide_only : seulement des onglets (serialisation inchangee)."""
     params, ser = root.find("Params"), root.find("SerOrder")
     for n in names:
         e = params.find(n)
         if e is None:
             raise SystemExit("parametre absent : " + n)
+        if hide_only:
+            continue
         params.remove(e)
         for s in list(ser):
             if s.text == n:
@@ -275,6 +284,27 @@ def write(root, path):
         fh.write(data + b"\n")
 
 
+# Profil VESC700, vue RESC Tool : aides seulement (les choix et les defauts restent ceux de 7.00)
+VIEW_EDIT_MC = {
+    "foc_observer_type": dict(description=html(
+        "Sensorless position observer. RESC uses its own observers in these slots: "
+        "<b>ORTEGA_ORIGINAL</b> = active flux with non-linear correction (recommended); "
+        "<b>MXLEMMING</b> = active flux with radial correction (gain 2|w|); "
+        "<b>..._LAMBDA_COMP</b> = same with flux linkage re-estimated while running; "
+        "<b>MXV</b> = back-EMF observer (Luenberger, no current derivative); "
+        "<b>MXV_LAMBDA_COMP_LIN</b> = hybrid active flux / back-EMF.")),
+    "foc_sensor_mode": dict(description=html(
+        "Angle source. Encoder and AB Encoder: ABI encoder (index not used). HFI and the four HFI variants: "
+        "the RESC injection method (needs Lq &gt; Ld). VSS: position found by injection at standstill, "
+        "then I/f without alignment and observer.")),
+    "foc_observer_offset": dict(description=html(
+        "Extra angle advance of the observer output in PWM periods, minus one: -1 (default) = none.")),
+    "foc_cc_decoupling": dict(description=html(
+        "Current loop feed-forward. With this configuration format, RESC always keeps the back-EMF "
+        "feed-forward; Cross adds the w L i terms.")),
+}
+
+
 def main():
     mc = ET.parse(os.path.join(SRC, "parameters_mcconf.xml")).getroot()
     app = ET.parse(os.path.join(SRC, "parameters_appconf.xml")).getroot()
@@ -285,7 +315,27 @@ def main():
     edit(app, APP_EDIT)
     write(mc, os.path.join(DST, "resc_mcconf.xml"))
     write(app, os.path.join(DST, "resc_appconf.xml"))
-    print("mcconf : %d parametres, appconf : %d" % (len(ser_names(mc)), len(ser_names(app))))
+    print("RESC   : mcconf %d parametres, appconf %d" % (len(ser_names(mc)), len(ser_names(app))))
+
+    # vue RESC Tool du profil VESC700 : inutilises invisibles, aides RESC (sans choix ni defauts)
+    def text_only(edits):
+        keep = ("description", "longName")
+        return {k: {kk: vv for kk, vv in v.items() if kk in keep} for k, v in edits.items()}
+
+    vmc = ET.parse(os.path.join(SRC, "parameters_mcconf.xml")).getroot()
+    vapp = ET.parse(os.path.join(SRC, "parameters_appconf.xml")).getroot()
+    remove(vmc, MC_REMOVE, hide_only=True)
+    edit(vmc, text_only(MC_EDIT))
+    edit(vmc, VIEW_EDIT_MC)
+    remove(vapp, APP_REMOVE, hide_only=True)
+    edit(vapp, text_only(APP_EDIT))
+    vdir = os.path.join(DST, "vesc700_view")
+    os.makedirs(vdir, exist_ok=True)
+    write(vmc, os.path.join(vdir, "parameters_mcconf.xml"))
+    write(vapp, os.path.join(vdir, "parameters_appconf.xml"))
+    vis = lambda r: len({p.text for p in r.iter("param") if not p.text.startswith("::sep::")})
+    print("VESC700 (vue RESC Tool) : mcconf %d visibles / %d, appconf %d visibles / %d" % (
+        vis(vmc), len(ser_names(vmc)), vis(vapp), len(ser_names(vapp))))
 
 
 if __name__ == "__main__":

@@ -125,7 +125,7 @@ def check_cmd250(conf):
     import struct
     import zlib
     files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if conf == "resc" else \
-            {"mc": "vesc700/parameters_mcconf.xml", "app": "vesc700/parameters_appconf.xml"}
+            {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
     ok = True
     for k, f in files.items():
         blob = open(os.path.join(HERE, "build", f"cmd250_{k}.bin"), "rb").read()
@@ -171,6 +171,9 @@ def tests(board):
         run([gcc] + flags + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else []) + mig + ["-lm", "-o", exe])
         print(f"== test_migrate (profil {conf})")
         rc |= subprocess.run([exe], cwd=HERE).returncode
+    print("== audit des parametres (inutilises invisibles, utilises visibles)")
+    rc |= subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "resc_conf", "audit_params.py"), "--strict"],
+                         cwd=ROOT).returncode
     sys.exit(rc)
 
 

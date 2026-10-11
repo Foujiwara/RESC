@@ -159,21 +159,33 @@ static void cmd_foc_gains(int argc, char **argv)
 
 static void cmd_help(void)
 {
-    P("Commandes RESC :");
-    P("  status | rt | conf | hw | faults | clear");
-    P("  detect_rl [A]                  : R (paliers 1/2, 3/4, 1 x A ; defaut 50 %% de l_current_max) puis L");
-    P("  detect_lambda <A> [duty]       : flux (moteur LIBRE, il va tourner)");
-    P("  detect_acim [A]                : moteur a induction : Lm, Lr, Rr (apres detect_rl, moteur a l'arret)");
-    P("  offsets_cal                    : calibration des offsets (moteur a l'arret, sauvegarde)");
-    P("  detect_hall [A]                : table des sondes Hall (le moteur tourne, sauvegarde)");
-    P("  detect_enc [A]                 : codeur ABI : rapport, sens, offset (sauvegarde)");
-    P("  sensor                         : etat des capteurs (Hall, source d'angle)");
+    P("Commandes RESC (les reglages se font aussi dans VESC Tool / RESC Tool) :");
+    P("-- Etat");
+    P("  status                         : etat, defaut, Vbus, ERPM, courants, temperatures, moteur identifie, config en flash");
+    P("  rt                             : f_PWM, temps de calcul de la boucle FOC, depassements, reconstructions de courant");
+    P("  conf                           : parametres effectifs du coeur (R, L, flux, gains, limites, demarrage)");
+    P("  hw                             : carte, offsets courant, dead-time, bootloader, reset watchdog");
+    P("  faults                         : defaut actif et crete de courant vue");
+    P("  sensor                         : mode capteur, etat Hall, source d'angle active");
+    P("  clear                          : efface le defaut (refuse si la ligne de defaut du driver est active)");
+    P("-- Detections (moteur a l'arret sauf indication ; resultats appliques et sauvegardes)");
+    P("  offsets_cal | foc_dc_cal       : offsets courant et tension, pont coupe puis sous PWM");
+    P("  detect_rl [A]                  : R (paliers 1/2, 3/4, 1 x A ; defaut foc_resc_rl_frac x courant max), Ld, Lq, gains");
+    P("  detect_lambda <A> [duty]       : flux d'aimant (moteur LIBRE : il tourne en boucle ouverte)");
+    P("  detect_acim [A]                : moteur a induction : Lm, Lr, Rr (apres detect_rl ; echelon continu, ne tourne pas)");
+    P("  detect_hall [A]                : table des sondes Hall (le moteur tourne lentement)");
+    P("  detect_enc [A]                 : codeur ABI : rapport, sens, offset (le moteur tourne lentement)");
+    P("  foc_gains [bande_rad_s]        : recalcule kp, ki, gain observateur (defaut foc_resc_cc_bw)");
+    P("-- Commande (maintien par 'resc_cli' ; coupure au timeout de commande)");
     P("  current <A> | brake <A> | duty <d> | rpm <erpm> | stop");
-    P("  foc_openloop <A> <erpm>        : boucle ouverte a courant impose (stop pour arreter)");
-    P("  foc_openloop_duty <d> <erpm>   : boucle ouverte a rapport cyclique impose, sans regulation");
-    P("  list | get <nom> | set <nom> <valeur>");
-    P("  foc_gains [bande_rad_s]        : recalcule kp, ki, gain observateur (auto apres R/L et flux)");
-    P("  store                          : sauvegarde la configuration (moteur + application)");
+    P("  foc_openloop <A> <erpm>        : boucle ouverte a courant impose (erpm < 0 : sens inverse)");
+    P("  foc_openloop_duty <d> <erpm>   : boucle ouverte a rapport cyclique impose, sans regulation de courant");
+    P("-- Parametres (noms des XML, '.' et '__' remplaces par '_')");
+    P("  list                           : parametres principaux");
+    P("  list <debut> | list all        : champs dont le nom commence ainsi | tous (moteur puis application)");
+    P("  get <nom> | set <nom> <valeur> : lire | modifier (applique aussitot, moteur arrete)");
+    P("  store                          : sauvegarde en flash (moteur + application)");
+    P("  help                           : cette aide");
 }
 
 void terminal_process(char *line)

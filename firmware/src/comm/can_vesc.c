@@ -10,13 +10,15 @@
 #include "resc_conf.h"
 #include "vesc_buffer.h"
 #include "vesc_defaults.h"
+#include "inputs.h"
+#include "apps.h"
 
 #define EID(cmd, id) (((uint32_t)(cmd) << 8) | (uint8_t)(id))
 
 static uint8_t s_rxbuf[PACKET_MAX_PL + 8];
 static uint32_t s_rxbuf_fill;
 static const comm_iface_t *s_fwd_iface;
-static uint32_t s_last_status_ms;
+static uint32_t s_last_status_ms, s_last_status2_ms;
 static uint32_t s_last_fwd_ms;
 
 /* scan PING */
@@ -280,11 +282,11 @@ static void handle_frame(const can_frame_t *fr)
     }
 }
 
-static void send_status(void)
+/* Trames de statut choisies par le masque m (bit0 STATUS 1 ... bit5 STATUS 6) */
+static void send_status(uint8_t m)
 {
     const ctrl_stats_t *s = ctrl_stats();
     uint8_t me = resc_controller_id();
-    uint8_t m = g_appconf.can_status_msgs_r1;
     uint8_t b[8];
     int32_t i;
     if (m & 0x01) {
@@ -311,7 +313,7 @@ static void send_status(void)
         vb_put_f16(b, s->tfet, 1e1f, &i);
         vb_put_f16(b, s->tmot, 1e1f, &i);
         vb_put_f16(b, s->i_in, 1e1f, &i);
-        vb_put_f16(b, 0.0f, 50.0f, &i);
+        vb_put_f16(b, s->pos_deg, 50.0f, &i);
         can_send(EID(CAN_PACKET_STATUS_4, me), b, 8);
     }
     if (m & 0x10) {
@@ -320,6 +322,15 @@ static void send_status(void)
         vb_put_f16(b, s->vbus, 1e1f, &i);
         vb_put_i16(b, 0, &i);
         can_send(EID(CAN_PACKET_STATUS_5, me), b, 8);
+    }
+    if (m & 0x20) {
+        /* entrees des applications : ADC1, ADC2, ADC3 (V) et PPM decode (-1..1) */
+        i = 0;
+        vb_put_f16(b, inputs_adc_v(1), 1e3f, &i);
+        vb_put_f16(b, inputs_adc_v(2), 1e3f, &i);
+        vb_put_f16(b, 0.0f, 1e3f, &i);
+        vb_put_f16(b, apps_ppm_decoded(), 1e3f, &i);
+        can_send(EID(CAN_PACKET_STATUS_6, me), b, 8);
     }
 }
 
@@ -337,10 +348,16 @@ void can_vesc_poll(uint32_t now)
     can_frame_t f;
     for (int k = 0; k < 32 && can_recv(&f); k++) handle_frame(&f);
 
+    /* deux groupes de trames de statut, chacun a sa cadence */
     uint16_t rate = g_appconf.can_status_rate_1;
     if (rate > 0 && now - s_last_status_ms >= 1000u / rate) {
         s_last_status_ms = now;
-        send_status();
+        send_status(g_appconf.can_status_msgs_r1);
+    }
+    uint16_t rate2 = g_appconf.can_status_rate_2;
+    if (rate2 > 0 && now - s_last_status2_ms >= 1000u / rate2) {
+        s_last_status2_ms = now;
+        send_status(g_appconf.can_status_msgs_r2);
     }
 
     /* Scan PING : 8 requetes par passage, puis 100 ms d'attente des PONG */
