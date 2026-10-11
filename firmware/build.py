@@ -194,7 +194,7 @@ def tests(board):
     out = os.path.join(HERE, "build")
     os.makedirs(out, exist_ok=True)
     flags = ["-std=gnu11", "-O1", "-Wall", "-Wextra", "-DRESC_HOST", f'-DRESC_BOARD_HEADER="boards/{board}.h"',
-             "-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm", "-Isrc/bsp"]
+             "-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm", "-Isrc/bsp", "-Isim"]
     suites = {
         "test_conf": ["tests/test_conf.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/comm/packet.c",
                       "src/core/foc.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"],
@@ -202,6 +202,9 @@ def tests(board):
         "test_sampler": ["tests/test_sampler.c", "src/comm/sampler.c", "src/comm/packet.c"],
         "test_abs_enc": ["tests/test_abs_enc.c"],
         "test_ahrs": ["tests/test_ahrs.c", "src/app/ahrs.c"],
+        "test_wizard": ["tests/test_wizard.c", "src/app/resc_conf.c", "src/app/stats.c", "src/app/detect_app.c",
+                        "src/app/detect_all.c", "src/vesc/vesc_conf.c", "src/core/foc.c", "src/core/observer.c",
+                        "src/core/angle_sensors.c", "src/core/ctrl.c", "sim/sim_motor.c"],
     }
     rc = 0
     for name, srcs in suites.items():

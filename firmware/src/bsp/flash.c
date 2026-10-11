@@ -86,9 +86,20 @@ bool flash_erase_new_app(uint32_t size)
     return true;
 }
 
+/* Mise a jour du bootloader (VESC Tool) : apres effacement explicite du secteur 11, les ecritures
+ * au-dela du tampon d'application (decalage >= 384 Kio) vont dans le secteur du bootloader. */
+static bool s_bl_unlocked;
+
+bool flash_erase_bootloader(void)
+{
+    s_bl_unlocked = flash_erase_sector(11);
+    return s_bl_unlocked;
+}
+
 bool flash_write_new_app(uint32_t off, const uint8_t *d, uint32_t n)
 {
-    if (off + n > FLASH_NEWAPP_SIZE) return false;
+    uint32_t lim = s_bl_unlocked ? FLASH_NEWAPP_SIZE + 128u * 1024u : FLASH_NEWAPP_SIZE;
+    if (off + n > lim) return false;
     return flash_program(FLASH_NEWAPP_BASE + off, d, n);
 }
 

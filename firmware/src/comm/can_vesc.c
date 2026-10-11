@@ -13,6 +13,7 @@
 #include "inputs.h"
 #include "apps.h"
 #include "bms.h"
+#include "detect_all.h"
 
 #define EID(cmd, id) (((uint32_t)(cmd) << 8) | (uint8_t)(id))
 
@@ -221,7 +222,10 @@ static void handle_frame(const can_frame_t *fr)
     if (bms_can_frame((uint8_t)cmd, id, d, fr->len, s_now)) return;
     bool bcast_ok = cmd <= CAN_PACKET_SET_CURRENT_HANDBRAKE_REL || (cmd >= CAN_PACKET_CONF_CURRENT_LIMITS &&
                     cmd <= CAN_PACKET_CONF_STORE_FOC_ERPMS) || cmd == CAN_PACKET_CONF_BATTERY_CUT ||
-                    cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT || cmd == CAN_PACKET_SHUTDOWN || cmd == CAN_PACKET_UPDATE_BAUD;
+                    cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT || cmd == CAN_PACKET_SHUTDOWN || cmd == CAN_PACKET_UPDATE_BAUD ||
+                    /* paquets diffuses (mise a jour du firmware sur tout le bus) */
+                    cmd == CAN_PACKET_FILL_RX_BUFFER || cmd == CAN_PACKET_FILL_RX_BUFFER_LONG ||
+                    cmd == CAN_PACKET_PROCESS_RX_BUFFER || cmd == CAN_PACKET_PROCESS_SHORT_BUFFER;
     if (id != me && !(id == 255 && bcast_ok)) return;
 
     /* Longueur minimale de chaque commande : une trame tronquee est ignoree */
@@ -341,6 +345,15 @@ static void handle_frame(const can_frame_t *fr)
         resc_conf_apply();
         if (cmd == CAN_PACKET_CONF_STORE_BATTERY_CUT) resc_conf_store_mc();
         break;
+    case CAN_PACKET_DETECT_APPLY_ALL_FOC:
+        if (fr->len >= 6) {
+            int32_t k = 2;
+            detect_all_can_request(d[0], d[1] != 0, vb_get_f32(d, 1e3f, &k));
+        }
+        break;
+    case CAN_PACKET_DETECT_APPLY_ALL_FOC_RES:
+        if (fr->len >= 1) detect_all_can_result((int8_t)d[0]);
+        break;
     case CAN_PACKET_SHUTDOWN:
         /* arret de la carte (si elle a un maintien d'alimentation), moteur arrete */
         if (ctrl_stats()->erpm < 100.0f && ctrl_stats()->erpm > -100.0f) g_req_poweroff = true;
@@ -380,6 +393,34 @@ bool can_vesc_update_baud_all(uint32_t kbits, uint32_t delay_ms)
     s_baud.sends_left = 10;                 /* 10 annonces espacees de 50 ms, comme VESC */
     s_baud.next_ms = s_now;
     return true;
+}
+
+static void send_f32x2(uint32_t cmd, uint8_t id, float a, float b2)
+{
+    uint8_t f[8];
+    int32_t i = 0;
+    vb_put_f32(f, a, 1e3f, &i);
+    vb_put_f32(f, b2, 1e3f, &i);
+    can_send(EID(cmd, id), f, 8);
+}
+
+void can_vesc_conf_in_limits(uint8_t id, float min, float max) { send_f32x2(CAN_PACKET_CONF_CURRENT_LIMITS_IN, id, min, max); }
+void can_vesc_conf_foc_erpms(uint8_t id, float ol, float sl) { send_f32x2(CAN_PACKET_CONF_FOC_ERPMS, id, ol, sl); }
+
+void can_vesc_detect_apply_all_foc(uint8_t id, bool activate_status, float p)
+{
+    uint8_t f[6];
+    int32_t i = 0;
+    f[i++] = resc_controller_id();
+    f[i++] = activate_status ? 1 : 0;
+    vb_put_f32(f, p, 1e3f, &i);
+    can_send(EID(CAN_PACKET_DETECT_APPLY_ALL_FOC, id), f, 6);
+}
+
+void can_vesc_detect_result(uint8_t master, int8_t res)
+{
+    uint8_t f[1] = { (uint8_t)res };
+    can_send(EID(CAN_PACKET_DETECT_APPLY_ALL_FOC_RES, master), f, 1);
 }
 
 int can_vesc_active_count(void)

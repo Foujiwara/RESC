@@ -22,6 +22,11 @@ void can_vesc_conf_battery_cut(bool store, float start, float end);
 /* Nouvelle vitesse du bus pour tous (COMM_CAN_UPDATE_BAUD_ALL) : annonces, puis bascule apres
  * delay_ms ; false si la vitesse n'existe pas */
 bool can_vesc_update_baud_all(uint32_t kbits, uint32_t delay_ms);
+/* Detection automatique sur le bus (assistant) */
+void can_vesc_conf_in_limits(uint8_t id, float min, float max);
+void can_vesc_conf_foc_erpms(uint8_t id, float openloop_rpm, float sl_erpm);
+void can_vesc_detect_apply_all_foc(uint8_t id, bool activate_status, float max_power_loss);
+void can_vesc_detect_result(uint8_t master, int8_t res);
 /* Controleurs actifs (statut recu depuis moins de 100 ms) */
 int can_vesc_active_count(void);
 

@@ -32,6 +32,9 @@ typedef enum { DA_IDLE = 0, DA_OFFSETS, DA_RL, DA_LAMBDA, DA_HALL, DA_ENCODER, D
 
 static da_state_t s_st;
 static const comm_iface_t *s_reply;
+static int s_last_err;
+
+int detect_app_last_error(void) { return s_last_err; }
 
 bool detect_app_busy(void) { return s_st != DA_IDLE; }
 
@@ -198,8 +201,8 @@ bool detect_app_start_encoder(const comm_iface_t *reply, float cur)
 {
     if (s_st != DA_IDLE) return false;
     s_reply = reply;
-    if (g_mcconf.m_encoder_counts < 4) {
-        commands_printf("Nombre de fronts du codeur non configure");
+    if (foc_params()->enc.cpr < 4) {
+        commands_printf("Codeur non configure (Sensor Port Mode, Encoder Counts)");
         send_enc(1001.0f, 0.0f, false);
         return false;
     }
@@ -237,6 +240,7 @@ void detect_app_poll(uint32_t now_ms)
     if (s_st == DA_IDLE) return;
     const foc_det_t *d = foc_detect_status();
     if (d->busy || !d->done) return;
+    s_last_err = d->error;
     if (d->error) commands_printf("Echec : %s (code %d)", err_text(d->error), d->error);
 
     switch (s_st) {
