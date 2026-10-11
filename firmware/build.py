@@ -87,6 +87,10 @@ def build(board, conf):
     # trou des secteurs de configuration (0x08004000-0x0800BFFF) rempli a 0xFF = flash effacee
     run([objcopy, "-O", "binary", "--gap-fill", "0xFF", elf, os.path.join(out, "resc.bin")])
     run([objcopy, "-O", "ihex", elf, os.path.join(out, "resc.hex")])
+    # flashage sans effacer la configuration (secteurs 1-2) : vecteurs (secteur 0) et application
+    full = open(os.path.join(out, "resc.bin"), "rb").read()
+    open(os.path.join(out, "resc_vec.bin"), "wb").write(full[:0x4000])      # 0x08000000
+    open(os.path.join(out, "resc_app.bin"), "wb").write(full[0xC000:])      # 0x0800C000
     run([size, elf])
     check_ramfunc(os.path.join(out, "resc.map"))
     print(f"\nOK : {os.path.relpath(elf, ROOT)}")

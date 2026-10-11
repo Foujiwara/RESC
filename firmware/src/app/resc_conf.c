@@ -611,6 +611,15 @@ void resc_conf_init(void)
     mc = g_mcconf;
     app = g_appconf;
     s_load_mc = load(SLOT_MC, &mc, vesc_mcconf_fields, vesc_mcconf_nfields, old_mc);
+    if (s_load_mc == RESC_LOAD_MIGRATED) {
+        /* RESC 0.x ignorait ces champs (comportement fixe) : la migration conserve le comportement
+         * essaye ; les nouvelles fonctions s'activent ensuite une par une. */
+        mc.foc_observer_type = 0;             /* flux actif non lineaire */
+        mc.foc_observer_gain_slow = 1.0f;     /* gain plein a l'arret */
+        mc.foc_cc_decoupling = 3;             /* anticipation croisee + FEM */
+        mc.foc_phase_filter_enable = 0;       /* filtre de phase non utilise */
+        mc.foc_sl_erpm_start = mc.foc_sl_erpm;/* Hall : bascule, pas de melange */
+    }
     if (s_load_mc == RESC_LOAD_OK || s_load_mc == RESC_LOAD_MIGRATED) {
         resc_conf_clamp_mc(&mc);
         g_mcconf = mc;

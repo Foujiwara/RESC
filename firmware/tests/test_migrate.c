@@ -84,6 +84,9 @@ int main(void)
     check("nouveaux champs RESC a leur defaut", g_mcconf.foc_motor_kind == 0 && g_mcconf.foc_resc_cc_bw == 1000.0f &&
           fabsf(g_mcconf.foc_resc_rl_frac - 0.5f) < 1e-6f);
     check("moteur considere identifie", resc_motor_configured());
+    check("comportement de RESC 0.x conserve (observateur 0, gain plein, anticipation, sans filtre de phase)",
+          g_mcconf.foc_observer_type == 0 && g_mcconf.foc_observer_gain_slow == 1.0f && g_mcconf.foc_cc_decoupling == 3 &&
+          g_mcconf.foc_phase_filter_enable == 0);
     check("reecrit aussitot dans le format par nom", n_writes == 2 && ((uint32_t *)flash[0])[0] == 0x32534552u);
 
     printf("== Relecture du format par nom\n");
