@@ -251,6 +251,19 @@ void terminal_process(char *line)
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
         P("Bootloader (secteur 11, mise a jour par VESC Tool) : %s", flash_bootloader_present() ? "present" : "ABSENT");
     }
+    else if (!strcmp(c, "reset")) {
+        uint32_t f = wdg_reset_flags();
+        P("Demarre depuis %lu s ; demarrages depuis la mise sous tension : %lu", (unsigned long)(systime_ms() / 1000u),
+          (unsigned long)wdg_boot_count());
+        P("Cause du dernier demarrage :%s%s%s%s%s%s%s", (f & (1u << 25)) ? " CHUTE DE TENSION (BOR)" : "",
+          (f & (1u << 27)) ? " mise sous tension (POR)" : "", (f & (1u << 28)) ? " reset logiciel" : "",
+          (f & (1u << 29)) ? " WATCHDOG" : "", (f & (1u << 30)) ? " watchdog fenetre" : "",
+          (f & (1u << 31)) ? " basse consommation" : "", (f & (1u << 26)) ? " (broche NRST)" : "");
+        uint32_t hf[4];
+        if (hardfault_info(hf))
+            P("Plantage enregistre : pc=0x%08lx lr=0x%08lx cfsr=0x%08lx hfsr=0x%08lx", (unsigned long)hf[0],
+              (unsigned long)hf[1], (unsigned long)hf[2], (unsigned long)hf[3]);
+    }
     else if (!strcmp(c, "ctrl_log")) {
         static const char *names[] = { "?", "mode", "TIMEOUT commande", "etat FOC", "ADC1 HORS PLAGE",
                                        "SAFE START bloque", "app : sortie nulle", "RUN demande, coeur a l'arret",

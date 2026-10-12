@@ -32,6 +32,15 @@ typedef struct {
 } fault_log_t;
 __attribute__((section(".noinit"))) volatile fault_log_t g_hardfault_log;
 
+/* Plantage enregistre avant le dernier reset : pc, lr, cfsr, hfsr */
+bool hardfault_info(uint32_t out[4])
+{
+    if (g_hardfault_log.magic != 0x48464C54u) return false;
+    out[0] = g_hardfault_log.pc; out[1] = g_hardfault_log.lr;
+    out[2] = g_hardfault_log.cfsr; out[3] = g_hardfault_log.hfsr;
+    return true;
+}
+
 void Default_Handler(void)
 {
     kill_bridge_raw();
