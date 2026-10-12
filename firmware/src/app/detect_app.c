@@ -286,6 +286,9 @@ void detect_app_poll(uint32_t now_ms)
             if (d->warn == 2)
                 commands_printf("ATTENTION : temps mort non sature au palier bas : R calculee sur les 2 paliers hauts. "
                                 "Augmenter l_current_max pour la mesure.");
+            /* comparaison : methode de VESC (V/I au palier haut, temps mort inclus) */
+            commands_printf("Comparaison : R pente = %.2f mOhm, R V/I facon VESC = %.2f mOhm",
+                            (double)(d->r * 1e3f), (double)((d->r + d->r_v_dt / fm_max(d->r_i_high, 0.1f)) * 1e3f));
             commands_printf("R=%.2f mOhm  Ld=%.1f uH  Lq=%.1f uH  ->  kp=%.4f ki=%.2f (sauvegarde)",
                             (double)(d->r * 1e3f), (double)(d->ld * 1e6f), (double)(d->lq * 1e6f),
                             (double)g_mcconf.foc_current_kp, (double)g_mcconf.foc_current_ki);
