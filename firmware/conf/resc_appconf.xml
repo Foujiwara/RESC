@@ -826,6 +826,7 @@ p, li { white-space: pre-wrap; }
 &lt;p style=" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"&gt;PID speed control with a button for reversing the throttle. The speed setpoint is mapped between 0 and the configured maximum motor speed limit, or between 0 and the minimum motor speed limit when the UART RX input is high.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</description>
             <cDefine>APPCONF_ADC_CTRL_TYPE</cDefine>
             <valInt>8</valInt>
+            <maxInt>15</maxInt>
             <enumNames>Off</enumNames>
             <enumNames>Current</enumNames>
             <enumNames>Current Reverse Center</enumNames>
@@ -841,6 +842,7 @@ p, li { white-space: pre-wrap; }
             <enumNames>PID Speed</enumNames>
             <enumNames>PID Speed Reverse Center</enumNames>
             <enumNames>PID Speed Reverse Button</enumNames>
+            <enumNames>Current Reverse ADC2</enumNames>
         </app_adc_conf.ctrl_type>
         <app_adc_conf.hyst>
             <longName>Input Deadband</longName>
@@ -2406,6 +2408,444 @@ p, li { white-space: pre-wrap; }
             <suffix />
             <vTx>9</vTx>
         </app_adc_conf.resc_hybrid_band>
+        <app_adc_conf.resc_adc2_brake_prio>
+            <longName>ADC2 Brake Priority</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Control type Current Reverse ADC2: ADC1 = forward, ADC2 = reverse, sent as a signed relative current (-100 % to +100 %), handled by App, Control Settings (braking, reverse).&lt;/p&gt;&lt;p&gt;On: when ADC2 is pressed (above the deadband) ADC1 is ignored. Off: request = ADC1 - ADC2.&lt;/p&gt;</description>
+            <cDefine>APPCONF_ADC_RESC_ADC2_BRAKE_PRIO</cDefine>
+            <valInt>1</valInt>
+        </app_adc_conf.resc_adc2_brake_prio>
+        <resc_ctrl.brk_enable>
+            <longName>Braking / Reverse Handling</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;On: the Braking and Reverse settings below apply to reverse requests (negative relative current). Off: official behaviour (negative current, then reverse at full current). Applies to relative current requests: ADC and PPM current types, VESC Remote, CAN. The VESC Tool keyboard (absolute current) is not affected.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_BRK_ENABLE</cDefine>
+            <valInt>0</valInt>
+        </resc_ctrl.brk_enable>
+        <resc_ctrl.stop_erpm>
+            <longName>Stop ERPM</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Below this speed the vehicle is considered stopped: end of braking, start of the reverse handling.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_STOP_ERPM</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>10000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>10</stepDouble>
+            <valDouble>300</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> ERPM</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.stop_erpm>
+        <resc_ctrl.rebrake_margin>
+            <longName>Re-brake Margin</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Once reversing, braking resumes only above Stop ERPM + this margin (in % of Stop ERPM).&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REBRAKE_MARGIN</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>3</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.5</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.rebrake_margin>
+        <resc_ctrl.fade_time>
+            <longName>Brake / Reverse Fade Time</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Time over which the current fades from the braking value to the reverse value (and back). 0 = immediate.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_FADE_TIME</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>2</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.05</stepDouble>
+            <valDouble>0.2</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> s</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.fade_time>
+        <resc_ctrl.brk_mode>
+            <longName>Braking Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Reverse request while rolling forward faster than Stop ERPM. Active: negative current (official): torque against the motion, down to Stop ERPM. Regen Only: brake current: regeneration only.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_BRK_MODE</cDefine>
+            <valInt>0</valInt>
+            <maxInt>1</maxInt>
+            <enumNames>Active (negative current)</enumNames>
+            <enumNames>Regen Only (brake)</enumNames>
+        </resc_ctrl.brk_mode>
+        <resc_ctrl.soft_stop_erpm>
+            <longName>Soft Stop Start ERPM</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Active braking: below this speed the braking becomes softer, down to Braking Force at Stop at Stop ERPM.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_SOFT_STOP_ERPM</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>30000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>10</stepDouble>
+            <valDouble>1500</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> ERPM</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.soft_stop_erpm>
+        <resc_ctrl.brk_force_stop>
+            <longName>Braking Force at Stop</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Active braking: braking force left at Stop ERPM, as a part of the request. 100 % = no softening.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_BRK_FORCE_STOP</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.brk_force_stop>
+        <resc_ctrl.rev_mode>
+            <longName>Reverse Mode</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Reverse request below Stop ERPM. Current: reverse current up to Reverse Current Max, top speed limited by Reverse Max Duty (100 % = official). None: never reverse. Duty: reverse duty = request x Reverse Max Duty (Basic Duty Mode applies when released). Current, Duty Limited: reverse at Reverse Current Max (immediate torque), speed capped by a duty limit = request x Reverse Max Duty: the current decreases over the Soft Zone below the limit and is zero above it (released, never braking).&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_MODE</cDefine>
+            <valInt>0</valInt>
+            <maxInt>3</maxInt>
+            <enumNames>Current</enumNames>
+            <enumNames>None</enumNames>
+            <enumNames>Duty</enumNames>
+            <enumNames>Current, Duty Limited</enumNames>
+        </resc_ctrl.rev_mode>
+        <resc_ctrl.rev_cur_max>
+            <longName>Reverse Current Max</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current: reverse current at full request. Current, Duty Limited: reverse current. Fraction of Motor Current Max.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_CUR_MAX</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.rev_cur_max>
+        <resc_ctrl.rev_duty_max>
+            <longName>Reverse Max Duty</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Fraction of Maximum Duty Cycle. Current: top reverse speed (100 % = no limit). Duty: duty at full request. Current, Duty Limited: duty limit at full request.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_DUTY_MAX</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0.02</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.rev_duty_max>
+        <resc_ctrl.rev_soft_zone>
+            <longName>Soft Zone Before Reverse Limit</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current and Current, Duty Limited: zone below the duty limit, as a part of Reverse Max Duty, where the current decreases progressively to zero.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_SOFT_ZONE</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>0.6</maxDouble>
+            <minDouble>0.02</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.15</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.rev_soft_zone>
+        <resc_ctrl.rev_ramp>
+            <longName>Reverse Ramp Time</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Time for the reverse current (Current), duty (Duty) or duty limit (Current, Duty Limited) to rise from 0 to full. Falls at once when the request is reduced. 0 = no ramp.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_RAMP</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>20</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>0</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> s</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.rev_ramp>
+        <resc_ctrl.rev_repress>
+            <longName>Re-press to Reverse</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Braking never turns into reverse. To reverse: stopped, release to neutral, press the brake once (above Reverse Arm Level) and release: reverse is armed, the next press reverses. Neutral longer than Reverse Disarm Time, or any throttle, disarms.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_REPRESS</cDefine>
+            <valInt>0</valInt>
+        </resc_ctrl.rev_repress>
+        <resc_ctrl.rev_arm_level>
+            <longName>Reverse Arm Level</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Re-press to Reverse: brake level of the press that arms the reverse.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_ARM_LEVEL</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0.1</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.95</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.rev_arm_level>
+        <resc_ctrl.rev_disarm_time>
+            <longName>Reverse Disarm Time</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Re-press to Reverse: time in neutral after which the armed reverse is disarmed.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_REV_DISARM_TIME</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>30</maxDouble>
+            <minDouble>0.1</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>2</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> s</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.rev_disarm_time>
+        <resc_ctrl.tr_enable>
+            <longName>Tractor Mode</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Virtual spring on the wheel position (tachometer): an anchor is held with zero throttle and moves with the throttle. Within Free Play the motor is free; beyond, a force proportional to the distance pulls the wheel back (Stiffness); Damping opposes the speed difference. Applies to relative current requests: ADC and PPM current types, VESC Remote, CAN. The VESC Tool keyboard (absolute current) is not affected.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_ENABLE</cDefine>
+            <valInt>0</valInt>
+        </resc_ctrl.tr_enable>
+        <resc_ctrl.tr_mode>
+            <longName>Tractor Output</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Spring Current: output in current. Spring Duty: output in duty.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_MODE</cDefine>
+            <valInt>0</valInt>
+            <maxInt>1</maxInt>
+            <enumNames>Spring Current</enumNames>
+            <enumNames>Spring Duty</enumNames>
+        </resc_ctrl.tr_mode>
+        <resc_ctrl.tr_speed_mode>
+            <longName>Tractor Speed</longName>
+            <type>4</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Throttle: anchor speed proportional to the throttle, up to Tractor Max ERPM. Preset: Tractor Max ERPM as soon as the throttle is pressed.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_SPEED_MODE</cDefine>
+            <valInt>0</valInt>
+            <maxInt>1</maxInt>
+            <enumNames>Throttle</enumNames>
+            <enumNames>Preset</enumNames>
+        </resc_ctrl.tr_speed_mode>
+        <resc_ctrl.tr_max_erpm>
+            <longName>Tractor Max ERPM</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Anchor speed at full throttle.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_MAX_ERPM</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>30000</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>10</stepDouble>
+            <valDouble>1500</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> ERPM</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_max_erpm>
+        <resc_ctrl.tr_free_play>
+            <longName>Tractor Free Play</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Free play around the anchor, in electrical degrees (the tachometer counts 60 degree steps).&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_FREE_PLAY</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>3600</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>60</stepDouble>
+            <valDouble>120</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> deg</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_free_play>
+        <resc_ctrl.tr_max_anchor>
+            <longName>Tractor Max Anchor Distance</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Largest distance between the wheel and the anchor, in electrical degrees.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_MAX_ANCHOR</cDefine>
+            <editorDecimalsDouble>0</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>36000</maxDouble>
+            <minDouble>60</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>60</stepDouble>
+            <valDouble>720</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> deg</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_max_anchor>
+        <resc_ctrl.tr_stiffness>
+            <longName>Tractor Stiffness (Current)</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current per electrical degree beyond Free Play.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_STIFFNESS</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>10</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.1</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> A/deg</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_stiffness>
+        <resc_ctrl.tr_damping>
+            <longName>Tractor Damping (Current)</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current against the speed difference to the anchor, per 1000 ERPM.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_DAMPING</cDefine>
+            <editorDecimalsDouble>2</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>200</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.1</stepDouble>
+            <valDouble>2</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> A/kERPM</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_damping>
+        <resc_ctrl.tr_max_current>
+            <longName>Tractor Max Current</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Current limit (also capped by the motor limit).&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_MAX_CURRENT</cDefine>
+            <editorDecimalsDouble>1</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>500</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>1</stepDouble>
+            <valDouble>20</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> A</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_max_current>
+        <resc_ctrl.tr_duty_stiffness>
+            <longName>Tractor Stiffness (Duty)</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty per electrical degree beyond Free Play.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_DUTY_STIFFNESS</cDefine>
+            <editorDecimalsDouble>4</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>0.1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.0001</stepDouble>
+            <valDouble>0.0005</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> /deg</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_duty_stiffness>
+        <resc_ctrl.tr_duty_damping>
+            <longName>Tractor Damping (Duty)</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty against the speed difference to the anchor, per 1000 ERPM.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_DUTY_DAMPING</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>0</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0</minDouble>
+            <showDisplay>0</showDisplay>
+            <stepDouble>0.001</stepDouble>
+            <valDouble>0.02</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix> /kERPM</suffix>
+            <vTx>9</vTx>
+        </resc_ctrl.tr_duty_damping>
+        <resc_ctrl.tr_max_duty>
+            <longName>Tractor Max Duty</longName>
+            <type>1</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty limit, as a fraction of Maximum Duty Cycle.&lt;/p&gt;</description>
+            <cDefine>APPCONF_RESC_CTRL_TR_MAX_DUTY</cDefine>
+            <editorDecimalsDouble>3</editorDecimalsDouble>
+            <editorScale>1</editorScale>
+            <editAsPercentage>1</editAsPercentage>
+            <maxDouble>1</maxDouble>
+            <minDouble>0.02</minDouble>
+            <showDisplay>1</showDisplay>
+            <stepDouble>0.01</stepDouble>
+            <valDouble>0.3</valDouble>
+            <vTxDoubleScale>1000</vTxDoubleScale>
+            <suffix />
+            <vTx>9</vTx>
+        </resc_ctrl.tr_max_duty>
     </Params>
     <SerOrder>
         <ser>controller_id</ser>
@@ -2519,6 +2959,34 @@ p, li { white-space: pre-wrap; }
         <ser>app_adc_conf.resc_hybrid</ser>
         <ser>app_adc_conf.resc_hybrid_duty</ser>
         <ser>app_adc_conf.resc_hybrid_band</ser>
+        <ser>app_adc_conf.resc_adc2_brake_prio</ser>
+        <ser>resc_ctrl.brk_enable</ser>
+        <ser>resc_ctrl.stop_erpm</ser>
+        <ser>resc_ctrl.rebrake_margin</ser>
+        <ser>resc_ctrl.fade_time</ser>
+        <ser>resc_ctrl.brk_mode</ser>
+        <ser>resc_ctrl.soft_stop_erpm</ser>
+        <ser>resc_ctrl.brk_force_stop</ser>
+        <ser>resc_ctrl.rev_mode</ser>
+        <ser>resc_ctrl.rev_cur_max</ser>
+        <ser>resc_ctrl.rev_duty_max</ser>
+        <ser>resc_ctrl.rev_soft_zone</ser>
+        <ser>resc_ctrl.rev_ramp</ser>
+        <ser>resc_ctrl.rev_repress</ser>
+        <ser>resc_ctrl.rev_arm_level</ser>
+        <ser>resc_ctrl.rev_disarm_time</ser>
+        <ser>resc_ctrl.tr_enable</ser>
+        <ser>resc_ctrl.tr_mode</ser>
+        <ser>resc_ctrl.tr_speed_mode</ser>
+        <ser>resc_ctrl.tr_max_erpm</ser>
+        <ser>resc_ctrl.tr_free_play</ser>
+        <ser>resc_ctrl.tr_max_anchor</ser>
+        <ser>resc_ctrl.tr_stiffness</ser>
+        <ser>resc_ctrl.tr_damping</ser>
+        <ser>resc_ctrl.tr_max_current</ser>
+        <ser>resc_ctrl.tr_duty_stiffness</ser>
+        <ser>resc_ctrl.tr_duty_damping</ser>
+        <ser>resc_ctrl.tr_max_duty</ser>
     </SerOrder>
     <Grouping>
         <group>
@@ -2542,6 +3010,45 @@ p, li { white-space: pre-wrap; }
                     <param>::sep::CAN Messages Rate 2</param>
                     <param>can_status_rate_2</param>
                     <param>can_status_msgs_r2</param>
+                </subgroupParams>
+            </subgroup>
+            <subgroup>
+                <subgroupName>Control Settings</subgroupName>
+                <subgroupParams>
+                    <param>::sep::Braking / Reverse</param>
+                    <param>resc_ctrl.brk_enable</param>
+                    <param>resc_ctrl.stop_erpm</param>
+                    <param>resc_ctrl.rebrake_margin</param>
+                    <param>resc_ctrl.fade_time</param>
+                    <param>::sep::Braking</param>
+                    <param>resc_ctrl.brk_mode</param>
+                    <param>resc_ctrl.soft_stop_erpm</param>
+                    <param>resc_ctrl.brk_force_stop</param>
+                    <param>::sep::Reverse</param>
+                    <param>resc_ctrl.rev_mode</param>
+                    <param>resc_ctrl.rev_cur_max</param>
+                    <param>resc_ctrl.rev_duty_max</param>
+                    <param>resc_ctrl.rev_soft_zone</param>
+                    <param>resc_ctrl.rev_ramp</param>
+                    <param>::sep::Re-press to Reverse</param>
+                    <param>resc_ctrl.rev_repress</param>
+                    <param>resc_ctrl.rev_arm_level</param>
+                    <param>resc_ctrl.rev_disarm_time</param>
+                    <param>::sep::Tractor Mode</param>
+                    <param>resc_ctrl.tr_enable</param>
+                    <param>resc_ctrl.tr_mode</param>
+                    <param>resc_ctrl.tr_speed_mode</param>
+                    <param>resc_ctrl.tr_max_erpm</param>
+                    <param>resc_ctrl.tr_free_play</param>
+                    <param>resc_ctrl.tr_max_anchor</param>
+                    <param>::sep::Spring Current</param>
+                    <param>resc_ctrl.tr_stiffness</param>
+                    <param>resc_ctrl.tr_damping</param>
+                    <param>resc_ctrl.tr_max_current</param>
+                    <param>::sep::Spring Duty</param>
+                    <param>resc_ctrl.tr_duty_stiffness</param>
+                    <param>resc_ctrl.tr_duty_damping</param>
+                    <param>resc_ctrl.tr_max_duty</param>
                 </subgroupParams>
             </subgroup>
         </group>
@@ -2608,6 +3115,7 @@ p, li { white-space: pre-wrap; }
                     <param>app_adc_conf.resc_hybrid</param>
                     <param>app_adc_conf.resc_hybrid_duty</param>
                     <param>app_adc_conf.resc_hybrid_band</param>
+                    <param>app_adc_conf.resc_adc2_brake_prio</param>
                 </subgroupParams>
             </subgroup>
             <subgroup>

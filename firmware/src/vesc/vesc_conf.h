@@ -383,12 +383,40 @@ typedef struct {
     uint8_t   app_adc_conf_resc_hybrid;
     float     app_adc_conf_resc_hybrid_duty;
     float     app_adc_conf_resc_hybrid_band;
+    uint8_t   app_adc_conf_resc_adc2_brake_prio;
+    uint8_t   resc_ctrl_brk_enable;
+    float     resc_ctrl_stop_erpm;
+    float     resc_ctrl_rebrake_margin;
+    float     resc_ctrl_fade_time;
+    uint8_t   resc_ctrl_brk_mode;
+    float     resc_ctrl_soft_stop_erpm;
+    float     resc_ctrl_brk_force_stop;
+    uint8_t   resc_ctrl_rev_mode;
+    float     resc_ctrl_rev_cur_max;
+    float     resc_ctrl_rev_duty_max;
+    float     resc_ctrl_rev_soft_zone;
+    float     resc_ctrl_rev_ramp;
+    uint8_t   resc_ctrl_rev_repress;
+    float     resc_ctrl_rev_arm_level;
+    float     resc_ctrl_rev_disarm_time;
+    uint8_t   resc_ctrl_tr_enable;
+    uint8_t   resc_ctrl_tr_mode;
+    uint8_t   resc_ctrl_tr_speed_mode;
+    float     resc_ctrl_tr_max_erpm;
+    float     resc_ctrl_tr_free_play;
+    float     resc_ctrl_tr_max_anchor;
+    float     resc_ctrl_tr_stiffness;
+    float     resc_ctrl_tr_damping;
+    float     resc_ctrl_tr_max_current;
+    float     resc_ctrl_tr_duty_stiffness;
+    float     resc_ctrl_tr_duty_damping;
+    float     resc_ctrl_tr_max_duty;
 } vesc_appconf_t;
 
 #define VESC700_APPCONF_SIGNATURE 2384027283u
-#define RESCP_APPCONF_SIGNATURE   3017840187u
+#define RESCP_APPCONF_SIGNATURE   2615082316u
 #define VESC700_APPCONF_SER_SIZE 284
-#define RESCP_APPCONF_SER_SIZE   284
+#define RESCP_APPCONF_SER_SIZE   372
 #ifndef VESC_APPCONF_SIGNATURE            /* les tests peuvent viser le format 7.00 */
 #define VESC_APPCONF_SIGNATURE RESCP_APPCONF_SIGNATURE
 #define VESC_APPCONF_SER_MAX RESCP_APPCONF_SER_SIZE
