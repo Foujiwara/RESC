@@ -255,6 +255,9 @@ typedef struct {
     uint32_t fault;               /* mc_fault_code */
     uint32_t last_fault;          /* dernier defaut vu (reste apres l'effacement automatique) */
     uint32_t fault_count;         /* nombre de defauts depuis le demarrage */
+    uint32_t last_fault_line;     /* origine du dernier defaut (ligne de foc.c, 0 = externe) */
+    struct { uint32_t code, line, ticks; } fault_log[8];   /* 8 derniers defauts (circulaire, ticks = periodes FOC) */
+    uint32_t fault_log_n;
     uint8_t hall;                 /* etat Hall courant */
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST

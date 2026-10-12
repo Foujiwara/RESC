@@ -348,7 +348,7 @@ static void adc_init(void)
 void motor_hw_set_awd(const float off[3], float i_trip, float i_scale)
 {
     float s = i_scale < 0.0f ? -i_scale : i_scale;
-    float cnt = 1.15f * i_trip / s;
+    float cnt = 1.5f * i_trip / s;     /* coupure instantanee (court-circuit) au-dessus du seuil filtre */
     for (int x = 0; x < 3; x++) {
         if (H.cs_adc[x] == 0xFF) continue;
         ADC_TypeDef *a = ADCS[H.cs_adc[x]];
