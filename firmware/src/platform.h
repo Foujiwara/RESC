@@ -27,8 +27,8 @@
 #define RESC_GIT_HASH       "local"      /* remplace a la compilation par le commit (build.py) */
 #endif
 #define RESC_FW_MAJOR       1
-#define RESC_FW_MINOR       2      /* incremente a chaque firmware livre */
-#define RESC_VERSION_STR    "RESC 1.2.0"
+#define RESC_FW_MINOR       3      /* incremente a chaque firmware livre */
+#define RESC_VERSION_STR    "RESC 1.3.0"
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 

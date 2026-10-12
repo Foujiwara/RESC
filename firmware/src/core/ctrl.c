@@ -63,7 +63,7 @@ static ctrl_t C;
 
 /* ------------------------------------------------------------- journal */
 #define CLOG_N 32
-static struct { uint32_t ms; uint8_t code; float val; } s_log[CLOG_N];
+static struct { uint32_t ms; uint8_t code; float val, erpm, flux, cmd, iq; } s_log[CLOG_N];
 static volatile uint32_t s_log_n;
 
 void ctrl_log(uint8_t code, float val)
@@ -72,6 +72,10 @@ void ctrl_log(uint8_t code, float val)
     s_log[k].ms = C.now_ms;
     s_log[k].code = code;
     s_log[k].val = val;
+    s_log[k].erpm = g_foc_telem.omega * RAD_TO_ERPM;
+    s_log[k].flux = g_foc_telem.flux_ratio;
+    s_log[k].cmd = C.value;
+    s_log[k].iq = g_foc_telem.iq;
     s_log_n++;
 }
 int ctrl_log_count(void) { return s_log_n > CLOG_N ? CLOG_N : (int)s_log_n; }
@@ -82,6 +86,15 @@ bool ctrl_log_get(int k, uint32_t *ms, uint8_t *code, float *val)
     uint32_t first = s_log_n > CLOG_N ? s_log_n - CLOG_N : 0u;
     uint32_t j = (first + (uint32_t)k) % CLOG_N;
     *ms = s_log[j].ms; *code = s_log[j].code; *val = s_log[j].val;
+    return true;
+}
+bool ctrl_log_get_ctx(int k, float *erpm, float *flux, float *cmd, float *iq)
+{
+    int n = ctrl_log_count();
+    if (k < 0 || k >= n) return false;
+    uint32_t first = s_log_n > CLOG_N ? s_log_n - CLOG_N : 0u;
+    uint32_t j = (first + (uint32_t)k) % CLOG_N;
+    *erpm = s_log[j].erpm; *flux = s_log[j].flux; *cmd = s_log[j].cmd; *iq = s_log[j].iq;
     return true;
 }
 
@@ -776,6 +789,10 @@ void ctrl_update(uint32_t now_ms, float dt)
 
     if (!C.power_ok) run = false;
     if (!run) openloop = 0;
+    {
+        static bool prev_run;
+        if (run != prev_run) { ctrl_log(CLOG_RUN, run ? 1.0f : 0.0f); prev_run = run; }
+    }
     {
         /* run demande mais le coeur ne demarre pas : signale une fois apres 50 ms */
         static float idle_t;
