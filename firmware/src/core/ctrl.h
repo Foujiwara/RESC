@@ -116,10 +116,12 @@ enum {
     CLOG_NO_START,       /* run demande mais le coeur reste a l'arret (val = etat) */
     CLOG_REV_ARMED,      /* re-press : recul arme */
     CLOG_REV_DISARMED,   /* re-press : recul desarme (val : 1 neutre trop long, 2 accelerateur) */
+    CLOG_RUN,            /* la commande demande (1) ou relache (0) le pont */
 };
 void ctrl_log(uint8_t code, float val);
 int ctrl_log_count(void);
 bool ctrl_log_get(int k, uint32_t *ms, uint8_t *code, float *val);   /* k = 0 : le plus ancien */
+bool ctrl_log_get_ctx(int k, float *erpm, float *flux, float *cmd, float *iq);  /* contexte de l'evenement */
 
 void ctrl_init(const ctrl_limits_t *l);
 void ctrl_set_limits(const ctrl_limits_t *l);

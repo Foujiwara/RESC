@@ -274,16 +274,20 @@ void terminal_process(char *line)
     else if (!strcmp(c, "ctrl_log")) {
         static const char *names[] = { "?", "mode", "TIMEOUT commande", "etat FOC", "ADC1 HORS PLAGE",
                                        "SAFE START bloque", "app : sortie nulle", "RUN demande, coeur a l'arret",
-                                       "recul ARME", "recul DESARME" };
+                                       "recul ARME", "recul DESARME", "commande : pont" };
         int n = ctrl_log_count();
         P("Journal de commande (%d evenements, t depuis le demarrage) :", n);
         for (int k = 0; k < n; k++) {
             uint32_t ms; uint8_t code; float val;
             if (!ctrl_log_get(k, &ms, &code, &val)) break;
-            P("  t=%8lu ms  %-28s %.3f", (unsigned long)ms, code < 10 ? names[code] : "?", (double)val);
+            float er = 0.0f, fx = 0.0f, cm = 0.0f, iq = 0.0f;
+            ctrl_log_get_ctx(k, &er, &fx, &cm, &iq);
+            P("  t=%8lu ms  %-28s %7.3f | erpm %6.0f flux %4.2f consigne %7.3f iq %6.1f", (unsigned long)ms,
+              code < 11 ? names[code] : "?", (double)val, (double)er, (double)fx, (double)cm, (double)iq);
         }
         P("modes : 0 aucun 1 courant 2 frein 3 duty 4 erpm 5 frein a main 6 position 7 BO courant 8 BO duty 9 hybride 10 relatif");
         P("etats FOC : 2 arret (pont coupe) 3 demarrage 4 marche 6 defaut ; desarme : 1 neutre trop long, 2 accelerateur");
+        P("flux : flux estime / flux attendu (1.00 = observateur juste) ; consigne : A (courant) ou relative selon le mode");
     }
     else if (!strcmp(c, "faults")) {
         P("Defaut actif : %s (%u) ; dernier : %s (%u), %u depuis le demarrage ; crete de phase vue : %.1f A",

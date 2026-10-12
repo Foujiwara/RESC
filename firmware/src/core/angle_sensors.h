@@ -15,12 +15,12 @@ typedef struct {
 } hall_cfg_t;
 
 typedef struct {
-    uint8_t state;
-    float edge_theta;      /* angle du dernier front */
-    float since_edge;      /* s */
-    float omega;           /* rad/s */
-    int8_t last_dir;
-    float theta;           /* angle de sortie (glisse vers la cible, sans saut) */
+    int8_t prev;           /* etat precedent valide (-1 : aucun) */
+    float dt_now;          /* s depuis le dernier front */
+    float dt_last;         /* s, duree du dernier secteur, signee par le sens */
+    float ang;             /* angle Hall (front, interpolation) */
+    float omega;           /* rad/s el. (secteur / duree, decroit sans front) */
+    float theta;           /* angle de sortie, vitesse de variation limitee */
     bool init;
     bool ok;               /* etat courant valide */
     uint32_t n_invalid;
