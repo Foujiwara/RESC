@@ -45,6 +45,18 @@ typedef struct {
     float s_iq_hold;                 /* sortie du PID vitesse entre deux pas */
     uint32_t oc_count;
     uint32_t oc_window_ms;
+
+    /* Control Settings (consigne de courant relatif) */
+    uint8_t x_phase;                 /* 0 avant / neutre, 1 freinage, 2 recul */
+    float x_last_rel;                /* dernier courant relatif applique (fondu) */
+    float x_fade_from, x_fade_left;
+    float x_rev_level;               /* niveau de recul en rampe (courant, duty ou limite) */
+    float x_speed_duty;              /* rapport cyclique de la vitesse (FEM), filtre */
+    bool  x_armed, x_arm_press, x_press_ok, x_was_neutral;
+    float x_neutral_t;
+    bool  x_tr_active;
+    float x_tr_anchor;               /* degres electriques */
+    float x_tr_pos;                  /* position (degres electriques, tachymetre) */
 } ctrl_t;
 
 static ctrl_t C;
@@ -80,6 +92,21 @@ void ctrl_set_current(float a)      { command(CTRL_MODE_CURRENT, a); }
 void ctrl_set_current_rel(float r)
 {
     r = fm_sat_sym(r, 1.0f);
+    if (C.l.x.brk_enable || C.l.x.tr_enable) {
+        /* Control Settings : la consigne est gardee et traitee a chaque pas de 1 kHz */
+        if (C.mode != CTRL_MODE_CURRENT_REL) {
+            C.x_phase = 0;
+            C.x_last_rel = 0.0f;
+            C.x_fade_left = 0.0f;
+            C.x_rev_level = 0.0f;
+            C.x_armed = C.x_arm_press = C.x_press_ok = false;
+            C.x_was_neutral = true;
+            C.x_neutral_t = 0.0f;
+            C.x_tr_active = false;
+        }
+        command(CTRL_MODE_CURRENT_REL, r);
+        return;
+    }
     command(CTRL_MODE_CURRENT, r >= 0.0f ? r * C.l.i_max : -r * C.l.i_min);
 }
 void ctrl_set_brake(float a)        { command(CTRL_MODE_BRAKE, fm_abs(a)); }
@@ -198,6 +225,183 @@ static void current_window(float erpm, float *lo, float *hi)
     C.st.i_scale_lim = fm_min(k_motor, k_regen);
 }
 
+/* ------------------------------------------------ Control Settings */
+/* Sortie d'un pas : courant (A), rapport cyclique ou frein */
+typedef struct {
+    uint8_t kind;        /* 0 courant, 1 duty, 2 frein (A, positif) */
+    float val;
+} x_out_t;
+
+/* Courant relatif signe -> A (convention de ctrl_set_current_rel) */
+static float x_amps(float r) { return r >= 0.0f ? r * C.l.i_max : -r * C.l.i_min; }
+
+/* Fondu frein <-> recul */
+static float x_blend(float target, float dt)
+{
+    if (C.x_fade_left <= 0.0f || C.l.x.fade_time <= 0.0f) return target;
+    C.x_fade_left -= dt;
+    float k = fm_sat(1.0f - C.x_fade_left / C.l.x.fade_time, 0.0f, 1.0f);
+    return C.x_fade_from + (target - C.x_fade_from) * k;
+}
+
+static void x_set_phase(uint8_t ph, float duty_now)
+{
+    if (ph == C.x_phase) return;
+    if ((C.x_phase == 1 && ph == 2) || (C.x_phase == 2 && ph == 1)) {
+        C.x_fade_from = C.x_last_rel;
+        C.x_fade_left = C.l.x.fade_time;
+    } else {
+        C.x_fade_left = 0.0f;
+    }
+    if (ph == 2) {
+        /* rampe du recul : depart du rapport cyclique de recul present (pas d'a-coup en marche) */
+        float rd = fm_max(-duty_now, 0.0f);
+        C.x_rev_level = C.l.x.rev_mode >= 2 ? rd : 0.0f;
+    }
+    C.x_phase = ph;
+}
+
+/* Reverse Ramp Time : monte de 0 a full en rev_ramp, redescend tout de suite */
+static float x_ramp(float goal, float full, float dt)
+{
+    if (C.l.x.rev_ramp <= 0.0f || C.x_rev_level >= goal) C.x_rev_level = goal;
+    else C.x_rev_level = fm_min(C.x_rev_level + full * dt / C.l.x.rev_ramp, goal);
+    return C.x_rev_level;
+}
+
+/* Re-press to Reverse : le frein ne devient jamais recul. A l'arret, un appui au-dessus de
+ * Arm Level parti du neutre arme le recul au relacher ; l'appui suivant recule. Neutre plus long
+ * que Disarm Time, ou accelerateur : desarme. */
+static void x_repress(float v, float erpm, float dt)
+{
+    if (v > 0.001f) {
+        C.x_armed = C.x_arm_press = C.x_press_ok = C.x_was_neutral = false;
+        C.x_neutral_t = 0.0f;
+        return;
+    }
+    if (v >= -0.001f) {
+        if (C.x_arm_press) { C.x_arm_press = false; C.x_armed = true; C.x_neutral_t = 0.0f; }
+        C.x_neutral_t += dt;
+        if (C.x_armed && C.x_neutral_t > C.l.x.rev_disarm_time) C.x_armed = false;
+        C.x_was_neutral = true;
+        C.x_press_ok = false;
+        return;
+    }
+    if (C.x_was_neutral) {
+        C.x_was_neutral = false;
+        C.x_press_ok = !C.x_armed && erpm <= C.l.x.stop_erpm;
+    }
+    C.x_neutral_t = 0.0f;
+    if (C.x_press_ok && -v >= C.l.x.rev_arm_level) C.x_arm_press = true;
+}
+
+/* Tracteur : ressort virtuel sur la position (tachymetre) autour d'une ancre mobile */
+static x_out_t x_tractor(float v, float erpm, float dt)
+{
+    x_out_t o = { 0, 0.0f };
+    const float pos = (float)C.st.tacho * 60.0f;    /* degres electriques */
+    if (!C.x_tr_active) { C.x_tr_active = true; C.x_tr_anchor = pos; }
+    float target = C.l.x.tr_speed_mode == 1 ? (fm_abs(v) > 0.05f ? fm_sign(v) * C.l.x.tr_max_erpm : 0.0f)
+                                            : v * C.l.x.tr_max_erpm;
+    C.x_tr_anchor += target / 60.0f * 360.0f * dt;
+    C.x_tr_anchor = fm_sat(C.x_tr_anchor, pos - C.l.x.tr_max_anchor, pos + C.l.x.tr_max_anchor);
+    float err = pos - C.x_tr_anchor;
+    float beyond = fm_max(fm_abs(err) - C.l.x.tr_free_play, 0.0f);
+    float sgn = err > 0.0f ? -1.0f : 1.0f;
+    float sp = (erpm - target) / 1000.0f;
+    if (C.l.x.tr_mode == 0) {
+        float imax = fm_min(C.l.x.tr_max_current, C.l.i_max);
+        o.val = fm_sat_sym(sgn * C.l.x.tr_stiffness * beyond - C.l.x.tr_damping * sp, imax);
+    } else {
+        o.kind = 1;
+        o.val = fm_sat_sym(sgn * C.l.x.tr_duty_stiffness * beyond - C.l.x.tr_duty_damping * sp,
+                           C.l.x.tr_max_duty * C.l.duty_max);
+    }
+    return o;
+}
+
+/* Un pas de 1 kHz de la consigne relative v (-1..1) ; sd : rapport cyclique de la vitesse */
+static x_out_t x_step(float v, float erpm, float sd, float dt)
+{
+    const ctrl_limits_t *l = &C.l;
+    x_out_t o = { 0, 0.0f };
+
+    if (l->x.tr_enable) return x_tractor(v, erpm, dt);
+    C.x_tr_active = false;
+
+    if (l->x.rev_repress) x_repress(v, erpm, dt);
+
+    if (v >= -0.001f || !l->x.brk_enable) {
+        x_set_phase(0, sd);
+        C.x_last_rel = v;
+        o.val = x_amps(v);
+        return o;
+    }
+
+    /* freinage ou recul, avec marge de reprise du freinage */
+    if (C.x_phase == 2) {
+        if (erpm > l->x.stop_erpm * (1.0f + l->x.rebrake_margin)) x_set_phase(1, sd);
+    } else {
+        x_set_phase(erpm > l->x.stop_erpm ? 1 : 2, sd);
+    }
+
+    if (C.x_phase == 1) {
+        if (l->x.brk_mode == 1) {
+            C.x_last_rel = 0.0f;
+            o.kind = 2;
+            o.val = -v * fm_abs(l->i_min);
+            return o;
+        }
+        float out = v;
+        if (l->x.brk_force_stop < 0.999f && erpm < l->x.soft_stop_erpm && l->x.soft_stop_erpm > l->x.stop_erpm) {
+            float f = fm_sat((erpm - l->x.stop_erpm) / (l->x.soft_stop_erpm - l->x.stop_erpm), 0.0f, 1.0f);
+            out = v * (l->x.brk_force_stop + (1.0f - l->x.brk_force_stop) * f);
+        }
+        C.x_last_rel = x_blend(out, dt);
+        o.val = x_amps(C.x_last_rel);
+        return o;
+    }
+
+    /* recul (arret ou deja en recul) ; Re-press : rien tant que non arme */
+    if (l->x.rev_repress && l->x.rev_mode != 1 && !C.x_armed) {
+        C.x_rev_level = 0.0f;
+        C.x_last_rel = x_blend(0.0f, dt);
+        o.val = x_amps(C.x_last_rel);
+        return o;
+    }
+    const float lim_full = l->x.rev_duty_max * l->duty_max;
+    switch (l->x.rev_mode) {
+    case 1:     /* aucun */
+        C.x_last_rel = x_blend(0.0f, dt);
+        o.val = x_amps(C.x_last_rel);
+        break;
+    case 2:     /* duty */
+        C.x_last_rel = 0.0f;
+        o.kind = 1;
+        o.val = -x_ramp(-v * lim_full, lim_full, dt);
+        break;
+    case 3: {   /* courant plein, limite de rapport cyclique fixee par la consigne */
+        float lim = x_ramp(-v * lim_full, lim_full, dt);
+        float band = fm_max(l->x.rev_soft_zone * lim_full, 0.01f);
+        float f = fm_sat((lim + sd) / band, 0.0f, 1.0f);
+        C.x_last_rel = x_blend(-l->x.rev_cur_max * f, dt);
+        o.val = x_amps(C.x_last_rel);
+        break;
+    }
+    default: {  /* courant */
+        float out = -x_ramp(-v * l->x.rev_cur_max, l->x.rev_cur_max, dt);
+        if (l->x.rev_duty_max < 0.999f) {
+            float band = fm_max(l->x.rev_soft_zone * lim_full, 0.002f);
+            out *= fm_sat((lim_full + sd) / band, 0.0f, 1.0f);
+        }
+        C.x_last_rel = x_blend(out, dt);
+        o.val = x_amps(C.x_last_rel);
+        break;
+    }
+    }
+    return o;
+}
+
 /* --------------------------------------------------------- pas 1 kHz */
 void ctrl_update(uint32_t now_ms, float dt)
 {
@@ -213,6 +417,15 @@ void ctrl_update(uint32_t now_ms, float dt)
     C.st.vbus = C.vbus_f;
     C.st.duty = t->duty;
     C.st.i_in = t->i_bus;
+    {
+        /* rapport cyclique correspondant a la vitesse (FEM / tension), filtre ~5 ms : les limites de
+         * rapport cyclique l'utilisent au lieu du rapport applique, qui contient la chute R x I et
+         * suit instantanement le courant commande (oscillation audible) */
+        const foc_params_t *fp = foc_params();
+        float vs = fm_max(C.vbus_f * FM_1_SQRT3, 1.0f);
+        float sd = fp->lambda > 1e-6f ? t->omega * fp->lambda / vs : t->duty;
+        C.x_speed_duty += (sd - C.x_speed_duty) * fm_min(dt / 0.005f, 1.0f);
+    }
     {
         /* filtre du courant d'entree de la cartographie, defini par periode PWM, ramene a 1 kHz */
         float k = fm_sat(l->in_map_filter, 0.0f, 1.0f);
@@ -300,6 +513,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     bool brake = false;
     int8_t dir = 1;
     float v = C.value;
+    float duty_cmd = v;              /* rapport cyclique envoye en mode duty */
 
     if (C.estop) {
         C.mode = CTRL_MODE_NONE;
@@ -325,7 +539,7 @@ void ctrl_update(uint32_t now_ms, float dt)
         /* courant reduit lineairement a l'approche de la limite de rapport cyclique (mesure dans le sens
          * demande) ; pont maintenu meme a courant nul pour garder la mesure et eviter les relances */
         if (fm_abs(v) > l->cc_min_current) {
-            float d = t->duty * (v >= 0.0f ? 1.0f : -1.0f);
+            float d = C.x_speed_duty * (v >= 0.0f ? 1.0f : -1.0f);   /* vitesse, pas le rapport applique */
             iq = v * fm_sat((C.hyb_lim - d) / C.hyb_band, 0.0f, 1.0f);
             run = t->state == FOC_ST_RUN || fm_abs(iq) > l->cc_min_current;
             allow_start = fm_abs(iq) > l->cc_min_current;
@@ -333,6 +547,40 @@ void ctrl_update(uint32_t now_ms, float dt)
             C.off_t = C.off_delay;
         }
         break;
+
+    case CTRL_MODE_CURRENT_REL: {
+        x_out_t o = x_step(v, erpm, C.x_speed_duty, dt);
+        if (o.kind == 1) {
+            duty_cmd = fm_sat_sym(o.val, l->duty_max);
+            if (fm_abs(duty_cmd) >= l->duty_min) {
+                duty_mode = true;
+                run = true;
+                allow_start = true;
+                dir = duty_cmd >= 0.0f ? 1 : -1;
+            }
+        } else if (o.kind == 2) {
+            if (o.val > l->cc_min_current) {
+                iq = erpm > 0.0f ? -o.val : o.val;
+                run = true;
+                brake = true;
+            }
+        } else {
+            /* pont maintenu tant que la consigne n'est pas nulle (tenue, frein, reprise) */
+            iq = o.val;
+            if (fm_abs(iq) > l->cc_min_current || C.l.x.tr_enable) {
+                run = true;
+                allow_start = fm_abs(iq) > l->cc_min_current;
+                dir = iq >= 0.0f ? 1 : -1;
+                C.off_t = C.off_delay;
+            } else if (fm_abs(v) > 0.001f) {
+                run = t->state == FOC_ST_RUN;
+            } else if (C.off_t > 0.0f) {
+                C.off_t -= dt;
+                run = t->state == FOC_ST_RUN;
+            }
+        }
+        break;
+    }
 
     case CTRL_MODE_BRAKE:
         /* le coeur tient le frein jusqu'a l'arret : courant oppose a la vitesse, puis phases en
@@ -494,7 +742,7 @@ void ctrl_update(uint32_t now_ms, float dt)
     g_foc_cmd.allow_start = allow_start ? 1 : 0;
     g_foc_cmd.ol_omega = C.ol_erpm * (FM_2PI / 60.0f);
     g_foc_cmd.ol_duty = C.ol_erpm >= 0.0f ? v : -v;
-    g_foc_cmd.duty = v;
+    g_foc_cmd.duty = duty_cmd;
     g_foc_cmd.i_hi = hi;
     g_foc_cmd.i_lo = lo;
     g_foc_cmd.duty_mode = (run && duty_mode) ? 1 : 0;

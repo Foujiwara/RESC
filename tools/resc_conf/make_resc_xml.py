@@ -229,6 +229,11 @@ APP_EDIT = {
         "Natural: a^(1+k) for k &gt;= 0, 1-(1-a)^(1-k) for k &lt; 0. Polynomial: a + k (a^3 - a), k in [-0.5, 1]. "
         "k &gt; 0 softens the start.")),
 }
+APP_EDIT["app_adc_conf.ctrl_type"] = dict(maxInt="15", enums=[
+    "Off", "Current", "Current Reverse Center", "Current Reverse Button", "Current Reverse ADC2 Brake Button",
+    "Current Reverse Button Brake Center", "Current No Reverse Brake Center", "Current No Reverse Brake Button",
+    "Current No Reverse Brake ADC2", "Duty Cycle", "Duty Cycle Reverse Center", "Duty Cycle Reverse Button",
+    "PID Speed", "PID Speed Reverse Center", "PID Speed Reverse Button", "Current Reverse ADC2"])
 for p in ("app_adc_conf.throttle_exp_mode", "app_chuk_conf.throttle_exp_mode"):
     APP_EDIT[p] = APP_EDIT["app_ppm_conf.throttle_exp_mode"]
 
@@ -403,6 +408,124 @@ APP_ADD = [
 ]
 
 
+# ADC : option du type Current Reverse ADC2
+APP_ADD += [
+    ("app_adc_conf.resc_adc2_brake_prio", "app_adc_conf.use_filter", dict(
+        longName="ADC2 Brake Priority", cDefine="APPCONF_ADC_RESC_ADC2_BRAKE_PRIO", valInt="1",
+        description=html("Control type Current Reverse ADC2: ADC1 = forward, ADC2 = reverse, sent as a signed "
+                         "relative current (-100 % to +100 %), handled by App, Control Settings (braking, reverse).",
+                         "On: when ADC2 is pressed (above the deadband) ADC1 is ignored. Off: request = ADC1 - ADC2.")),
+     "ADC", "General", None),
+]
+
+# App > General > Control Settings : freinage, recul et mode tracteur sur les consignes de courant
+# relatif (ADC, PPM, VESC Remote, CAN). Le clavier de VESC Tool (courant absolu) n'est pas concerne.
+_REL = ("Applies to relative current requests: ADC and PPM current types, VESC Remote, CAN. The VESC Tool "
+        "keyboard (absolute current) is not affected.")
+
+
+def _pct(name, title, dflt, desc, lo="0", hi="1"):
+    return (name, "app_ppm_conf.smart_rev_max_duty", dict(
+        longName=title, cDefine="APPCONF_" + name.upper().replace(".", "_"), valDouble=dflt, minDouble=lo,
+        maxDouble=hi, description=html(desc)))
+
+
+def _f(name, title, dflt, desc, lo, hi, step, dec, suffix):
+    return (name, "app_adc_conf.tc_max_diff", dict(
+        longName=title, cDefine="APPCONF_" + name.upper().replace(".", "_"), valDouble=dflt, minDouble=lo,
+        maxDouble=hi, stepDouble=step, editorDecimalsDouble=dec, suffix=suffix, description=html(desc)))
+
+
+def _b(name, title, dflt, desc):
+    return (name, "app_adc_conf.use_filter", dict(
+        longName=title, cDefine="APPCONF_" + name.upper().replace(".", "_"), valInt=dflt, description=html(desc)))
+
+
+def _e(name, title, enums, desc):
+    return (name, "app_adc_conf.ctrl_type", dict(
+        longName=title, cDefine="APPCONF_" + name.upper().replace(".", "_"), valInt="0",
+        maxInt=str(len(enums) - 1), enums=enums, description=html(desc)))
+
+
+_CS = [
+    ("Braking / Reverse", _b("resc_ctrl.brk_enable", "Braking / Reverse Handling", "0",
+        "On: the Braking and Reverse settings below apply to reverse requests (negative relative current). "
+        "Off: official behaviour (negative current, then reverse at full current). " + _REL)),
+    (None, _f("resc_ctrl.stop_erpm", "Stop ERPM", "300",
+        "Below this speed the vehicle is considered stopped: end of braking, start of the reverse handling.",
+        "0", "10000", "10", "0", " ERPM")),
+    (None, _pct("resc_ctrl.rebrake_margin", "Re-brake Margin", "0.5",
+        "Once reversing, braking resumes only above Stop ERPM + this margin (in % of Stop ERPM).", "0", "3")),
+    (None, _f("resc_ctrl.fade_time", "Brake / Reverse Fade Time", "0.2",
+        "Time over which the current fades from the braking value to the reverse value (and back). 0 = immediate.",
+        "0", "2", "0.05", "2", " s")),
+    ("Braking", _e("resc_ctrl.brk_mode", "Braking Mode", ["Active (negative current)", "Regen Only (brake)"],
+        "Reverse request while rolling forward faster than Stop ERPM. Active: negative current (official): torque "
+        "against the motion, down to Stop ERPM. Regen Only: brake current: regeneration only.")),
+    (None, _f("resc_ctrl.soft_stop_erpm", "Soft Stop Start ERPM", "1500",
+        "Active braking: below this speed the braking becomes softer, down to Braking Force at Stop at Stop ERPM.",
+        "0", "30000", "10", "0", " ERPM")),
+    (None, _pct("resc_ctrl.brk_force_stop", "Braking Force at Stop", "1",
+        "Active braking: braking force left at Stop ERPM, as a part of the request. 100 % = no softening.")),
+    ("Reverse", _e("resc_ctrl.rev_mode", "Reverse Mode", ["Current", "None", "Duty", "Current, Duty Limited"],
+        "Reverse request below Stop ERPM. Current: reverse current up to Reverse Current Max, top speed limited by "
+        "Reverse Max Duty (100 % = official). None: never reverse. Duty: reverse duty = request x Reverse Max "
+        "Duty (Basic Duty Mode applies when released). Current, Duty Limited: reverse at Reverse Current Max "
+        "(immediate torque), speed capped by a duty limit = request x Reverse Max Duty: the current decreases "
+        "over the Soft Zone below the limit and is zero above it (released, never braking).")),
+    (None, _pct("resc_ctrl.rev_cur_max", "Reverse Current Max", "1",
+        "Current: reverse current at full request. Current, Duty Limited: reverse current. Fraction of Motor "
+        "Current Max.")),
+    (None, _pct("resc_ctrl.rev_duty_max", "Reverse Max Duty", "1",
+        "Fraction of Maximum Duty Cycle. Current: top reverse speed (100 % = no limit). Duty: duty at full "
+        "request. Current, Duty Limited: duty limit at full request.", "0.02", "1")),
+    (None, _pct("resc_ctrl.rev_soft_zone", "Soft Zone Before Reverse Limit", "0.15",
+        "Current and Current, Duty Limited: zone below the duty limit, as a part of Reverse Max Duty, where the "
+        "current decreases progressively to zero.", "0.02", "0.6")),
+    (None, _f("resc_ctrl.rev_ramp", "Reverse Ramp Time", "0",
+        "Time for the reverse current (Current), duty (Duty) or duty limit (Current, Duty Limited) to rise from 0 "
+        "to full. Falls at once when the request is reduced. 0 = no ramp.", "0", "20", "0.1", "2", " s")),
+    ("Re-press to Reverse", _b("resc_ctrl.rev_repress", "Re-press to Reverse", "0",
+        "Braking never turns into reverse. To reverse: stopped, release to neutral, press the brake once (above "
+        "Reverse Arm Level) and release: reverse is armed, the next press reverses. Neutral longer than Reverse "
+        "Disarm Time, or any throttle, disarms.")),
+    (None, _pct("resc_ctrl.rev_arm_level", "Reverse Arm Level", "0.95",
+        "Re-press to Reverse: brake level of the press that arms the reverse.", "0.1", "1")),
+    (None, _f("resc_ctrl.rev_disarm_time", "Reverse Disarm Time", "2",
+        "Re-press to Reverse: time in neutral after which the armed reverse is disarmed.", "0.1", "30", "0.1",
+        "1", " s")),
+    ("Tractor Mode", _b("resc_ctrl.tr_enable", "Tractor Mode", "0",
+        "Virtual spring on the wheel position (tachometer): an anchor is held with zero throttle and moves with "
+        "the throttle. Within Free Play the motor is free; beyond, a force proportional to the distance pulls the "
+        "wheel back (Stiffness); Damping opposes the speed difference. " + _REL)),
+    (None, _e("resc_ctrl.tr_mode", "Tractor Output", ["Spring Current", "Spring Duty"],
+        "Spring Current: output in current. Spring Duty: output in duty.")),
+    (None, _e("resc_ctrl.tr_speed_mode", "Tractor Speed", ["Throttle", "Preset"],
+        "Throttle: anchor speed proportional to the throttle, up to Tractor Max ERPM. Preset: Tractor Max ERPM "
+        "as soon as the throttle is pressed.")),
+    (None, _f("resc_ctrl.tr_max_erpm", "Tractor Max ERPM", "1500", "Anchor speed at full throttle.",
+        "0", "30000", "10", "0", " ERPM")),
+    (None, _f("resc_ctrl.tr_free_play", "Tractor Free Play", "120",
+        "Free play around the anchor, in electrical degrees (the tachometer counts 60 degree steps).",
+        "0", "3600", "60", "0", " deg")),
+    (None, _f("resc_ctrl.tr_max_anchor", "Tractor Max Anchor Distance", "720",
+        "Largest distance between the wheel and the anchor, in electrical degrees.", "60", "36000", "60", "0",
+        " deg")),
+    ("Spring Current", _f("resc_ctrl.tr_stiffness", "Tractor Stiffness (Current)", "0.1",
+        "Current per electrical degree beyond Free Play.", "0", "10", "0.01", "3", " A/deg")),
+    (None, _f("resc_ctrl.tr_damping", "Tractor Damping (Current)", "2",
+        "Current against the speed difference to the anchor, per 1000 ERPM.", "0", "200", "0.1", "2", " A/kERPM")),
+    (None, _f("resc_ctrl.tr_max_current", "Tractor Max Current", "20",
+        "Current limit (also capped by the motor limit).", "0", "500", "1", "1", " A")),
+    ("Spring Duty", _f("resc_ctrl.tr_duty_stiffness", "Tractor Stiffness (Duty)", "0.0005",
+        "Duty per electrical degree beyond Free Play.", "0", "0.1", "0.0001", "4", " /deg")),
+    (None, _f("resc_ctrl.tr_duty_damping", "Tractor Damping (Duty)", "0.02",
+        "Duty against the speed difference to the anchor, per 1000 ERPM.", "0", "1", "0.001", "3", " /kERPM")),
+    (None, _pct("resc_ctrl.tr_max_duty", "Tractor Max Duty", "0.3",
+        "Duty limit, as a fraction of Maximum Duty Cycle.", "0.02", "1")),
+]
+APP_ADD += [(n, tpl, ch, "General", "Control Settings", sep) for sep, (n, tpl, ch) in _CS]
+
 # Parametres places en tete de leur onglet
 MC_FIRST = {("General", "General"): ["foc_motor_kind"]}
 
@@ -482,6 +605,20 @@ def find_subgroup(root, group, sub):
     raise SystemExit("onglet absent : %s / %s" % (group, sub))
 
 
+def ensure_subgroup(root, group, sub):
+    """Onglet : cree en fin de groupe s'il n'existe pas."""
+    for g in root.find("Grouping"):
+        if g.findtext("groupName", "").lower() != group.lower():
+            continue
+        for sg in g.findall("subgroup"):
+            if sg.findtext("subgroupName", "").lower() == sub.lower():
+                return sg.find("subgroupParams")
+        sg = ET.SubElement(g, "subgroup")
+        ET.SubElement(sg, "subgroupName").text = sub
+        return ET.SubElement(sg, "subgroupParams")
+    raise SystemExit("groupe absent : %s" % group)
+
+
 def add(root, adds):
     params, ser = root.find("Params"), root.find("SerOrder")
     for name, tpl, ch, group, sub, sep in adds:
@@ -490,7 +627,7 @@ def add(root, adds):
         params.append(e)
         edit(root, {name: ch})
         ET.SubElement(ser, "ser").text = name
-        sp = find_subgroup(root, group, sub)
+        sp = ensure_subgroup(root, group, sub)
         if sep:
             ET.SubElement(sp, "param").text = "::sep::" + sep
         ET.SubElement(sp, "param").text = name

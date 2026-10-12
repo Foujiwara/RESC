@@ -1651,13 +1651,41 @@ int32_t rescp_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
     buf[i++] = (uint8_t)c->app_adc_conf_resc_hybrid;
     vb_put_f32_auto(buf, c->app_adc_conf_resc_hybrid_duty, &i);
     vb_put_f32_auto(buf, c->app_adc_conf_resc_hybrid_band, &i);
+    buf[i++] = (uint8_t)c->app_adc_conf_resc_adc2_brake_prio;
+    buf[i++] = (uint8_t)c->resc_ctrl_brk_enable;
+    vb_put_f32_auto(buf, c->resc_ctrl_stop_erpm, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_rebrake_margin, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_fade_time, &i);
+    buf[i++] = (uint8_t)c->resc_ctrl_brk_mode;
+    vb_put_f32_auto(buf, c->resc_ctrl_soft_stop_erpm, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_brk_force_stop, &i);
+    buf[i++] = (uint8_t)c->resc_ctrl_rev_mode;
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_cur_max, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_duty_max, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_soft_zone, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_ramp, &i);
+    buf[i++] = (uint8_t)c->resc_ctrl_rev_repress;
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_arm_level, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_rev_disarm_time, &i);
+    buf[i++] = (uint8_t)c->resc_ctrl_tr_enable;
+    buf[i++] = (uint8_t)c->resc_ctrl_tr_mode;
+    buf[i++] = (uint8_t)c->resc_ctrl_tr_speed_mode;
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_max_erpm, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_free_play, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_max_anchor, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_stiffness, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_damping, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_max_current, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_duty_stiffness, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_duty_damping, &i);
+    vb_put_f32_auto(buf, c->resc_ctrl_tr_max_duty, &i);
     return i;
 }
 
 bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c)
 {
     int32_t i = 0;
-    if (len < 284) return false;
+    if (len < 372) return false;
     if (vb_get_u32(buf, &i) != g_rescp_appconf_sig) return false;
     c->controller_id = (float)buf[i++];
     c->timeout_msec = vb_get_u32(buf, &i);
@@ -1770,6 +1798,34 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     c->app_adc_conf_resc_hybrid = (uint8_t)buf[i++];
     c->app_adc_conf_resc_hybrid_duty = vb_get_f32_auto(buf, &i);
     c->app_adc_conf_resc_hybrid_band = vb_get_f32_auto(buf, &i);
+    c->app_adc_conf_resc_adc2_brake_prio = (uint8_t)buf[i++];
+    c->resc_ctrl_brk_enable = (uint8_t)buf[i++];
+    c->resc_ctrl_stop_erpm = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rebrake_margin = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_fade_time = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_brk_mode = (uint8_t)buf[i++];
+    c->resc_ctrl_soft_stop_erpm = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_brk_force_stop = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_mode = (uint8_t)buf[i++];
+    c->resc_ctrl_rev_cur_max = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_duty_max = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_soft_zone = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_ramp = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_repress = (uint8_t)buf[i++];
+    c->resc_ctrl_rev_arm_level = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_rev_disarm_time = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_enable = (uint8_t)buf[i++];
+    c->resc_ctrl_tr_mode = (uint8_t)buf[i++];
+    c->resc_ctrl_tr_speed_mode = (uint8_t)buf[i++];
+    c->resc_ctrl_tr_max_erpm = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_free_play = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_max_anchor = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_stiffness = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_damping = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_max_current = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_duty_stiffness = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_duty_damping = vb_get_f32_auto(buf, &i);
+    c->resc_ctrl_tr_max_duty = vb_get_f32_auto(buf, &i);
     return true;
 }
 
@@ -1927,6 +1983,118 @@ void vesc_appconf_defaults(vesc_appconf_t *c)
 #define APPCONF_ADC_RESC_HYBRID_BAND 0.15
 #endif
     c->app_adc_conf_resc_hybrid_band = (float)(APPCONF_ADC_RESC_HYBRID_BAND);
+#ifndef APPCONF_ADC_RESC_ADC2_BRAKE_PRIO
+#define APPCONF_ADC_RESC_ADC2_BRAKE_PRIO 1
+#endif
+    c->app_adc_conf_resc_adc2_brake_prio = (uint8_t)(APPCONF_ADC_RESC_ADC2_BRAKE_PRIO);
+#ifndef APPCONF_RESC_CTRL_BRK_ENABLE
+#define APPCONF_RESC_CTRL_BRK_ENABLE 0
+#endif
+    c->resc_ctrl_brk_enable = (uint8_t)(APPCONF_RESC_CTRL_BRK_ENABLE);
+#ifndef APPCONF_RESC_CTRL_STOP_ERPM
+#define APPCONF_RESC_CTRL_STOP_ERPM 300
+#endif
+    c->resc_ctrl_stop_erpm = (float)(APPCONF_RESC_CTRL_STOP_ERPM);
+#ifndef APPCONF_RESC_CTRL_REBRAKE_MARGIN
+#define APPCONF_RESC_CTRL_REBRAKE_MARGIN 0.5
+#endif
+    c->resc_ctrl_rebrake_margin = (float)(APPCONF_RESC_CTRL_REBRAKE_MARGIN);
+#ifndef APPCONF_RESC_CTRL_FADE_TIME
+#define APPCONF_RESC_CTRL_FADE_TIME 0.2
+#endif
+    c->resc_ctrl_fade_time = (float)(APPCONF_RESC_CTRL_FADE_TIME);
+#ifndef APPCONF_RESC_CTRL_BRK_MODE
+#define APPCONF_RESC_CTRL_BRK_MODE 0
+#endif
+    c->resc_ctrl_brk_mode = (uint8_t)(APPCONF_RESC_CTRL_BRK_MODE);
+#ifndef APPCONF_RESC_CTRL_SOFT_STOP_ERPM
+#define APPCONF_RESC_CTRL_SOFT_STOP_ERPM 1500
+#endif
+    c->resc_ctrl_soft_stop_erpm = (float)(APPCONF_RESC_CTRL_SOFT_STOP_ERPM);
+#ifndef APPCONF_RESC_CTRL_BRK_FORCE_STOP
+#define APPCONF_RESC_CTRL_BRK_FORCE_STOP 1
+#endif
+    c->resc_ctrl_brk_force_stop = (float)(APPCONF_RESC_CTRL_BRK_FORCE_STOP);
+#ifndef APPCONF_RESC_CTRL_REV_MODE
+#define APPCONF_RESC_CTRL_REV_MODE 0
+#endif
+    c->resc_ctrl_rev_mode = (uint8_t)(APPCONF_RESC_CTRL_REV_MODE);
+#ifndef APPCONF_RESC_CTRL_REV_CUR_MAX
+#define APPCONF_RESC_CTRL_REV_CUR_MAX 1
+#endif
+    c->resc_ctrl_rev_cur_max = (float)(APPCONF_RESC_CTRL_REV_CUR_MAX);
+#ifndef APPCONF_RESC_CTRL_REV_DUTY_MAX
+#define APPCONF_RESC_CTRL_REV_DUTY_MAX 1
+#endif
+    c->resc_ctrl_rev_duty_max = (float)(APPCONF_RESC_CTRL_REV_DUTY_MAX);
+#ifndef APPCONF_RESC_CTRL_REV_SOFT_ZONE
+#define APPCONF_RESC_CTRL_REV_SOFT_ZONE 0.15
+#endif
+    c->resc_ctrl_rev_soft_zone = (float)(APPCONF_RESC_CTRL_REV_SOFT_ZONE);
+#ifndef APPCONF_RESC_CTRL_REV_RAMP
+#define APPCONF_RESC_CTRL_REV_RAMP 0
+#endif
+    c->resc_ctrl_rev_ramp = (float)(APPCONF_RESC_CTRL_REV_RAMP);
+#ifndef APPCONF_RESC_CTRL_REV_REPRESS
+#define APPCONF_RESC_CTRL_REV_REPRESS 0
+#endif
+    c->resc_ctrl_rev_repress = (uint8_t)(APPCONF_RESC_CTRL_REV_REPRESS);
+#ifndef APPCONF_RESC_CTRL_REV_ARM_LEVEL
+#define APPCONF_RESC_CTRL_REV_ARM_LEVEL 0.95
+#endif
+    c->resc_ctrl_rev_arm_level = (float)(APPCONF_RESC_CTRL_REV_ARM_LEVEL);
+#ifndef APPCONF_RESC_CTRL_REV_DISARM_TIME
+#define APPCONF_RESC_CTRL_REV_DISARM_TIME 2
+#endif
+    c->resc_ctrl_rev_disarm_time = (float)(APPCONF_RESC_CTRL_REV_DISARM_TIME);
+#ifndef APPCONF_RESC_CTRL_TR_ENABLE
+#define APPCONF_RESC_CTRL_TR_ENABLE 0
+#endif
+    c->resc_ctrl_tr_enable = (uint8_t)(APPCONF_RESC_CTRL_TR_ENABLE);
+#ifndef APPCONF_RESC_CTRL_TR_MODE
+#define APPCONF_RESC_CTRL_TR_MODE 0
+#endif
+    c->resc_ctrl_tr_mode = (uint8_t)(APPCONF_RESC_CTRL_TR_MODE);
+#ifndef APPCONF_RESC_CTRL_TR_SPEED_MODE
+#define APPCONF_RESC_CTRL_TR_SPEED_MODE 0
+#endif
+    c->resc_ctrl_tr_speed_mode = (uint8_t)(APPCONF_RESC_CTRL_TR_SPEED_MODE);
+#ifndef APPCONF_RESC_CTRL_TR_MAX_ERPM
+#define APPCONF_RESC_CTRL_TR_MAX_ERPM 1500
+#endif
+    c->resc_ctrl_tr_max_erpm = (float)(APPCONF_RESC_CTRL_TR_MAX_ERPM);
+#ifndef APPCONF_RESC_CTRL_TR_FREE_PLAY
+#define APPCONF_RESC_CTRL_TR_FREE_PLAY 120
+#endif
+    c->resc_ctrl_tr_free_play = (float)(APPCONF_RESC_CTRL_TR_FREE_PLAY);
+#ifndef APPCONF_RESC_CTRL_TR_MAX_ANCHOR
+#define APPCONF_RESC_CTRL_TR_MAX_ANCHOR 720
+#endif
+    c->resc_ctrl_tr_max_anchor = (float)(APPCONF_RESC_CTRL_TR_MAX_ANCHOR);
+#ifndef APPCONF_RESC_CTRL_TR_STIFFNESS
+#define APPCONF_RESC_CTRL_TR_STIFFNESS 0.1
+#endif
+    c->resc_ctrl_tr_stiffness = (float)(APPCONF_RESC_CTRL_TR_STIFFNESS);
+#ifndef APPCONF_RESC_CTRL_TR_DAMPING
+#define APPCONF_RESC_CTRL_TR_DAMPING 2
+#endif
+    c->resc_ctrl_tr_damping = (float)(APPCONF_RESC_CTRL_TR_DAMPING);
+#ifndef APPCONF_RESC_CTRL_TR_MAX_CURRENT
+#define APPCONF_RESC_CTRL_TR_MAX_CURRENT 20
+#endif
+    c->resc_ctrl_tr_max_current = (float)(APPCONF_RESC_CTRL_TR_MAX_CURRENT);
+#ifndef APPCONF_RESC_CTRL_TR_DUTY_STIFFNESS
+#define APPCONF_RESC_CTRL_TR_DUTY_STIFFNESS 0.0005
+#endif
+    c->resc_ctrl_tr_duty_stiffness = (float)(APPCONF_RESC_CTRL_TR_DUTY_STIFFNESS);
+#ifndef APPCONF_RESC_CTRL_TR_DUTY_DAMPING
+#define APPCONF_RESC_CTRL_TR_DUTY_DAMPING 0.02
+#endif
+    c->resc_ctrl_tr_duty_damping = (float)(APPCONF_RESC_CTRL_TR_DUTY_DAMPING);
+#ifndef APPCONF_RESC_CTRL_TR_MAX_DUTY
+#define APPCONF_RESC_CTRL_TR_MAX_DUTY 0.3
+#endif
+    c->resc_ctrl_tr_max_duty = (float)(APPCONF_RESC_CTRL_TR_MAX_DUTY);
     /* defauts de RESC differents de la reference 7.00 (valeurs du XML RESC) */
 }
 
@@ -2059,8 +2227,36 @@ const conf_field_t vesc_appconf_fields[] = {
     { 0xF7D22C6Du, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid), 1, "app_adc_conf_resc_hybrid" },
     { 0xA62325DCu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid_duty), 0, "app_adc_conf_resc_hybrid_duty" },
     { 0x4B4CE7AEu, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_hybrid_band), 0, "app_adc_conf_resc_hybrid_band" },
+    { 0xAA9EDFA3u, (uint16_t)offsetof(vesc_appconf_t, app_adc_conf_resc_adc2_brake_prio), 1, "app_adc_conf_resc_adc2_brake_prio" },
+    { 0xB7F2EA1Du, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_brk_enable), 1, "resc_ctrl_brk_enable" },
+    { 0x12BEE032u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_stop_erpm), 0, "resc_ctrl_stop_erpm" },
+    { 0x896FB7ACu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rebrake_margin), 0, "resc_ctrl_rebrake_margin" },
+    { 0x98CF87D4u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_fade_time), 0, "resc_ctrl_fade_time" },
+    { 0x2B52089Eu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_brk_mode), 1, "resc_ctrl_brk_mode" },
+    { 0xC8AFE678u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_soft_stop_erpm), 0, "resc_ctrl_soft_stop_erpm" },
+    { 0xA84E0A41u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_brk_force_stop), 0, "resc_ctrl_brk_force_stop" },
+    { 0x4AD88AB0u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_mode), 1, "resc_ctrl_rev_mode" },
+    { 0x9308D6B3u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_cur_max), 0, "resc_ctrl_rev_cur_max" },
+    { 0x8402AC95u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_duty_max), 0, "resc_ctrl_rev_duty_max" },
+    { 0xDDF674A4u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_soft_zone), 0, "resc_ctrl_rev_soft_zone" },
+    { 0xF423BFD1u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_ramp), 0, "resc_ctrl_rev_ramp" },
+    { 0x98DA9F32u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_repress), 1, "resc_ctrl_rev_repress" },
+    { 0xB036E7A9u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_arm_level), 0, "resc_ctrl_rev_arm_level" },
+    { 0x4EA886E4u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_rev_disarm_time), 0, "resc_ctrl_rev_disarm_time" },
+    { 0xAC61C278u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_enable), 1, "resc_ctrl_tr_enable" },
+    { 0x74C2C652u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_mode), 1, "resc_ctrl_tr_mode" },
+    { 0x007142A1u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_speed_mode), 1, "resc_ctrl_tr_speed_mode" },
+    { 0xF3CD34A8u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_max_erpm), 0, "resc_ctrl_tr_max_erpm" },
+    { 0x08BDCC9Fu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_free_play), 0, "resc_ctrl_tr_free_play" },
+    { 0x203B4611u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_max_anchor), 0, "resc_ctrl_tr_max_anchor" },
+    { 0xE2B682E5u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_stiffness), 0, "resc_ctrl_tr_stiffness" },
+    { 0xD25853EEu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_damping), 0, "resc_ctrl_tr_damping" },
+    { 0x98B0732Fu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_max_current), 0, "resc_ctrl_tr_max_current" },
+    { 0x1AC92D94u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_duty_stiffness), 0, "resc_ctrl_tr_duty_stiffness" },
+    { 0x6450EAFEu, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_duty_damping), 0, "resc_ctrl_tr_duty_damping" },
+    { 0x30885431u, (uint16_t)offsetof(vesc_appconf_t, resc_ctrl_tr_max_duty), 0, "resc_ctrl_tr_max_duty" },
 };
-const uint16_t vesc_appconf_nfields = 128;
+const uint16_t vesc_appconf_nfields = 156;
 
 
 /* choix dependant de la carte (mcconf, tools/resc_conf/board_enum.py) */
@@ -2073,6 +2269,6 @@ __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode[] = { 0, 1, 2, 3,
 __attribute__((weak)) const uint8_t g_keepb_m_sensor_port_mode_n = 16;
 
 /* choix dependant de la carte (appconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 3017840187u;
+__attribute__((weak)) const uint32_t g_rescp_appconf_sig = 2615082316u;
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type[] = { 0, 1, 4 };
 __attribute__((weak)) const uint8_t g_keepb_imu_conf_type_n = 3;

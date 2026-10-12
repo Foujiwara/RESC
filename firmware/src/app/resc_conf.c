@@ -489,6 +489,35 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     cl->in_map_filter = fm_sat(mc->l_in_current_map_filter, 0.0f, 1.0f);
     cl->f_isr = fp->f_pwm;
     cl->pole_pairs = mc->si_motor_poles >= 2 ? 0.5f * (float)mc->si_motor_poles : 7.0f;
+
+    /* App > Control Settings */
+    cl->x.brk_enable = app->resc_ctrl_brk_enable != 0;
+    cl->x.stop_erpm = fm_sat(app->resc_ctrl_stop_erpm, 0.0f, 10000.0f);
+    cl->x.rebrake_margin = fm_sat(app->resc_ctrl_rebrake_margin, 0.0f, 3.0f);
+    cl->x.fade_time = fm_sat(app->resc_ctrl_fade_time, 0.0f, 2.0f);
+    cl->x.brk_mode = app->resc_ctrl_brk_mode <= 1 ? app->resc_ctrl_brk_mode : 0;
+    cl->x.soft_stop_erpm = fm_sat(app->resc_ctrl_soft_stop_erpm, 0.0f, 30000.0f);
+    cl->x.brk_force_stop = fm_sat(app->resc_ctrl_brk_force_stop, 0.0f, 1.0f);
+    cl->x.rev_mode = app->resc_ctrl_rev_mode <= 3 ? app->resc_ctrl_rev_mode : 0;
+    cl->x.rev_cur_max = fm_sat(app->resc_ctrl_rev_cur_max, 0.0f, 1.0f);
+    cl->x.rev_duty_max = fm_sat(app->resc_ctrl_rev_duty_max, 0.02f, 1.0f);
+    cl->x.rev_soft_zone = fm_sat(app->resc_ctrl_rev_soft_zone, 0.02f, 0.6f);
+    cl->x.rev_ramp = fm_sat(app->resc_ctrl_rev_ramp, 0.0f, 20.0f);
+    cl->x.rev_repress = app->resc_ctrl_rev_repress != 0;
+    cl->x.rev_arm_level = fm_sat(app->resc_ctrl_rev_arm_level, 0.1f, 1.0f);
+    cl->x.rev_disarm_time = fm_sat(app->resc_ctrl_rev_disarm_time, 0.1f, 30.0f);
+    cl->x.tr_enable = app->resc_ctrl_tr_enable != 0;
+    cl->x.tr_mode = app->resc_ctrl_tr_mode <= 1 ? app->resc_ctrl_tr_mode : 0;
+    cl->x.tr_speed_mode = app->resc_ctrl_tr_speed_mode <= 1 ? app->resc_ctrl_tr_speed_mode : 0;
+    cl->x.tr_max_erpm = fm_sat(app->resc_ctrl_tr_max_erpm, 0.0f, 30000.0f);
+    cl->x.tr_free_play = fm_sat(app->resc_ctrl_tr_free_play, 0.0f, 3600.0f);
+    cl->x.tr_max_anchor = fm_sat(app->resc_ctrl_tr_max_anchor, 60.0f, 36000.0f);
+    cl->x.tr_stiffness = fm_sat(app->resc_ctrl_tr_stiffness, 0.0f, 10.0f);
+    cl->x.tr_damping = fm_sat(app->resc_ctrl_tr_damping, 0.0f, 200.0f);
+    cl->x.tr_max_current = fm_sat(app->resc_ctrl_tr_max_current, 0.0f, 500.0f);
+    cl->x.tr_duty_stiffness = fm_sat(app->resc_ctrl_tr_duty_stiffness, 0.0f, 0.1f);
+    cl->x.tr_duty_damping = fm_sat(app->resc_ctrl_tr_duty_damping, 0.0f, 1.0f);
+    cl->x.tr_max_duty = fm_sat(app->resc_ctrl_tr_max_duty, 0.02f, 1.0f);
 }
 
 /* Fourni par la plateforme : changement de frequence PWM (pont coupe) */

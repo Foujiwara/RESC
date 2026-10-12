@@ -20,7 +20,8 @@ typedef enum {
     CTRL_MODE_POS,              /* position (degres mecaniques, PID -> courant) */
     CTRL_MODE_OPENLOOP,         /* courant impose, angle a vitesse imposee */
     CTRL_MODE_OPENLOOP_DUTY,    /* rapport cyclique impose, angle a vitesse imposee */
-    CTRL_MODE_CURRENT_HYB       /* courant, reduit a l'approche d'une limite de rapport cyclique (ADC hybride) */
+    CTRL_MODE_CURRENT_HYB,      /* courant, reduit a l'approche d'une limite de rapport cyclique (ADC hybride) */
+    CTRL_MODE_CURRENT_REL       /* courant relatif signe, traite par Control Settings (freinage, recul, tracteur) */
 } ctrl_mode_t;
 
 typedef struct {
@@ -71,6 +72,22 @@ typedef struct {
     float in_map_start;              /* fraction de i_in_max ; au-dessus, courant moteur max reduit lineairement */
     float in_map_filter;             /* filtre du courant d'entree par periode PWM */
     float f_isr;                     /* Hz, frequence de la boucle FOC (conversion du filtre) */
+    /* App > Control Settings : consignes de courant relatif (freinage, recul, tracteur) */
+    struct {
+        bool  brk_enable;
+        float stop_erpm, rebrake_margin, fade_time;
+        uint8_t brk_mode;                /* 0 actif (courant negatif), 1 regeneration seule */
+        float soft_stop_erpm, brk_force_stop;
+        uint8_t rev_mode;                /* 0 courant, 1 aucun, 2 duty, 3 courant limite en duty */
+        float rev_cur_max, rev_duty_max, rev_soft_zone, rev_ramp;
+        bool  rev_repress;
+        float rev_arm_level, rev_disarm_time;
+        bool  tr_enable;
+        uint8_t tr_mode, tr_speed_mode;
+        float tr_max_erpm, tr_free_play, tr_max_anchor;
+        float tr_stiffness, tr_damping, tr_max_current;
+        float tr_duty_stiffness, tr_duty_damping, tr_max_duty;
+    } x;
 } ctrl_limits_t;
 
 typedef struct {

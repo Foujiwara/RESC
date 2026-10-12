@@ -180,6 +180,30 @@ VIS_APP = {
     "app_chuk_conf.tc": "app->app_chuk_conf_multi_esc",
     "app_chuk_conf.tc_max_diff": "(app->app_chuk_conf_multi_esc && app->app_chuk_conf_tc)",
 }
+# ADC2 utilise aussi par Current Reverse ADC2 (15)
+for _p in ("voltage2_start", "voltage2_end", "voltage2_inverted"):
+    VIS_APP["app_adc_conf." + _p] = any_of(ADC, (4, 8, 15))
+VIS_APP["app_adc_conf.resc_adc2_brake_prio"] = "%s == 15" % ADC
+# App > Control Settings
+_BRK = "app->resc_ctrl_brk_enable"
+_TR = "app->resc_ctrl_tr_enable"
+_RV = "app->resc_ctrl_rev_mode"
+for _p in ("stop_erpm", "rebrake_margin", "fade_time", "brk_mode", "rev_mode", "rev_repress"):
+    VIS_APP["resc_ctrl." + _p] = _BRK
+VIS_APP["resc_ctrl.soft_stop_erpm"] = both(_BRK, "app->resc_ctrl_brk_mode == 0")
+VIS_APP["resc_ctrl.brk_force_stop"] = both(_BRK, "app->resc_ctrl_brk_mode == 0")
+VIS_APP["resc_ctrl.rev_cur_max"] = both(_BRK, any_of(_RV, (0, 3)))
+VIS_APP["resc_ctrl.rev_duty_max"] = both(_BRK, "%s != 1" % _RV)
+VIS_APP["resc_ctrl.rev_soft_zone"] = both(_BRK, any_of(_RV, (0, 3)))
+VIS_APP["resc_ctrl.rev_ramp"] = both(_BRK, "%s != 1" % _RV)
+VIS_APP["resc_ctrl.rev_arm_level"] = both(_BRK, "app->resc_ctrl_rev_repress")
+VIS_APP["resc_ctrl.rev_disarm_time"] = both(_BRK, "app->resc_ctrl_rev_repress")
+for _p in ("tr_mode", "tr_speed_mode", "tr_max_erpm", "tr_free_play", "tr_max_anchor"):
+    VIS_APP["resc_ctrl." + _p] = _TR
+for _p in ("tr_stiffness", "tr_damping", "tr_max_current"):
+    VIS_APP["resc_ctrl." + _p] = both(_TR, "app->resc_ctrl_tr_mode == 0")
+for _p in ("tr_duty_stiffness", "tr_duty_damping", "tr_max_duty"):
+    VIS_APP["resc_ctrl." + _p] = both(_TR, "app->resc_ctrl_tr_mode == 1")
 IMU_ON = "(app->imu_conf_type != 0)"
 for _p in ("mode", "filter", "accel_lowpass_filter_x", "accel_lowpass_filter_y", "accel_lowpass_filter_z",
            "gyro_lowpass_filter", "sample_rate_hz", "accel_confidence_decay", "rot_roll", "rot_pitch", "rot_yaw",

@@ -313,7 +313,7 @@ static void adc_drive(float c, uint8_t type, bool multi, bool tc, float tcm, flo
 {
     const vesc_appconf_t *a = &g_appconf;
     const ctrl_limits_t *l = ctrl_limits();
-    if (a->app_adc_conf_resc_smart_rev && type >= 2 && type <= 5 && c < 0.0f) {
+    if (a->app_adc_conf_resc_smart_rev && !l->x.brk_enable && type >= 2 && type <= 5 && c < 0.0f) {   /* Control Settings prioritaire */
         if (erpm_now() > a->app_adc_conf_resc_smart_rev_erpm) {
             /* encore en marche avant : frein proportionnel a la demande */
             A.adc_sduty = 0.0f;
@@ -422,6 +422,13 @@ static void app_adc(uint32_t now, float dt)
     case 12: output(OUT_RPM, v * l->erpm_max, multi, tc, tcm); break;
     case 13: output(OUT_RPM, v >= 0.0f ? v * l->erpm_max : -v * l->erpm_min, multi, tc, tcm); break;
     case 14: output(OUT_RPM, (rev ? -l->erpm_min : l->erpm_max) * v, multi, tc, tcm); break;
+    case 15: {
+        /* Current Reverse ADC2 : ADC1 avant, ADC2 arriere, courant relatif signe (traite par
+         * App > Control Settings). Priorite au frein : ADC2 appuye coupe ADC1. */
+        float r = c->app_adc_conf_resc_adc2_brake_prio ? (br > 0.0f ? -br : v) : v - br;
+        output(OUT_CUR_REL, fm_sat_sym(r, 1.0f), multi, tc, tcm);
+        break;
+    }
     default: break;
     }
     A.last_activity = now;
