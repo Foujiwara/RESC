@@ -211,6 +211,7 @@ static void cmd_help(void)
     P("  faults                         : defaut actif, 8 derniers defauts avec leur origine, crete de courant vue");
     P("  reset                          : cause du dernier demarrage, redemarrages, plantage, config relue au demarrage");
     P("  ctrl_log                       : journal de la commande (modes, timeouts, ADC, etats du moteur, recul arme)");
+    P("  prof [reset]                   : chronometrage des taches (blocages de la boucle principale et 1 kHz)");
     P("  sensor                         : mode capteur, etat Hall, source d'angle active");
     P("  acim                           : moteur a induction : parametres, flux, glissement, ce qui manque");
     P("  clear                          : efface le defaut (refuse si la ligne de defaut du driver est active)");
@@ -246,6 +247,28 @@ void terminal_process(char *line)
     if (!strcmp(c, "help")) cmd_help();
     else if (!strcmp(c, "status")) cmd_status();
     else if (!strcmp(c, "rt")) cmd_rt();
+    else if (!strcmp(c, "prof")) {
+        extern int main_prof_count(void);
+        extern const char *main_prof_get(int i, uint32_t *max_us, uint32_t *at_ms, uint32_t *n_slow);
+        extern void main_prof_reset(void);
+        if (argc >= 2 && !strcmp(argv[1], "reset")) {
+            extern volatile uint32_t g_isr_gap_max;
+            main_prof_reset(); motor_hw_reset_stats(); g_isr_gap_max = 0;
+            P("Chronometrage remis a zero");
+            return;
+        }
+        P("Duree maximale de chaque tache (us), instant du maximum (ms depuis le demarrage), nombre de fois > 5 ms :");
+        for (int i = 0; i < main_prof_count(); i++) {
+            uint32_t mx, at, ns;
+            const char *n = main_prof_get(i, &mx, &at, &ns);
+            P("  %-28s max %8lu us  a t=%8lu ms  > 5 ms : %lu", n, (unsigned long)mx, (unsigned long)at, (unsigned long)ns);
+        }
+        extern volatile uint32_t g_isr_gap_max;
+        P("  %-28s max %8lu us  (periode normale %.0f us)", "boucle FOC (ecart)", (unsigned long)(g_isr_gap_max / 168u),
+          (double)(1e6f / motor_hw_freq()));
+        cmd_rt();
+        P("Maintenant t=%lu ms", (unsigned long)systime_ms());
+    }
     else if (!strcmp(c, "conf")) cmd_conf();
     else if (!strcmp(c, "hw")) {
         P("Firmware RESC %d.%d, version %s, compile le %s a %s", RESC_FW_MAJOR, RESC_FW_MINOR, RESC_GIT_HASH, __DATE__, __TIME__);
@@ -256,6 +279,7 @@ void terminal_process(char *line)
         P("Offsets tension pont coupe : %.3f %.3f %.3f V (%s)", (double)g_foc_telem.off_vph_used[0],
           (double)g_foc_telem.off_vph_used[1], (double)g_foc_telem.off_vph_used[2],
           g_foc_telem.off_vph_boot ? "calibres au demarrage" : "configuration : moteur en mouvement au demarrage");
+        P("  (ecart-type entre phases a la calibration : %.3f V, seuil 0.3 V)", (double)g_foc_telem.off_vph_sd);
     }
     else if (!strcmp(c, "reset")) {
         uint32_t f = wdg_reset_flags();

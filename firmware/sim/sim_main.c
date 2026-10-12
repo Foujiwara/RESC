@@ -433,6 +433,7 @@ int main(void)
     check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
 
 #include "sim_coast.inc"
+#include "sim_user.inc"
 #include "sim_features.inc"
 #include "sim_vesc1.inc"
 #include "sim_acim.inc"
