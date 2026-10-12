@@ -48,7 +48,6 @@ typedef struct {
     float cal_vacc[3], cal_vmin[3], cal_vmax[3];   /* tensions de phase pont coupe (calibration au demarrage) */
     float cal_dacc[3], cal_dsq[3];                 /* ecart a la moyenne des 3 phases : somme, somme des carres */
     float off_vph[3];            /* offsets de tension pont coupe utilises (demarrage ou configuration) */
-    float vdm_f, vqm_f;          /* pont coupe : tension mesuree aux bornes (axes d, q de l'observateur), filtree */
     uint32_t meas_n;             /* echantillons pont coupe depuis le dernier pilotage */
     float va_prev, vb_prev;      /* pont coupe : tension mesuree a l'echantillon precedent */
     bool calibrated;
@@ -302,25 +301,6 @@ RAMFUNC static void ff_terms(float w, float id, float iq, float *vd, float *vq)
 
 /* Integrateurs prepositionnes sur la tension du modele en regime etabli pour les
  * references actuelles (reprise sans a-coup), anticipation deduite si utilisee */
-RAMFUNC static void pi_preload(float w, bool with_ff);
-
-/* Reprise au vol comme VESC : integrateurs sur la tension REELLEMENT mesuree aux bornes pendant la roue
- * libre (« Set the current controller integrator to the BEMF voltage to avoid a current spike when the
- * motor is driven again »), et non sur la tension calculee (vitesse x flux) : sur un moteur de faible
- * impedance, la moindre erreur du modele (flux, temps mort, angle, offsets) donne une pointe de courant.
- * theta : angle de la commande a la reprise (la mesure est exprimee sur l'angle de l'observateur). */
-RAMFUNC static void pi_preload_meas(float w, float theta)
-{
-    if (S.meas_n < 20u) { pi_preload(w, true); return; }
-    float sn, cs;
-    fm_sincos(fm_wrap_pi(theta - S.obs.theta), &sn, &cs);
-    float vd = cs * S.vdm_f + sn * S.vqm_f;
-    float vq = -sn * S.vdm_f + cs * S.vqm_f;
-    float fd = 0.0f, fq = 0.0f;
-    ff_terms(w, 0.0f, 0.0f, &fd, &fq);
-    S.int_d = vd - fd;
-    S.int_q = vq - fq;
-}
 RAMFUNC static void pi_preload(float w, bool with_ff)
 {
     float vd = S.oc.r * S.id_ref - w * S.oc.lq * S.iq_ref;
@@ -1345,7 +1325,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                     if (sd_max > 0.3f) still = false;
                     g_foc_telem.off_vph_sd = sd_max;
                     if (still) {
-                        for (int x = 0; x < 3; x++) S.off_vph[x] = fm_sat_sym(S.cal_vacc[x] / (float)S.cal_n - vm, 2.0f);
+                        for (int x = 0; x < 3; x++) S.off_vph[x] = fm_sat_sym(S.cal_vacc[x] / (float)S.cal_n - vm, 1.0f);
                     }
                     for (int x = 0; x < 3; x++) g_foc_telem.off_vph_used[x] = S.off_vph[x];
                     g_foc_telem.off_vph_boot = still;
@@ -1381,8 +1361,14 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         valid[a0 >= a1 ? (a0 >= a2 ? 0 : 2) : (a1 >= a2 ? 1 : 2)] = false;
     }
 
-    /* ---- 4. Protections rapides (surintensite : sur le courant filtre, ci-dessous, comme
-     * l_slow_abs_current de VESC ; le watchdog analogique reste la coupure instantanee) */
+    /* ---- 4. Protections rapides : surintensite echantillon par echantillon (pas de filtre : la carte
+     * n'a pas de protection materielle independante ; le watchdog analogique double cette coupure) */
+    for (int x = 0; x < 3; x++) {
+        if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
+            trip(RESC_FAULT_ABS_OVER_CURRENT);
+            break;
+        }
+    }
     if (S.vbus > S.p.vbus_trip_max) trip(RESC_FAULT_OVER_VOLTAGE);
     if (S.br && S.vbus < S.p.vbus_trip_min) trip(RESC_FAULT_UNDER_VOLTAGE);
 
@@ -1390,7 +1376,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     {
         float imag = fm_sqrt(S.i_a * S.i_a + S.i_b * S.i_b);
         FM_LPF(S.i_abs_f, imag, 0.2f);                /* ~0.3 ms a 15 kHz */
-        if (S.i_abs_f > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
+        if (imag > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
         if (imag > g_foc_telem.i_phase_max) g_foc_telem.i_phase_max = imag;
     }
 
@@ -1458,13 +1444,6 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                              : fm_sqrt(va * va + vb * vb) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
         obs_update(&S.obs, &S.oc, va, vb, driven ? S.i_a : 0.0f, driven ? S.i_b : 0.0f, m_obs, dt);
         if (!driven) {
-            /* tension aux bornes sur les axes de l'observateur (milieu de l'intervalle mesure), filtree */
-            float sn, cs;
-            fm_sincos(fm_wrap_pi(S.obs.theta - 0.5f * S.obs.omega * dt), &sn, &cs);
-            float vdm = cs * va + sn * vb, vqm = cs * vb - sn * va;
-            if (S.meas_n == 0u) { S.vdm_f = vdm; S.vqm_f = vqm; }
-            FM_LPF(S.vdm_f, vdm, 0.2f);
-            FM_LPF(S.vqm_f, vqm, 0.2f);
             if (S.meas_n < 0xFFFFFFFFu) S.meas_n++;
         } else {
             S.meas_n = 0u;
@@ -1536,20 +1515,16 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             if (S.p.sensor_mode == FOC_SENSOR_HALL && sensor_ok && fm_abs(S.hall.omega) > 0.5f * S.p.sl_omega &&
                 (!obs_ok0 || fm_abs(S.obs.omega - S.hall.omega) > 0.2f * fm_abs(S.hall.omega))) {
                 obs_reset(&S.obs, &S.oc, S.hall.theta, S.hall.omega);
-                S.meas_n = 0u;          /* tension mesuree exprimee dans l'ancien repere (faux) : inutilisable */
                 obs_fast = false;
                 g_foc_telem.obs_resync++;
             }
             if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
+                pi_preload(S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega, true);
                 {
                     float w0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega;
-                    float th0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.theta : S.enc.theta;
-                    pi_preload_meas(w0, th0);
-                    S.duty_sf = S.meas_n >= 20u ? (S.int_q + (S.p.decoupling & 2 ? w0 * S.lam_eff : 0.0f)) /
-                                                      fm_max(S.vbus_f * FM_1_SQRT3, 1.0f)
-                                                : w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                    S.duty_sf = w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                     S.brk_w_prev = w0;
                     S.brk_vq_prev = S.duty_sf;
                     S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);   /* mode duty : part de la FEM, pas de 0 */
@@ -1564,11 +1539,9 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             } else if (obs_fast) {
                 /* Reprise au vol : integrateurs sur la FEM observee (selon l'anticipation) */
                 S.id_ref = S.iq_ref = 0.0f;
-                pi_preload_meas(S.obs.omega, S.obs.theta);
+                pi_preload(S.obs.omega, true);
                 /* frein au vol : modulation et signes courants (pas de court-circuit a pleine vitesse) */
-                S.duty_sf = S.meas_n >= 20u ? (S.int_q + (S.p.decoupling & 2 ? S.obs.omega * S.lam_eff : 0.0f)) /
-                                                  fm_max(S.vbus_f * FM_1_SQRT3, 1.0f)
-                                            : (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                S.duty_sf = (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                 S.brk_w_prev = S.obs.omega;
                 S.brk_vq_prev = S.duty_sf;
                 S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);       /* mode duty : part de la FEM, pas de 0 */
@@ -1841,8 +1814,8 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             if (!sensor_ok) {
                 S.hall_bad_t += dt;
                 /* etat invalide (parasite) : l'angle Hall reste le dernier valide, comme VESC ;
-                 * defaut seulement si les capteurs restent invalides 0,5 s */
-                if (!S.use_obs && S.hall_bad_t > 0.5f) { trip(RESC_FAULT_UNDERSPEED); goto output; }
+                 * defaut si les capteurs restent invalides 0,1 s */
+                if (!S.use_obs && S.hall_bad_t > 0.1f) { trip(RESC_FAULT_UNDERSPEED); goto output; }
             } else {
                 S.hall_bad_t = 0.0f;
             }

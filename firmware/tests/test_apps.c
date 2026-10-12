@@ -42,6 +42,7 @@ static float last_val;
 static int n_cmd;
 static void rec(const char *k, float v) { strcpy(last_kind, k); last_val = v; n_cmd++; }
 void ctrl_alive(void) { }
+void ctrl_alive_if_idle(void) { }
 void ctrl_log(uint8_t code, float val) { (void)code; (void)val; }
 void ctrl_set_current_rel(float r) { rec("cur_rel", r); }
 void ctrl_set_brake_rel(float r) { rec("brake_rel", r); }

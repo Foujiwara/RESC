@@ -292,12 +292,15 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->short_ls = mc->foc_short_ls_on_zero_duty != 0;
 
     float i_abs_cap = (float)HWLIM_I_ABS_TRIP_A * cap;
-    fp->i_abs_trip = fm_min(mc->l_abs_current_max, i_abs_cap);
+    /* plage mesurable des shunts : +/-2048 LSB autour de l'offset ; la coupure doit rester dedans (90 %) */
+    float i_meas_max = 0.9f * 2048.0f * fm_abs(fp->i_scale);
+    fp->i_abs_trip = fm_min(fm_min(mc->l_abs_current_max, i_abs_cap), i_meas_max);
     fp->enc_slip_fault = (mc->l_additional_faults & 0x01u) != 0;
     fp->vbus_trip_max = mc->l_max_vin;
     fp->vbus_trip_min = mc->l_min_vin;
 
-    float i_max_eff = fm_min(mc->l_current_max, (float)HWLIM_I_MOTOR_A * cap);
+    /* courant moteur toujours sous la coupure (marge de 10 % pour l'ondulation et les depassements) */
+    float i_max_eff = fm_min(fm_min(mc->l_current_max, (float)HWLIM_I_MOTOR_A * cap), 0.9f * fp->i_abs_trip);
     /* Courant de demarrage comme VESC : la consigne, au moins foc_sl_openloop_boost_q, au plus
      * foc_sl_openloop_max_q (si > 0). Plancher de 0,5 A pour que le calage reste possible. */
     fp->st_i_max = mc->foc_sl_openloop_max_q > 0.0f ? fm_min(mc->foc_sl_openloop_max_q, i_max_eff) : i_max_eff;
@@ -435,7 +438,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 
     memset(cl, 0, sizeof(*cl));
     cl->i_max = i_max_eff;
-    cl->i_min = fm_max(mc->l_current_min, -(float)HWLIM_I_MOTOR_A * cap);
+    cl->i_min = fm_max(fm_max(mc->l_current_min, -(float)HWLIM_I_MOTOR_A * cap), -0.9f * fp->i_abs_trip);
     cl->i_max_scale = mc->l_current_max_scale;
     cl->i_min_scale = mc->l_current_min_scale;
     cl->i_in_max = fm_min(mc->l_in_current_max, (float)HWLIM_I_INPUT_A * cap);
