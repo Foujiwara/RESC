@@ -895,7 +895,7 @@ RAMFUNC static void det_step(float vmax, const float vph[3])
             float r_lo = (S.rv[1] - S.rv[0]) / d01;
             float r_hi = (S.rv[2] - S.rv[1]) / d12;
             float r = (S.rv[2] - S.rv[0]) / (S.ri[2] - S.ri[0]);
-            if (r_lo > 1.3f * r_hi && r_hi > 0.0f) { r = r_hi; S.det.warn = 2; }
+            if (r_lo > 1.1f * r_hi && r_hi > 0.0f) { r = r_hi; S.det.warn = 2; }   /* temps mort non sature en bas */
             if (!(r > 1e-5f && r < 20.0f)) { det_finish(-2); return; }
             S.det.r = r;
             S.det.r_v_high = S.rv[2] - S.rv[0];            /* chute ohmique utile */
