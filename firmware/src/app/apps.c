@@ -146,6 +146,7 @@ static void output(out_kind_t k, float v, bool multi, bool tc, float tc_max)
     if ((k == OUT_CUR_REL || k == OUT_BRAKE_REL || k == OUT_NONE) && fm_abs(v) < 0.001f) {
         if (A.out_idle) return;
         A.out_idle = true;
+        ctrl_log(CLOG_ADC_IDLE, 0.0f);
     } else {
         A.out_idle = false;
     }
@@ -329,7 +330,7 @@ static void adc_drive(float c, uint8_t type, bool multi, bool tc, float tcm, flo
         return;
     }
     A.adc_sduty = 0.0f;
-    if (a->app_adc_conf_resc_hybrid && type >= 1 && type <= 8 && fm_abs(c) > 0.001f) {
+    if (a->app_adc_conf_resc_hybrid && ((type >= 1 && type <= 8) || type == 15) && fm_abs(c) > 0.001f) {
         /* limite de rapport cyclique proportionnelle aux gaz ; le courant decroit lineairement sur
          * la bande sous la limite et s'annule a la limite (pas de coupure brutale). Regulation dans
          * ctrl (1 kHz, pont maintenu) ; les autres controleurs recoivent le courant deja reduit. */
@@ -380,7 +381,12 @@ static void app_adc(uint32_t now, float dt)
     bool centered = type == 2 || type == 5 || type == 6 || type == 10 || type == 13;
     A.adc_d[1] = centered ? dc : d1;
     A.adc_d[2] = d2;
-    if (!valid || type == 0) { safe(&A.ch_adc, c->app_adc_conf_safe_start, 1.0f, true, step); return; }
+    if (!valid || type == 0) {
+        static uint32_t last_log;
+        if (!valid && now - last_log > 200u) { ctrl_log(CLOG_ADC_RANGE, v1); last_log = now; }
+        safe(&A.ch_adc, c->app_adc_conf_safe_start, 1.0f, true, step);
+        return;
+    }
 
     /* boutons : bit0 regulateur de vitesse, bit1 inverse le bouton du regulateur, bit2 inverse la marche arriere */
     bool rev = inputs_btn_reverse() ^ ((c->app_adc_conf_buttons & 4u) != 0);
@@ -389,7 +395,11 @@ static void app_adc(uint32_t now, float dt)
     float h = c->app_adc_conf_hyst;
     float x = deadband(centered ? dc : d1, h);
     float br = deadband(d2, h);
-    if (!safe(&A.ch_adc, c->app_adc_conf_safe_start, x, false, step)) return;
+    if (!safe(&A.ch_adc, c->app_adc_conf_safe_start, x, false, step)) {
+        static uint32_t last_log;
+        if (now - last_log > 200u) { ctrl_log(CLOG_ADC_SAFE, x); last_log = now; }
+        return;
+    }
     x = curve(x, c->app_adc_conf_throttle_exp, c->app_adc_conf_throttle_exp_brake, c->app_adc_conf_throttle_exp_mode);
     ramp(&A.ch_adc, x, c->app_adc_conf_ramp_time_pos, c->app_adc_conf_ramp_time_neg, step);
     float v = A.ch_adc.val;
@@ -426,7 +436,9 @@ static void app_adc(uint32_t now, float dt)
         /* Current Reverse ADC2 : ADC1 avant, ADC2 arriere, courant relatif signe (traite par
          * App > Control Settings). Priorite au frein : ADC2 appuye coupe ADC1. */
         float r = c->app_adc_conf_resc_adc2_brake_prio ? (br > 0.0f ? -br : v) : v - br;
-        output(OUT_CUR_REL, fm_sat_sym(r, 1.0f), multi, tc, tcm);
+        r = fm_sat_sym(r, 1.0f);
+        if (r > 0.0f) adc_drive(r, type, multi, tc, tcm, step);    /* avant : commande hybride possible */
+        else output(OUT_CUR_REL, r, multi, tc, tcm);
         break;
     }
     default: break;

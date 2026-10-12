@@ -251,6 +251,20 @@ void terminal_process(char *line)
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
         P("Bootloader (secteur 11, mise a jour par VESC Tool) : %s", flash_bootloader_present() ? "present" : "ABSENT");
     }
+    else if (!strcmp(c, "ctrl_log")) {
+        static const char *names[] = { "?", "mode", "TIMEOUT commande", "etat FOC", "ADC1 HORS PLAGE",
+                                       "SAFE START bloque", "app : sortie nulle", "RUN demande, coeur a l'arret",
+                                       "recul ARME", "recul DESARME" };
+        int n = ctrl_log_count();
+        P("Journal de commande (%d evenements, t depuis le demarrage) :", n);
+        for (int k = 0; k < n; k++) {
+            uint32_t ms; uint8_t code; float val;
+            if (!ctrl_log_get(k, &ms, &code, &val)) break;
+            P("  t=%8lu ms  %-28s %.3f", (unsigned long)ms, code < 10 ? names[code] : "?", (double)val);
+        }
+        P("modes : 0 aucun 1 courant 2 frein 3 duty 4 erpm 5 frein a main 6 position 7 BO courant 8 BO duty 9 hybride 10 relatif");
+        P("etats FOC : 2 arret (pont coupe) 3 demarrage 4 marche 6 defaut ; desarme : 1 neutre trop long, 2 accelerateur");
+    }
     else if (!strcmp(c, "faults")) {
         P("Defaut actif : %s (%u) ; dernier : %s (%u), %u depuis le demarrage ; crete de phase vue : %.1f A",
           fault_name(g_foc_telem.fault), (unsigned)g_foc_telem.fault,

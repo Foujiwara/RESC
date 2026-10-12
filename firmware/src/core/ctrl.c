@@ -61,6 +61,30 @@ typedef struct {
 
 static ctrl_t C;
 
+/* ------------------------------------------------------------- journal */
+#define CLOG_N 32
+static struct { uint32_t ms; uint8_t code; float val; } s_log[CLOG_N];
+static volatile uint32_t s_log_n;
+
+void ctrl_log(uint8_t code, float val)
+{
+    uint32_t k = s_log_n % CLOG_N;
+    s_log[k].ms = C.now_ms;
+    s_log[k].code = code;
+    s_log[k].val = val;
+    s_log_n++;
+}
+int ctrl_log_count(void) { return s_log_n > CLOG_N ? CLOG_N : (int)s_log_n; }
+bool ctrl_log_get(int k, uint32_t *ms, uint8_t *code, float *val)
+{
+    int n = ctrl_log_count();
+    if (k < 0 || k >= n) return false;
+    uint32_t first = s_log_n > CLOG_N ? s_log_n - CLOG_N : 0u;
+    uint32_t j = (first + (uint32_t)k) % CLOG_N;
+    *ms = s_log[j].ms; *code = s_log[j].code; *val = s_log[j].val;
+    return true;
+}
+
 /* ------------------------------------------------------------- API */
 void ctrl_init(const ctrl_limits_t *l)
 {
@@ -81,6 +105,7 @@ const ctrl_stats_t *ctrl_stats(void) { return &C.st; }
 
 static void command(ctrl_mode_t m, float v)
 {
+    if (m != C.mode) ctrl_log(CLOG_MODE, (float)m);
     C.mode = m;
     C.value = v;
     C.last_cmd_ms = C.now_ms;
@@ -95,13 +120,12 @@ void ctrl_set_current_rel(float r)
     if (C.l.x.brk_enable || C.l.x.tr_enable) {
         /* Control Settings : la consigne est gardee et traitee a chaque pas de 1 kHz */
         if (C.mode != CTRL_MODE_CURRENT_REL) {
+            /* nouvelle sequence (apres neutre, timeout ou autre commande) ; l'armement du recul
+             * n'est pas efface ici : il suit sa propre temporisation (Reverse Disarm Time) */
             C.x_phase = 0;
             C.x_last_rel = 0.0f;
             C.x_fade_left = 0.0f;
             C.x_rev_level = 0.0f;
-            C.x_armed = C.x_arm_press = C.x_press_ok = false;
-            C.x_was_neutral = true;
-            C.x_neutral_t = 0.0f;
             C.x_tr_active = false;
         }
         command(CTRL_MODE_CURRENT_REL, r);
@@ -114,6 +138,7 @@ void ctrl_set_brake_rel(float r)    { command(CTRL_MODE_BRAKE, fm_abs(fm_sat_sym
 void ctrl_set_handbrake(float a)    { command(CTRL_MODE_HANDBRAKE, fm_abs(a)); }
 void ctrl_set_current_hybrid(float a, float lim, float band)
 {
+    if (a > 0.0f && C.x_armed) { C.x_armed = C.x_arm_press = false; ctrl_log(CLOG_REV_DISARMED, 2.0f); }
     C.hyb_lim = fm_sat(lim, 0.0f, C.l.duty_max);
     C.hyb_band = fm_max(fm_sat(band, 0.0f, 1.0f) * C.hyb_lim, 0.002f);
     command(CTRL_MODE_CURRENT_HYB, a);
@@ -275,14 +300,15 @@ static float x_ramp(float goal, float full, float dt)
 static void x_repress(float v, float erpm, float dt)
 {
     if (v > 0.001f) {
+        if (C.x_armed) ctrl_log(CLOG_REV_DISARMED, 2.0f);
         C.x_armed = C.x_arm_press = C.x_press_ok = C.x_was_neutral = false;
         C.x_neutral_t = 0.0f;
         return;
     }
     if (v >= -0.001f) {
-        if (C.x_arm_press) { C.x_arm_press = false; C.x_armed = true; C.x_neutral_t = 0.0f; }
+        if (C.x_arm_press) { C.x_arm_press = false; C.x_armed = true; C.x_neutral_t = 0.0f; ctrl_log(CLOG_REV_ARMED, 0.0f); }
         C.x_neutral_t += dt;
-        if (C.x_armed && C.x_neutral_t > C.l.x.rev_disarm_time) C.x_armed = false;
+        if (C.x_armed && C.x_neutral_t > C.l.x.rev_disarm_time) { C.x_armed = false; ctrl_log(CLOG_REV_DISARMED, 1.0f); }
         C.x_was_neutral = true;
         C.x_press_ok = false;
         return;
@@ -476,8 +502,24 @@ void ctrl_update(uint32_t now_ms, float dt)
         else if ((l->add_faults & 0x02u) && lim > 0.0f && fm_abs(erpm) > 1.1f * lim) foc_raise_fault(RESC_FAULT_OVERSPEED);
     }
 
+    /* -- re-press : hors consigne relative (neutre, timeout, autre commande), le temps de neutre continue */
+    if (C.mode != CTRL_MODE_CURRENT_REL) {
+        if (C.x_arm_press) { C.x_arm_press = false; C.x_armed = true; C.x_neutral_t = 0.0f; ctrl_log(CLOG_REV_ARMED, 0.0f); }
+        C.x_was_neutral = true;
+        C.x_press_ok = false;
+        C.x_neutral_t += dt;
+        if (C.x_armed && C.x_neutral_t > l->x.rev_disarm_time) { C.x_armed = false; ctrl_log(CLOG_REV_DISARMED, 1.0f); }
+    }
+
+    /* -- journal : etat du coeur */
+    {
+        static foc_state_t prev_st;
+        if (t->state != prev_st) { ctrl_log(CLOG_FOC_STATE, (float)t->state); prev_st = t->state; }
+    }
+
     /* -- timeout de commande */
     if (l->timeout_ms > 0 && C.mode != CTRL_MODE_NONE && (now_ms - C.last_cmd_ms) > l->timeout_ms) {
+        if (!C.st.timeout) ctrl_log(CLOG_TIMEOUT, (float)(now_ms - C.last_cmd_ms));
         C.st.timeout = true;
         if (l->timeout_brake > 0.0f) { C.mode = CTRL_MODE_BRAKE; C.value = l->timeout_brake; }
         else { C.mode = CTRL_MODE_NONE; C.value = 0.0f; }
@@ -734,6 +776,18 @@ void ctrl_update(uint32_t now_ms, float dt)
 
     if (!C.power_ok) run = false;
     if (!run) openloop = 0;
+    {
+        /* run demande mais le coeur ne demarre pas : signale une fois apres 50 ms */
+        static float idle_t;
+        static bool logged;
+        if (run && t->state == FOC_ST_IDLE) {
+            idle_t += dt;
+            if (idle_t > 0.05f && !logged) { ctrl_log(CLOG_NO_START, (float)t->state); logged = true; }
+        } else {
+            idle_t = 0.0f;
+            logged = false;
+        }
+    }
 
     C.iq_out = iq;
     g_foc_cmd.id_ref = 0.0f;
