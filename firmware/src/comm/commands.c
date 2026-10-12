@@ -420,7 +420,10 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
         if (n >= 4 && foc_state() != FOC_ST_RUN && foc_state() != FOC_ST_START && foc_state() != FOC_ST_DETECT) {
             uint32_t sz = vb_get_u32(d, &i);
             ctrl_release();
-            ok = sz <= FLASH_NEWAPP_SIZE && flash_erase_new_app(sz);
+            /* pas de borne sur la taille, comme VESC : VESC Tool annonce la taille NON compressee
+             * (ex. 524280 octets pour un firmware VESC 7.00) puis envoie l'image compressee
+             * (heatshrink) qui tient dans les 3 secteurs ; les ecritures restent bornees au tampon */
+            ok = flash_erase_new_app(sz);
         }
         b[o++] = COMM_ERASE_NEW_APP;
         b[o++] = ok ? 1 : 0;
