@@ -145,6 +145,38 @@ static int32_t put_setup_values(uint8_t *b, int32_t i, uint32_t mask)
 }
 
 /* ------------------------------------------------------ traitement */
+/* Ecriture de configuration : les valeurs hors des plafonds (carte, coherence) sont ramenees
+ * dans les limites. Chaque valeur modifiee est signalee, et la configuration reelle est renvoyee
+ * a VESC Tool, qui affiche alors les plafonds appliques au lieu des valeurs demandees. */
+static float field_val(const void *conf, const conf_field_t *f)
+{
+    const uint8_t *q = (const uint8_t *)conf + f->offset;
+    switch (f->ctype) {
+    case 0: { float v; memcpy(&v, q, 4); return v; }
+    case 1: return (float)*q;
+    case 2: return (float)(int8_t)*q;
+    case 3: { uint16_t v; memcpy(&v, q, 2); return (float)v; }
+    case 4: { int16_t v; memcpy(&v, q, 2); return (float)v; }
+    case 5: { uint32_t v; memcpy(&v, q, 4); return (float)v; }
+    default: { int32_t v; memcpy(&v, q, 4); return (float)v; }
+    }
+}
+
+static int report_clamped(const void *asked, const void *applied, const conf_field_t *t, uint16_t n)
+{
+    int changed = 0;
+    for (uint16_t k = 0; k < n; k++) {
+        float a = field_val(asked, &t[k]), b = field_val(applied, &t[k]);
+        if (a != b && !(a != a && b != b)) {
+            if (changed < 20)
+                commands_printf("Plafonne : %s = %.4g (demande %.4g)", t[k].name, (double)b, (double)a);
+            changed++;
+        }
+    }
+    if (changed > 20) commands_printf("... %d valeurs plafonnees au total", changed);
+    return changed;
+}
+
 void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
 {
     if (len < 1) return;
@@ -246,12 +278,22 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
             commands_printf("SET_MCCONF refuse : signature ou taille incorrecte");
             break;
         }
+        static vesc_mcconf_t asked;
+        asked = tmp;
         resc_conf_clamp_mc(&tmp);
+        int changed = report_clamped(&asked, &tmp, vesc_mcconf_fields, vesc_mcconf_nfields);
         g_mcconf = tmp;
         resc_conf_apply();
         resc_conf_store_mc();
         b[o++] = COMM_SET_MCCONF;
         reply(src, b, 1);
+        if (changed) {
+            /* valeurs reelles renvoyees : VESC Tool met a jour l'affichage */
+            o = 0;
+            b[o++] = COMM_GET_MCCONF;
+            o += vesc_mcconf_serialize(b + o, &g_mcconf);
+            reply(src, b, (uint32_t)o);
+        }
         break;
     }
     case COMM_GET_APPCONF:
@@ -271,7 +313,10 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
             commands_printf("SET_APPCONF refuse : signature ou taille incorrecte");
             break;
         }
+        static vesc_appconf_t asked_app;
+        asked_app = tmp;
         resc_conf_clamp_app(&tmp);
+        int changed_app = report_clamped(&asked_app, &tmp, vesc_appconf_fields, vesc_appconf_nfields);
         g_appconf = tmp;
         resc_conf_apply();
         apps_configure();
@@ -279,6 +324,12 @@ void commands_process(const comm_iface_t *src, uint8_t *data, uint32_t len)
         if (id == COMM_SET_APPCONF) resc_conf_store_app();
         b[o++] = id;
         reply(src, b, 1);
+        if (changed_app) {
+            o = 0;
+            b[o++] = COMM_GET_APPCONF;
+            o += vesc_appconf_serialize(b + o, &g_appconf);
+            reply(src, b, (uint32_t)o);
+        }
         break;
     }
 
