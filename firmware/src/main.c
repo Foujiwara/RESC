@@ -193,6 +193,33 @@ static void aux_tick(uint32_t now)
 #endif
 }
 
+/* ------------------------------------------------------------ chronometrage (terminal prof) */
+#define PROF_N 14
+static const char *const s_prof_name[PROF_N] = {
+    "usb rx", "uart rx", "codeur abs", "uart2 rx", "can", "commandes", "sampler", "imu", "stats/bms",
+    "conf", "usb poll", "awd", "boucle principale (tour)", "boucle 1 kHz (ecart)" };
+static volatile uint32_t s_prof_max[PROF_N], s_prof_ms[PROF_N], s_prof_n_slow[PROF_N];
+static void prof_note(int i, uint32_t cyc, uint32_t now)
+{
+    if (cyc > s_prof_max[i]) { s_prof_max[i] = cyc; s_prof_ms[i] = now; }
+    if (cyc > 168000u * 5u) s_prof_n_slow[i]++;       /* > 5 ms */
+}
+#define PROF(i, stmt) do { uint32_t _t0 = DWT->CYCCNT; stmt; prof_note((i), DWT->CYCCNT - _t0, now); } while (0)
+
+int main_prof_count(void) { return PROF_N; }
+const char *main_prof_get(int i, uint32_t *max_us, uint32_t *at_ms, uint32_t *n_slow)
+{
+    if (i < 0 || i >= PROF_N) return 0;
+    *max_us = s_prof_max[i] / 168u;
+    *at_ms = s_prof_ms[i];
+    *n_slow = s_prof_n_slow[i];
+    return s_prof_name[i];
+}
+void main_prof_reset(void)
+{
+    for (int i = 0; i < PROF_N; i++) { s_prof_max[i] = 0; s_prof_ms[i] = 0; s_prof_n_slow[i] = 0; }
+}
+
 /* ------------------------------------------------------------ 1 kHz */
 static volatile uint32_t s_main_alive;
 static uint32_t s_last_alive, s_alive_ms, s_last_foc_ticks;
@@ -200,6 +227,12 @@ static uint32_t s_last_alive, s_alive_ms, s_last_foc_ticks;
 void app_tick_1khz(void)
 {
     uint32_t now = systime_ms();
+    {
+        static uint32_t last_cyc;
+        uint32_t cyc = DWT->CYCCNT;
+        if (last_cyc) prof_note(13, cyc - last_cyc, now);
+        last_cyc = cyc;
+    }
     ctrl_set_power_allowed(resc_power_allowed() && resc_motor_configured());
     apps_tick_1khz(now);
     ctrl_update(now, 0.001f);
@@ -268,40 +301,41 @@ int main(void)
     for (;;) {
         s_main_alive++;
         uint32_t now = systime_ms();
+        uint32_t loop_t0 = DWT->CYCCNT;
         int c;
-        for (int k = 0; k < 256 && (c = usb_cdc_getc()) >= 0; k++) packet_dec_byte(&s_dec_usb, (uint8_t)c, now);
+        PROF(0, for (int k = 0; k < 256 && (c = usb_cdc_getc()) >= 0; k++) packet_dec_byte(&s_dec_usb, (uint8_t)c, now));
         /* UART du port COMM : paquets, sauf s'il sert au codeur TS5700N8501 */
         if (!abs_enc_uart_owned())
-            for (int k = 0; k < 256 && (c = uart_getc(s_uart1)) >= 0; k++) packet_dec_byte(&s_dec_u1, (uint8_t)c, now);
-        abs_enc_poll(DWT->CYCCNT / 168u);
+            PROF(1, for (int k = 0; k < 256 && (c = uart_getc(s_uart1)) >= 0; k++) packet_dec_byte(&s_dec_u1, (uint8_t)c, now));
+        PROF(2, abs_enc_poll(DWT->CYCCNT / 168u));
         /* UART permanent (module BLE / NRF) : permanent_uart_enabled */
         if (g_appconf.permanent_uart_enabled)
-            for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now);
-        can_vesc_poll(now);
-        commands_poll(now);
-        sampler_poll();
-        imu_poll(DWT->CYCCNT / 168u);
+            PROF(3, for (int k = 0; k < 256 && (c = uart_getc(s_uart2)) >= 0; k++) packet_dec_byte(&s_dec_u2, (uint8_t)c, now));
+        PROF(4, can_vesc_poll(now));
+        PROF(5, commands_poll(now));
+        PROF(6, sampler_poll());
+        PROF(7, imu_poll(DWT->CYCCNT / 168u));
         {
             static uint32_t st_ms;
             if (now - st_ms >= 10u) {
                 st_ms = now;
-                stats_update(now);
-                bms_update(now);
+                PROF(8, stats_update(now); bms_update(now));
                 const foc_params_t *fpp = foc_params();
                 sampler_set_scale(fpp->i_scale, fpp->v_scale, fpp->vph_scale, fpp->f_pwm);
             }
         }
-        resc_conf_poll();
-        usb_cdc_poll();
+        PROF(9, resc_conf_poll());
+        PROF(10, usb_cdc_poll());
 
         /* Watchdog analogique : seuils a partir des offsets mesures, mis a jour toutes les 100 ms */
         if (foc_calibrated() && (!awd_set || now - awd_ms > 100u)) {
             const foc_params_t *p = foc_params();
-            motor_hw_set_awd(g_foc_telem.off_cs, p->i_abs_trip, p->i_scale);
+            PROF(11, motor_hw_set_awd(g_foc_telem.off_cs, p->i_abs_trip, p->i_scale));
             awd_set = true;
             awd_ms = now;
         }
 
+        prof_note(12, DWT->CYCCNT - loop_t0, now);
         bool idle = foc_state() == FOC_ST_IDLE || foc_state() == FOC_ST_FAULT || foc_state() == FOC_ST_CALIB;
         if (g_req_reboot && idle) {
             resc_conf_store_backup();                       /* odometre */

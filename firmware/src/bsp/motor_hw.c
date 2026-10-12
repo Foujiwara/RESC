@@ -361,9 +361,16 @@ void motor_hw_set_awd(const float off[3], float i_trip, float i_scale)
 }
 
 /* ---------------------------------------------------------------- ISR */
+volatile uint32_t g_isr_gap_max;        /* cycles : plus grand ecart entre deux boucles FOC (prof) */
+
 RAMFUNC void ADC_IRQHandler(void)
 {
     uint32_t t0 = DWT->CYCCNT;
+    {
+        static uint32_t last;
+        if (last && t0 - last > g_isr_gap_max) g_isr_gap_max = t0 - last;
+        last = t0;
+    }
     uint32_t sr1 = ADC1->SR, sr2 = ADC2->SR, sr3 = ADC3->SR;
 
     /* Watchdog analogique : coupure immediate, avant tout calcul */

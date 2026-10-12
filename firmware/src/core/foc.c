@@ -46,7 +46,11 @@ typedef struct {
     float cal_acc[3];
     float off[3];
     float cal_vacc[3], cal_vmin[3], cal_vmax[3];   /* tensions de phase pont coupe (calibration au demarrage) */
+    float cal_dacc[3], cal_dsq[3];                 /* ecart a la moyenne des 3 phases : somme, somme des carres */
     float off_vph[3];            /* offsets de tension pont coupe utilises (demarrage ou configuration) */
+    float vdm_f, vqm_f;          /* pont coupe : tension mesuree aux bornes (axes d, q de l'observateur), filtree */
+    uint32_t meas_n;             /* echantillons pont coupe depuis le dernier pilotage */
+    float va_prev, vb_prev;      /* pont coupe : tension mesuree a l'echantillon precedent */
     bool calibrated;
 
     /* mesures */
@@ -298,6 +302,25 @@ RAMFUNC static void ff_terms(float w, float id, float iq, float *vd, float *vq)
 
 /* Integrateurs prepositionnes sur la tension du modele en regime etabli pour les
  * references actuelles (reprise sans a-coup), anticipation deduite si utilisee */
+RAMFUNC static void pi_preload(float w, bool with_ff);
+
+/* Reprise au vol comme VESC : integrateurs sur la tension REELLEMENT mesuree aux bornes pendant la roue
+ * libre (« Set the current controller integrator to the BEMF voltage to avoid a current spike when the
+ * motor is driven again »), et non sur la tension calculee (vitesse x flux) : sur un moteur de faible
+ * impedance, la moindre erreur du modele (flux, temps mort, angle, offsets) donne une pointe de courant.
+ * theta : angle de la commande a la reprise (la mesure est exprimee sur l'angle de l'observateur). */
+RAMFUNC static void pi_preload_meas(float w, float theta)
+{
+    if (S.meas_n < 20u) { pi_preload(w, true); return; }
+    float sn, cs;
+    fm_sincos(fm_wrap_pi(theta - S.obs.theta), &sn, &cs);
+    float vd = cs * S.vdm_f + sn * S.vqm_f;
+    float vq = -sn * S.vdm_f + cs * S.vqm_f;
+    float fd = 0.0f, fq = 0.0f;
+    ff_terms(w, 0.0f, 0.0f, &fd, &fq);
+    S.int_d = vd - fd;
+    S.int_q = vq - fq;
+}
 RAMFUNC static void pi_preload(float w, bool with_ff)
 {
     float vd = S.oc.r * S.id_ref - w * S.oc.lq * S.iq_ref;
@@ -1275,8 +1298,14 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         if (S.st_time > 0.05f) {
             for (int x = 0; x < 3; x++) {
                 S.cal_acc[x] += (float)cs[x];
-                if (S.cal_n == 0) { S.cal_vacc[x] = 0.0f; S.cal_vmin[x] = S.cal_vmax[x] = S.vph_raw[x]; }
+                if (S.cal_n == 0) { S.cal_vacc[x] = 0.0f; S.cal_vmin[x] = S.cal_vmax[x] = S.vph_raw[x];
+                                    S.cal_dacc[x] = S.cal_dsq[x] = 0.0f; }
                 S.cal_vacc[x] += S.vph_raw[x];
+                {
+                    float dv = S.vph_raw[x] - (S.vph_raw[0] + S.vph_raw[1] + S.vph_raw[2]) * (1.0f / 3.0f);
+                    S.cal_dacc[x] += dv;
+                    S.cal_dsq[x] += dv * dv;
+                }
                 S.cal_vmin[x] = fm_min(S.cal_vmin[x], S.vph_raw[x]);
                 S.cal_vmax[x] = fm_max(S.cal_vmax[x], S.vph_raw[x]);
             }
@@ -1304,8 +1333,17 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                  * servent qu'en roue libre (l'observateur suit alors les tensions mesurees). */
                 {
                     float vm = (S.cal_vacc[0] + S.cal_vacc[1] + S.cal_vacc[2]) / (3.0f * (float)S.cal_n);
+                    /* moteur a l'arret : l'ecart entre phases ne varie pas (un moteur qui tourne donne une
+                     * FEM alternative) ; ecart-type, insensible aux pics de bruit isoles */
                     bool still = true;
-                    for (int x = 0; x < 3; x++) if (S.cal_vmax[x] - S.cal_vmin[x] > 0.5f) still = false;
+                    float sd_max = 0.0f;
+                    for (int x = 0; x < 3; x++) {
+                        float mn = S.cal_dacc[x] / (float)S.cal_n;
+                        float sd = fm_sqrt(fm_max(S.cal_dsq[x] / (float)S.cal_n - mn * mn, 0.0f));
+                        sd_max = fm_max(sd_max, sd);
+                    }
+                    if (sd_max > 0.3f) still = false;
+                    g_foc_telem.off_vph_sd = sd_max;
                     if (still) {
                         for (int x = 0; x < 3; x++) S.off_vph[x] = fm_sat_sym(S.cal_vacc[x] / (float)S.cal_n - vm, 2.0f);
                     }
@@ -1396,6 +1434,19 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* RESC _LAMBDA : seulement en marche observee */
         float va, vb;
         applied_voltage(vph, &va, &vb);
+        if (!driven) {
+            /* pont coupe : la mesure est la tension a l'instant de l'echantillon ; l'observateur integre la
+             * moyenne de l'intervalle ecoule -> moyenne des deux derniers echantillons (sinon retard d'une
+             * demi-periode : 6.7 deg a 30000 ERPM, pointe de courant a la reprise) */
+            float pa = S.meas_n ? S.va_prev : va, pb = S.meas_n ? S.vb_prev : vb;
+            S.va_prev = va;
+            S.vb_prev = vb;
+            /* utile en vitesse seulement (retard negligeable a basse vitesse : demarrages inchanges) */
+            if (fm_abs(S.obs.omega) * dt > 0.05f) {
+                va = 0.5f * (va + pa);
+                vb = 0.5f * (vb + pb);
+            }
+        }
 #ifdef RESC_HOST
         g_foc_telem.dbg_va = va; g_foc_telem.dbg_vb = vb; g_foc_telem.dbg_ia = S.i_a; g_foc_telem.dbg_ib = S.i_b;
 #endif
@@ -1406,6 +1457,18 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         float m_obs = driven ? fm_max(S.duty_abs, fm_abs(S.obs.omega) * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f))
                              : fm_sqrt(va * va + vb * vb) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
         obs_update(&S.obs, &S.oc, va, vb, driven ? S.i_a : 0.0f, driven ? S.i_b : 0.0f, m_obs, dt);
+        if (!driven) {
+            /* tension aux bornes sur les axes de l'observateur (milieu de l'intervalle mesure), filtree */
+            float sn, cs;
+            fm_sincos(fm_wrap_pi(S.obs.theta - 0.5f * S.obs.omega * dt), &sn, &cs);
+            float vdm = cs * va + sn * vb, vqm = cs * vb - sn * va;
+            if (S.meas_n == 0u) { S.vdm_f = vdm; S.vqm_f = vqm; }
+            FM_LPF(S.vdm_f, vdm, 0.2f);
+            FM_LPF(S.vqm_f, vqm, 0.2f);
+            if (S.meas_n < 0xFFFFFFFFu) S.meas_n++;
+        } else {
+            S.meas_n = 0u;
+        }
         S.lam_eff = S.obs.lambda;
     }
     float flux_ratio = S.obs.flux / S.lam_eff;
@@ -1473,16 +1536,20 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             if (S.p.sensor_mode == FOC_SENSOR_HALL && sensor_ok && fm_abs(S.hall.omega) > 0.5f * S.p.sl_omega &&
                 (!obs_ok0 || fm_abs(S.obs.omega - S.hall.omega) > 0.2f * fm_abs(S.hall.omega))) {
                 obs_reset(&S.obs, &S.oc, S.hall.theta, S.hall.omega);
+                S.meas_n = 0u;          /* tension mesuree exprimee dans l'ancien repere (faux) : inutilisable */
                 obs_fast = false;
                 g_foc_telem.obs_resync++;
             }
             if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
-                pi_preload(S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega, true);
                 {
                     float w0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega;
-                    S.duty_sf = w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                    float th0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.theta : S.enc.theta;
+                    pi_preload_meas(w0, th0);
+                    S.duty_sf = S.meas_n >= 20u ? (S.int_q + (S.p.decoupling & 2 ? w0 * S.lam_eff : 0.0f)) /
+                                                      fm_max(S.vbus_f * FM_1_SQRT3, 1.0f)
+                                                : w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                     S.brk_w_prev = w0;
                     S.brk_vq_prev = S.duty_sf;
                     S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);   /* mode duty : part de la FEM, pas de 0 */
@@ -1497,9 +1564,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             } else if (obs_fast) {
                 /* Reprise au vol : integrateurs sur la FEM observee (selon l'anticipation) */
                 S.id_ref = S.iq_ref = 0.0f;
-                pi_preload(S.obs.omega, true);
+                pi_preload_meas(S.obs.omega, S.obs.theta);
                 /* frein au vol : modulation et signes courants (pas de court-circuit a pleine vitesse) */
-                S.duty_sf = (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                S.duty_sf = S.meas_n >= 20u ? (S.int_q + (S.p.decoupling & 2 ? S.obs.omega * S.lam_eff : 0.0f)) /
+                                                  fm_max(S.vbus_f * FM_1_SQRT3, 1.0f)
+                                            : (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                 S.brk_w_prev = S.obs.omega;
                 S.brk_vq_prev = S.duty_sf;
                 S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);       /* mode duty : part de la FEM, pas de 0 */

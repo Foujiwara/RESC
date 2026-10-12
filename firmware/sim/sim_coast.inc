@@ -14,13 +14,13 @@
     foc_set_params(&p);
     L.i_max = 40; L.i_min = -40;
     ctrl_set_limits(&L);
-    const double erpm_targets[2] = { 1500, 6000 };
-    for (int sc = 0; sc < 2; sc++) {
+    const double erpm_targets[3] = { 1500, 6000, 16000 };   /* 16000 : FEM ~ 85 % de la tension max */
+    for (int sc = 0; sc < 3; sc++) {
         M.b = 2e-4; M.t_load = 0.05; M.omega_m = 0;
         RUN_CTRL(0.3);
         /* gaz jusqu'a la vitesse visee */
         for (int k = 0; k < 8000 && sim_omega_e(&M) * 60 / (2 * M_PI) < erpm_targets[sc]; k++) {
-            ctrl_set_current_rel(0.4f);
+            ctrl_set_current_rel(sc == 2 ? 0.05f : 0.4f);
             RUN_CTRL(0.001);
         }
         report("gaz");
@@ -52,7 +52,7 @@
         double iq_max = 0, iq_min = 0, err_max = 0;
         int t_run = -1;
         for (int k = 0; k < 300; k++) {
-            ctrl_set_current_rel(0.4f);
+            ctrl_set_current_rel(sc == 2 ? 0.05f : 0.4f);
             RUN_CTRL(0.001);
             if (t_run < 0 && foc_state() == FOC_ST_RUN) t_run = k;
             if (foc_state() == FOC_ST_RUN) {

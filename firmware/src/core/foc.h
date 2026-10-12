@@ -260,7 +260,8 @@ typedef struct {
     uint32_t fault_log_n;
     uint32_t obs_resync;
     float off_vph_used[3];        /* V : offsets de tension pont coupe en service */
-    bool off_vph_boot;            /* calibres au demarrage (moteur a l'arret) */          /* reprises ou l'observateur a ete recale sur les Hall */
+    bool off_vph_boot;            /* calibres au demarrage (moteur a l'arret) */
+    float off_vph_sd;             /* V : ecart-type entre phases pendant la calibration (arret si < 0.3) */          /* reprises ou l'observateur a ete recale sur les Hall */
     uint8_t hall;                 /* etat Hall courant */
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST
