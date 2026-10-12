@@ -76,8 +76,11 @@ const uint8_t *plat_conf_read(uint32_t slot, uint32_t *len)
 }
 
 /* -------------------------------------------- nouvelle application (8-10) */
+static uint32_t s_newapp_end;      /* fin de l'image recue (decalage dans le tampon) */
+
 bool flash_erase_new_app(uint32_t size)
 {
+    s_newapp_end = 0;
     for (uint32_t s = 0; s < 3; s++) {
         if (size > s * 128u * 1024u) {
             if (!flash_erase_sector(8 + s)) return false;
@@ -100,8 +103,26 @@ bool flash_write_new_app(uint32_t off, const uint8_t *d, uint32_t n)
 {
     uint32_t lim = s_bl_unlocked ? FLASH_NEWAPP_SIZE + 128u * 1024u : FLASH_NEWAPP_SIZE;
     if (off + n > lim) return false;
+    if (off + n > s_newapp_end) s_newapp_end = off + n;
     return flash_program(FLASH_NEWAPP_BASE + off, d, n);
 }
+
+bool flash_upd_backup_free(void)
+{
+    if (s_newapp_end > FLASH_UPD_BACKUP - FLASH_NEWAPP_BASE) return false;
+    const uint32_t *p = (const uint32_t *)FLASH_UPD_BACKUP;
+    for (uint32_t k = 0; k < 0x2000u / 4u; k++) if (p[k] != 0xFFFFFFFFu) return false;
+    return true;
+}
+
+bool flash_upd_backup_write(uint32_t off, const uint8_t *d, uint32_t n)
+{
+    if (off + n > 0x2000u) return false;
+    return flash_program(FLASH_UPD_BACKUP + off, d, n);
+}
+
+bool flash_upd_backup_erase(void) { return flash_erase_sector(10); }
+const uint8_t *flash_upd_backup_ptr(void) { return (const uint8_t *)FLASH_UPD_BACKUP; }
 
 bool flash_bootloader_present(void)
 {

@@ -19,6 +19,14 @@ bool flash_program(uint32_t addr, const uint8_t *data, uint32_t len);
 bool flash_erase_new_app(uint32_t size);
 bool flash_write_new_app(uint32_t offset, const uint8_t *data, uint32_t len);
 bool flash_bootloader_present(void);
+
+/* Copie de la configuration pendant une mise a jour : le bootloader efface les secteurs de
+ * configuration. Derniers 8 Kio du tampon (secteur 10), au-dela de l'image recue. */
+#define FLASH_UPD_BACKUP    (FLASH_NEWAPP_BASE + FLASH_NEWAPP_SIZE - 0x2000u)
+bool flash_upd_backup_free(void);                 /* image recue hors de la zone, zone vierge */
+bool flash_upd_backup_write(uint32_t off, const uint8_t *d, uint32_t n);
+bool flash_upd_backup_erase(void);
+const uint8_t *flash_upd_backup_ptr(void);       /* contenu de la zone (0 si indisponible) */
 bool flash_erase_bootloader(void);
 void flash_jump_to_bootloader(void);
 

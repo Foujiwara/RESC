@@ -34,7 +34,9 @@ bool resc_conf_apply_pending(void);
 
 bool resc_conf_store_mc(void);                  /* refuse si le moteur tourne */
 bool resc_conf_store_app(void);
-bool resc_conf_store_backup(void);              /* odometre (arret, redemarrage), s'il a change */
+bool resc_conf_store_backup(void);
+bool resc_conf_backup_for_update(void);           /* avant le bootloader : copie de la configuration */
+bool resc_conf_restored_after_update(void);       /* configuration restauree depuis cette copie au demarrage */              /* odometre (arret, redemarrage), s'il a change */
 /* Capteurs : broches, codeur absolu (m_sensor_port_mode), sin/cos ; moteur arrete */
 void resc_conf_sensor_hw(const vesc_mcconf_t *mc, const foc_params_t *fp);
 
