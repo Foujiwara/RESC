@@ -208,7 +208,9 @@ static void cmd_help(void)
     P("  rt                             : f_PWM, temps de calcul de la boucle FOC, depassements, reconstructions de courant");
     P("  conf                           : parametres effectifs du coeur (R, L, flux, gains, limites, demarrage)");
     P("  hw                             : carte, offsets courant, dead-time, bootloader, reset watchdog");
-    P("  faults                         : defaut actif et crete de courant vue");
+    P("  faults                         : defaut actif, 8 derniers defauts avec leur origine, crete de courant vue");
+    P("  reset                          : cause du dernier demarrage, redemarrages, plantage, config relue au demarrage");
+    P("  ctrl_log                       : journal de la commande (modes, timeouts, ADC, etats du moteur, recul arme)");
     P("  sensor                         : mode capteur, etat Hall, source d'angle active");
     P("  acim                           : moteur a induction : parametres, flux, glissement, ce qui manque");
     P("  clear                          : efface le defaut (refuse si la ligne de defaut du driver est active)");
