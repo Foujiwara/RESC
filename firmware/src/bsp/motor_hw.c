@@ -349,7 +349,10 @@ static void adc_init(void)
 void motor_hw_set_awd(const float off[3], float i_trip, float i_scale)
 {
     float s = i_scale < 0.0f ? -i_scale : i_scale;
-    float cnt = 1.5f * i_trip / s;     /* coupure instantanee (court-circuit) au-dessus du seuil filtre */
+    /* 1.15 x le seuil logiciel, mais toujours DANS la plage mesurable (sinon la coupure materielle ne
+     * peut plus jamais se declencher) : au plus 1900 LSB de l'offset (pleine echelle ~2048) */
+    float cnt = 1.15f * i_trip / s;
+    if (cnt > 1900.0f) cnt = 1900.0f;
     for (int x = 0; x < 3; x++) {
         if (H.cs_adc[x] == 0xFF) continue;
         ADC_TypeDef *a = ADCS[H.cs_adc[x]];

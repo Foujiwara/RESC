@@ -146,7 +146,7 @@ static void output(out_kind_t k, float v, bool multi, bool tc, float tc_max)
     if ((k == OUT_CUR_REL || k == OUT_BRAKE_REL || k == OUT_NONE) && fm_abs(v) < 0.001f) {
         /* l'app reste vivante : pas de timeout de commande (et de frein de timeout) au neutre,
          * comme l'app ADC de VESC qui envoie sa consigne en continu */
-        ctrl_alive();
+        ctrl_alive_if_idle();
         if (A.out_idle) return;
         A.out_idle = true;
         ctrl_log(CLOG_ADC_IDLE, 0.0f);

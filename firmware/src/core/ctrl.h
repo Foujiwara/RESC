@@ -144,6 +144,7 @@ void ctrl_release(void);
 void ctrl_set_openloop(float amps, float erpm);
 void ctrl_set_openloop_duty(float duty, float erpm);
 void ctrl_alive(void);
+void ctrl_alive_if_idle(void);   /* maintien d'une consigne nulle seulement (app au neutre) */
 void ctrl_set_off_delay(float seconds);
 void ctrl_estop(void);
 /* Autorisation globale du pont (statut de carte, moteur configure). */

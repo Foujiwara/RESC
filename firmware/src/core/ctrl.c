@@ -163,6 +163,15 @@ void ctrl_release(void)             { command(CTRL_MODE_NONE, 0.0f); }
 void ctrl_set_openloop(float a, float erpm)      { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP, fm_abs(a)); }
 void ctrl_set_openloop_duty(float d, float erpm) { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP_DUTY, fm_abs(fm_sat_sym(d, C.l.duty_max))); }
 void ctrl_alive(void)               { C.last_cmd_ms = C.now_ms; C.st.timeout = false; }
+/* Maintien par une app au neutre : seulement si la commande en cours est une consigne nulle (celle de
+ * l'app). Une commande d'une autre source (outil, CAN) n'est jamais prolongee : son timeout s'applique. */
+void ctrl_alive_if_idle(void)
+{
+    bool zero_cmd = C.mode == CTRL_MODE_NONE ||
+                    ((C.mode == CTRL_MODE_CURRENT || C.mode == CTRL_MODE_CURRENT_REL || C.mode == CTRL_MODE_CURRENT_HYB ||
+                      C.mode == CTRL_MODE_BRAKE) && fm_abs(C.value) < 1e-6f);
+    if (zero_cmd) { C.last_cmd_ms = C.now_ms; C.st.timeout = false; }
+}
 void ctrl_set_off_delay(float s)    { C.off_delay = fm_sat(s, 0.0f, 10.0f); }
 void ctrl_estop(void)               { C.estop = true; command(CTRL_MODE_NONE, 0.0f); }
 void ctrl_set_power_allowed(bool a) { C.power_ok = a; }
