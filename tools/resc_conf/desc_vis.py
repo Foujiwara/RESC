@@ -161,10 +161,6 @@ VIS_APP = {
     "app_ppm_conf.smart_rev_ramp_time": "%s == 9" % PPM,
     "app_ppm_conf.tc": "app->app_ppm_conf_multi_esc",
     "app_ppm_conf.tc_max_diff": "(app->app_ppm_conf_multi_esc && app->app_ppm_conf_tc)",
-    "app_adc_conf.voltage_center": any_of(ADC, (2, 5, 6, 10, 13)),
-    "app_adc_conf.voltage2_start": any_of(ADC, (4, 8)),
-    "app_adc_conf.voltage2_end": any_of(ADC, (4, 8)),
-    "app_adc_conf.voltage2_inverted": any_of(ADC, (4, 8)),
     "app_adc_conf.tc": "app->app_adc_conf_multi_esc",
     "app_adc_conf.tc_max_diff": "(app->app_adc_conf_multi_esc && app->app_adc_conf_tc)",
     "app_adc_conf.resc_smart_rev": any_of(ADC, (2, 3, 4, 5)),
@@ -180,9 +176,7 @@ VIS_APP = {
     "app_chuk_conf.tc": "app->app_chuk_conf_multi_esc",
     "app_chuk_conf.tc_max_diff": "(app->app_chuk_conf_multi_esc && app->app_chuk_conf_tc)",
 }
-# ADC2 utilise aussi par Current Reverse ADC2 (15)
-for _p in ("voltage2_start", "voltage2_end", "voltage2_inverted"):
-    VIS_APP["app_adc_conf." + _p] = any_of(ADC, (4, 8, 15))
+# ADC2 toujours visible : a calibrer avant de choisir le type de controle
 VIS_APP["app_adc_conf.resc_adc2_brake_prio"] = "%s == 15" % ADC
 # App > Control Settings
 _BRK = "app->resc_ctrl_brk_enable"

@@ -3010,42 +3010,37 @@ p, li { white-space: pre-wrap; }
                     <param>::sep::CAN Messages Rate 2</param>
                     <param>can_status_rate_2</param>
                     <param>can_status_msgs_r2</param>
-                </subgroupParams>
-            </subgroup>
-            <subgroup>
-                <subgroupName>Control Settings</subgroupName>
-                <subgroupParams>
-                    <param>::sep::Braking / Reverse</param>
+                    <param>::sep::Control Settings: Braking / Reverse</param>
                     <param>resc_ctrl.brk_enable</param>
                     <param>resc_ctrl.stop_erpm</param>
                     <param>resc_ctrl.rebrake_margin</param>
                     <param>resc_ctrl.fade_time</param>
-                    <param>::sep::Braking</param>
+                    <param>::sep::Control Settings: Braking</param>
                     <param>resc_ctrl.brk_mode</param>
                     <param>resc_ctrl.soft_stop_erpm</param>
                     <param>resc_ctrl.brk_force_stop</param>
-                    <param>::sep::Reverse</param>
+                    <param>::sep::Control Settings: Reverse</param>
                     <param>resc_ctrl.rev_mode</param>
                     <param>resc_ctrl.rev_cur_max</param>
                     <param>resc_ctrl.rev_duty_max</param>
                     <param>resc_ctrl.rev_soft_zone</param>
                     <param>resc_ctrl.rev_ramp</param>
-                    <param>::sep::Re-press to Reverse</param>
+                    <param>::sep::Control Settings: Re-press to Reverse</param>
                     <param>resc_ctrl.rev_repress</param>
                     <param>resc_ctrl.rev_arm_level</param>
                     <param>resc_ctrl.rev_disarm_time</param>
-                    <param>::sep::Tractor Mode</param>
+                    <param>::sep::Control Settings: Tractor Mode</param>
                     <param>resc_ctrl.tr_enable</param>
                     <param>resc_ctrl.tr_mode</param>
                     <param>resc_ctrl.tr_speed_mode</param>
                     <param>resc_ctrl.tr_max_erpm</param>
                     <param>resc_ctrl.tr_free_play</param>
                     <param>resc_ctrl.tr_max_anchor</param>
-                    <param>::sep::Spring Current</param>
+                    <param>::sep::Control Settings: Spring Current</param>
                     <param>resc_ctrl.tr_stiffness</param>
                     <param>resc_ctrl.tr_damping</param>
                     <param>resc_ctrl.tr_max_current</param>
-                    <param>::sep::Spring Duty</param>
+                    <param>::sep::Control Settings: Spring Duty</param>
                     <param>resc_ctrl.tr_duty_stiffness</param>
                     <param>resc_ctrl.tr_duty_damping</param>
                     <param>resc_ctrl.tr_max_duty</param>

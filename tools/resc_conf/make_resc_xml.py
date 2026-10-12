@@ -524,7 +524,8 @@ _CS = [
     (None, _pct("resc_ctrl.tr_max_duty", "Tractor Max Duty", "0.3",
         "Duty limit, as a fraction of Maximum Duty Cycle.", "0.02", "1")),
 ]
-APP_ADD += [(n, tpl, ch, "General", "Control Settings", sep) for sep, (n, tpl, ch) in _CS]
+# dans App > General (la page de l'outil n'affiche que cet onglet), sous des separateurs
+APP_ADD += [(n, tpl, ch, "General", "General", ("Control Settings: " + sep) if sep else None) for sep, (n, tpl, ch) in _CS]
 
 # Parametres places en tete de leur onglet
 MC_FIRST = {("General", "General"): ["foc_motor_kind"]}
