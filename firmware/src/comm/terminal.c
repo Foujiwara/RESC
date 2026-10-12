@@ -202,7 +202,7 @@ static void cmd_foc_gains(int argc, char **argv)
 
 static void cmd_help(void)
 {
-    P("Commandes RESC (les reglages se font aussi dans VESC Tool / RESC Tool) :");
+    P("Commandes RESC, version %s (les reglages se font aussi dans VESC Tool / RESC Tool) :", RESC_GIT_HASH);
     P("-- Etat");
     P("  status                         : etat, defaut, Vbus, ERPM, courants, temperatures, moteur identifie, config en flash");
     P("  rt                             : f_PWM, temps de calcul de la boucle FOC, depassements, reconstructions de courant");
@@ -248,6 +248,7 @@ void terminal_process(char *line)
     else if (!strcmp(c, "rt")) cmd_rt();
     else if (!strcmp(c, "conf")) cmd_conf();
     else if (!strcmp(c, "hw")) {
+        P("Firmware RESC %d.%d, version %s, compile le %s a %s", RESC_FW_MAJOR, RESC_FW_MINOR, RESC_GIT_HASH, __DATE__, __TIME__);
         P("Carte %s (%s), statut %d, OCP materielle %d, dead-time %d ns", BOARD_NAME, BOARD_ORIGIN, BOARD_STATUS, BOARD_HW_OCP, BOARD_DEADTIME_NS);
         P("Offsets courant %.1f %.1f %.1f, reset watchdog : %s", (double)g_foc_telem.off_cs[0], (double)g_foc_telem.off_cs[1],
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
