@@ -105,6 +105,22 @@ typedef struct {
     bool timeout;
 } ctrl_stats_t;
 
+/* Journal de la chaine de commande (terminal ctrl_log) : evenements horodates */
+enum {
+    CLOG_MODE = 1,       /* changement de mode de commande (val = nouveau mode) */
+    CLOG_TIMEOUT,        /* timeout de commande (val = ms depuis la derniere commande) */
+    CLOG_FOC_STATE,      /* etat du coeur FOC (val = nouvel etat) */
+    CLOG_ADC_RANGE,      /* entree ADC1 hors plage (val = tension) */
+    CLOG_ADC_SAFE,       /* demarrage securise : sortie bloquee (val = entree) */
+    CLOG_ADC_IDLE,       /* app : sortie nulle envoyee (gaz et frein relaches) */
+    CLOG_NO_START,       /* run demande mais le coeur reste a l'arret (val = etat) */
+    CLOG_REV_ARMED,      /* re-press : recul arme */
+    CLOG_REV_DISARMED,   /* re-press : recul desarme (val : 1 neutre trop long, 2 accelerateur) */
+};
+void ctrl_log(uint8_t code, float val);
+int ctrl_log_count(void);
+bool ctrl_log_get(int k, uint32_t *ms, uint8_t *code, float *val);   /* k = 0 : le plus ancien */
+
 void ctrl_init(const ctrl_limits_t *l);
 void ctrl_set_limits(const ctrl_limits_t *l);
 const ctrl_limits_t *ctrl_limits(void);

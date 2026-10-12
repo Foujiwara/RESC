@@ -1497,7 +1497,7 @@ static bool xml_mc_vis(uint16_t c, const vesc_mcconf_t *mc, const vesc_appconf_t
     }
 }
 const conf_desc_t conf_desc_mc = { xml_mc_z, 23658u, 255311u, 0xD1278B32u, xml_mc_grp, xml_mc_vis, xml_mc_vif, xml_mc_pages };
-/* description app : partie fixe 228444 octets -> 17944, 180 entrees d'onglets, 34 conditions, 38 visibleIf, 5 pages */
+/* description app : partie fixe 228444 octets -> 17944, 180 entrees d'onglets, 33 conditions, 37 visibleIf, 5 pages */
 static const uint8_t xml_app_z[] = {
     0x78, 0xDA, 0xEC, 0x7D, 0xFD, 0x72, 0xE2, 0x48, 0x96, 0xEF, 0xFF, 0xFB, 0x14, 0x79, 0x3B, 0x62, 0xB6, 0xED, 0x68, 0x1B,
     0x03, 0x2E, 0x57, 0xCF, 0xB8, 0xAA, 0xFA, 0x06, 0x06, 0x5C, 0xE5, 0x28, 0x63, 0x13, 0x80, 0xAB, 0xBB, 0x7A, 0x63, 0x47,
@@ -2475,7 +2475,7 @@ static const conf_grp_t xml_app_grp[] = {
     { 'P', 0, 0u, "app_ppm_conf.throttle_exp" },
     { 'P', 0, 0u, "app_ppm_conf.throttle_exp_brake" },
     { 'P', 0, 0u, "app_ppm_conf.throttle_exp_mode" },
-    { 'G', 0, 29u, "ADC" },
+    { 'G', 0, 28u, "ADC" },
     { 'S', 0, 0u, "General" },
     { 'P', 0, 0u, "app_adc_conf.ctrl_type" },
     { 'P', 0, 0u, "app_adc_conf.use_filter" },
@@ -2503,7 +2503,7 @@ static const conf_grp_t xml_app_grp[] = {
     { 'P', 0, 0u, "::sep::ADC 1" },
     { 'P', 0, 0u, "app_adc_conf.voltage_start" },
     { 'P', 0, 0u, "app_adc_conf.voltage_end" },
-    { 'P', 27, 28u, "app_adc_conf.voltage_center" },
+    { 'P', 0, 0u, "app_adc_conf.voltage_center" },
     { 'P', 0, 0u, "app_adc_conf.voltage_inverted" },
     { 'P', 0, 0u, "app_adc_conf.voltage_min" },
     { 'P', 0, 0u, "app_adc_conf.voltage_max" },
@@ -2518,7 +2518,7 @@ static const conf_grp_t xml_app_grp[] = {
     { 'G', 0, 0u, "UART" },
     { 'S', 0, 0u, "General" },
     { 'P', 0, 0u, "app_uart_baudrate" },
-    { 'G', 0, 34u, "VESC Remote" },
+    { 'G', 0, 33u, "VESC Remote" },
     { 'S', 0, 0u, "General" },
     { 'P', 0, 0u, "app_chuk_conf.ctrl_type" },
     { 'P', 0, 0u, "app_chuk_conf.ramp_time_pos" },
@@ -2527,15 +2527,15 @@ static const conf_grp_t xml_app_grp[] = {
     { 'P', 0, 0u, "app_chuk_conf.hyst" },
     { 'P', 0, 0u, "::sep::Smart Reverse" },
     { 'P', 0, 0u, "app_chuk_conf.use_smart_rev" },
-    { 'P', 28, 30u, "app_chuk_conf.smart_rev_max_duty" },
-    { 'P', 28, 30u, "app_chuk_conf.smart_rev_ramp_time" },
+    { 'P', 27, 29u, "app_chuk_conf.smart_rev_max_duty" },
+    { 'P', 27, 29u, "app_chuk_conf.smart_rev_ramp_time" },
     { 'P', 0, 0u, "::sep::Coasting Brake" },
     { 'P', 0, 0u, "app_chuk_conf.coast_brake_level" },
-    { 'P', 29, 31u, "app_chuk_conf.coast_brake_ramp_time" },
+    { 'P', 28, 30u, "app_chuk_conf.coast_brake_ramp_time" },
     { 'P', 0, 0u, "::sep::Multiple ESCs over CAN-bus" },
     { 'P', 0, 0u, "app_chuk_conf.multi_esc" },
-    { 'P', 30, 32u, "app_chuk_conf.tc" },
-    { 'P', 31, 33u, "app_chuk_conf.tc_max_diff" },
+    { 'P', 29, 31u, "app_chuk_conf.tc" },
+    { 'P', 30, 32u, "app_chuk_conf.tc_max_diff" },
     { 'S', 0, 0u, "Throttle Curve" },
     { 'P', 0, 0u, "app_chuk_conf.throttle_exp" },
     { 'P', 0, 0u, "app_chuk_conf.throttle_exp_brake" },
@@ -2543,30 +2543,30 @@ static const conf_grp_t xml_app_grp[] = {
     { 'G', 0, 0u, "IMU" },
     { 'S', 0, 0u, "General" },
     { 'P', 0, 0u, "imu_conf.type" },
-    { 'P', 32, 35u, "imu_conf.sample_rate_hz" },
-    { 'P', 32, 35u, "imu_conf.filter" },
-    { 'P', 32, 35u, "imu_conf.accel_lowpass_filter_x" },
-    { 'P', 32, 35u, "imu_conf.accel_lowpass_filter_y" },
-    { 'P', 32, 35u, "imu_conf.accel_lowpass_filter_z" },
-    { 'P', 32, 35u, "imu_conf.gyro_lowpass_filter" },
-    { 'P', 0, 35u, "::sep::AHRS" },
-    { 'P', 32, 35u, "imu_conf.mode" },
-    { 'P', 32, 35u, "imu_conf.accel_confidence_decay" },
-    { 'P', 33, 36u, "imu_conf.mahony_kp" },
-    { 'P', 33, 36u, "imu_conf.mahony_ki" },
-    { 'P', 34, 37u, "imu_conf.madgwick_beta" },
-    { 'P', 0, 35u, "::sep::Rotation" },
-    { 'P', 32, 35u, "imu_conf.rot_roll" },
-    { 'P', 32, 35u, "imu_conf.rot_pitch" },
-    { 'P', 32, 35u, "imu_conf.rot_yaw" },
-    { 'P', 0, 35u, "::sep::Offsets" },
-    { 'P', 32, 35u, "imu_conf.accel_offsets__0" },
-    { 'P', 32, 35u, "imu_conf.accel_offsets__1" },
-    { 'P', 32, 35u, "imu_conf.accel_offsets__2" },
-    { 'P', 32, 35u, "imu_conf.gyro_offsets__0" },
-    { 'P', 32, 35u, "imu_conf.gyro_offsets__1" },
-    { 'P', 32, 35u, "imu_conf.gyro_offsets__2" },
-    { 'G', 0, 38u, "PAS" },
+    { 'P', 31, 34u, "imu_conf.sample_rate_hz" },
+    { 'P', 31, 34u, "imu_conf.filter" },
+    { 'P', 31, 34u, "imu_conf.accel_lowpass_filter_x" },
+    { 'P', 31, 34u, "imu_conf.accel_lowpass_filter_y" },
+    { 'P', 31, 34u, "imu_conf.accel_lowpass_filter_z" },
+    { 'P', 31, 34u, "imu_conf.gyro_lowpass_filter" },
+    { 'P', 0, 34u, "::sep::AHRS" },
+    { 'P', 31, 34u, "imu_conf.mode" },
+    { 'P', 31, 34u, "imu_conf.accel_confidence_decay" },
+    { 'P', 32, 35u, "imu_conf.mahony_kp" },
+    { 'P', 32, 35u, "imu_conf.mahony_ki" },
+    { 'P', 33, 36u, "imu_conf.madgwick_beta" },
+    { 'P', 0, 34u, "::sep::Rotation" },
+    { 'P', 31, 34u, "imu_conf.rot_roll" },
+    { 'P', 31, 34u, "imu_conf.rot_pitch" },
+    { 'P', 31, 34u, "imu_conf.rot_yaw" },
+    { 'P', 0, 34u, "::sep::Offsets" },
+    { 'P', 31, 34u, "imu_conf.accel_offsets__0" },
+    { 'P', 31, 34u, "imu_conf.accel_offsets__1" },
+    { 'P', 31, 34u, "imu_conf.accel_offsets__2" },
+    { 'P', 31, 34u, "imu_conf.gyro_offsets__0" },
+    { 'P', 31, 34u, "imu_conf.gyro_offsets__1" },
+    { 'P', 31, 34u, "imu_conf.gyro_offsets__2" },
+    { 'G', 0, 37u, "PAS" },
     { 'S', 0, 0u, "General" },
     { 'P', 0, 0u, "app_pas_conf.ctrl_type" },
     { 'P', 0, 0u, "app_pas_conf.pedal_rpm_start" },
@@ -2605,11 +2605,10 @@ static const char *const xml_app_vif[] = {
     "app_adc_conf.multi_esc == 1 &amp;&amp; app_adc_conf.tc == 1",
     "app_adc_conf.ctrl_type in [2, 3, 4, 5]",
     "app_adc_conf.ctrl_type in [2, 3, 4, 5] &amp;&amp; app_adc_conf.resc_smart_rev == 1",
-    "(app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8]) || (app_adc_conf.ctrl_type == 15)",
-    "app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8]",
-    "app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] &amp;&amp; app_adc_conf.resc_hybrid == 1",
+    "(app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] || app_adc_conf.ctrl_type == 15) || (app_adc_conf.ctrl_type == 15)",
+    "app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] || app_adc_conf.ctrl_type == 15",
+    "(app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] || app_adc_conf.ctrl_type == 15) &amp;&amp; app_adc_conf.resc_hybrid == 1",
     "app_adc_conf.ctrl_type == 15",
-    "app_adc_conf.ctrl_type in [2, 5, 6, 10, 13]",
     "app_to_use in [2, 5, 10]",
     "app_chuk_conf.use_smart_rev == 1",
     "app_chuk_conf.coast_brake_level &gt; 0",
@@ -2656,17 +2655,16 @@ static bool xml_app_vis(uint16_t c, const vesc_mcconf_t *mc, const vesc_appconf_
     case 21: return (app->app_adc_conf_multi_esc && app->app_adc_conf_tc);
     case 22: return (app->app_adc_conf_ctrl_type == 2 || app->app_adc_conf_ctrl_type == 3 || app->app_adc_conf_ctrl_type == 4 || app->app_adc_conf_ctrl_type == 5);
     case 23: return ((app->app_adc_conf_ctrl_type == 2 || app->app_adc_conf_ctrl_type == 3 || app->app_adc_conf_ctrl_type == 4 || app->app_adc_conf_ctrl_type == 5) && app->app_adc_conf_resc_smart_rev);
-    case 24: return (app->app_adc_conf_ctrl_type >= 1 && app->app_adc_conf_ctrl_type <= 8);
-    case 25: return (app->app_adc_conf_ctrl_type >= 1 && app->app_adc_conf_ctrl_type <= 8 && app->app_adc_conf_resc_hybrid);
+    case 24: return ((app->app_adc_conf_ctrl_type >= 1 && app->app_adc_conf_ctrl_type <= 8) || app->app_adc_conf_ctrl_type == 15);
+    case 25: return (((app->app_adc_conf_ctrl_type >= 1 && app->app_adc_conf_ctrl_type <= 8) || app->app_adc_conf_ctrl_type == 15) && app->app_adc_conf_resc_hybrid);
     case 26: return app->app_adc_conf_ctrl_type == 15;
-    case 27: return (app->app_adc_conf_ctrl_type == 2 || app->app_adc_conf_ctrl_type == 5 || app->app_adc_conf_ctrl_type == 6 || app->app_adc_conf_ctrl_type == 10 || app->app_adc_conf_ctrl_type == 13);
-    case 28: return app->app_chuk_conf_use_smart_rev;
-    case 29: return app->app_chuk_conf_coast_brake_level > 0.0f;
-    case 30: return app->app_chuk_conf_multi_esc;
-    case 31: return (app->app_chuk_conf_multi_esc && app->app_chuk_conf_tc);
-    case 32: return (app->imu_conf_type != 0);
-    case 33: return ((app->imu_conf_type != 0) && app->imu_conf_mode == 1);
-    case 34: return ((app->imu_conf_type != 0) && app->imu_conf_mode != 1);
+    case 27: return app->app_chuk_conf_use_smart_rev;
+    case 28: return app->app_chuk_conf_coast_brake_level > 0.0f;
+    case 29: return app->app_chuk_conf_multi_esc;
+    case 30: return (app->app_chuk_conf_multi_esc && app->app_chuk_conf_tc);
+    case 31: return (app->imu_conf_type != 0);
+    case 32: return ((app->imu_conf_type != 0) && app->imu_conf_mode == 1);
+    case 33: return ((app->imu_conf_type != 0) && app->imu_conf_mode != 1);
     default: return true;
     }
 }

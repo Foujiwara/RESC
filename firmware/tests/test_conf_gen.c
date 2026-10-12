@@ -247,7 +247,7 @@ int main(void)
               ok2 && got2 == t2 && has_raw(blob2, got2, "<group visibleIf=\"app_to_use in [2, 5, 10]\"><groupName>ADC</groupName>") &&
               has_raw(blob2, got2, "<page name=\"app_adc\" visibleIf=\"app_to_use in [2, 5, 10]\"/>"));
         check("app, 0x81 : options RESC de l'ADC avec leurs conditions",
-              has_raw(blob2, got2, "visibleIf=\"app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] &amp;&amp; app_adc_conf.resc_hybrid == 1\">app_adc_conf.resc_hybrid_band</param>") &&
+              has_raw(blob2, got2, "visibleIf=\"(app_adc_conf.ctrl_type in [1, 2, 3, 4, 5, 6, 7, 8] || app_adc_conf.ctrl_type == 15) &amp;&amp; app_adc_conf.resc_hybrid == 1\">app_adc_conf.resc_hybrid_band</param>") &&
               has_raw(blob2, got2, "app_adc_conf.resc_smart_rev_ramp_time</param>"));
         /* la variante complete ne depend pas de la configuration */
         int32_t got3 = fetch250(0x80, blob, &total, &ok);
