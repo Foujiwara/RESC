@@ -220,7 +220,9 @@ void ctrl_update(uint32_t now_ms, float dt)
         float kk = k >= 1.0f ? 1.0f : 1.0f - powf(1.0f - k, n);
         C.i_in_map_f += kk * (t->i_bus - C.i_in_map_f);
     }
-    float i_motor = (t->iq < 0.0f ? -1.0f : 1.0f) * t->i_abs;
+    /* courant affiche : signe de iq (negatif = frein) seulement si iq compte dans le module ; sinon positif.
+     * Sans cela, le frein a main (courant sur l'axe d, iq ~ 0 bruite) change de signe a chaque echantillon */
+    float i_motor = (t->iq < -0.25f * t->i_abs ? -1.0f : 1.0f) * t->i_abs;
     FM_LPF(C.st.i_motor, i_motor, 0.1f);
     C.st.fault = t->fault;
 

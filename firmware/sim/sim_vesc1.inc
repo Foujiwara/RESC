@@ -131,6 +131,17 @@
         printf("  deplacement sous 0.4 Nm : %.1f deg electriques, |i| %.1f A, etat %s\n", moved,
                sqrt(g_foc_telem.id * g_foc_telem.id + g_foc_telem.iq * g_foc_telem.iq), st_name(foc_state()));
         check("frein a main : rotor tenu (< 45 deg electriques sous 0.4 Nm)", moved < 45 && foc_state() == FOC_ST_START);
+        {
+            double mn = 1e9, mx = -1e9;
+            for (int k = 0; k < 500; k++) {
+                ctrl_alive(); RUN_CTRL(0.001);
+                double v = ctrl_stats()->i_motor;
+                if (v < mn) mn = v;
+                if (v > mx) mx = v;
+            }
+            printf("  courant moteur affiche par l'outil pendant le frein a main : %.1f .. %.1f A\n", mn, mx);
+            check("frein a main : courant affiche = +25 A (+/-3), sans changement de signe", mn > 22.0 && mx < 28.0);
+        }
         check("frein a main : courant 25 A (+/-2)", fabs(sqrt(g_foc_telem.id * g_foc_telem.id + g_foc_telem.iq * g_foc_telem.iq) - 25) < 2);
         ctrl_release(); RUN_CTRL(0.02);
         M.t_load = 0.0;
@@ -317,6 +328,44 @@
     }
     p = p0;
     foc_set_params(&p);
+
+    /* ------------------------------------------------------------------ */
+    printf("== 37. Mode courant (clavier) : relache puis reprise pendant l'elan\n");
+    {
+        static const double tacc[3] = { 0.15, 0.6, 3.0 };      /* duree de poussee : vitesse atteinte */
+        static const double trel[4] = { 0.05, 0.2, 0.5, 1.5 };  /* duree de relache */
+        int bad = 0;
+        for (int a = 0; a < 3; a++) {
+            for (int r = 0; r < 4; r++) {
+                p = p0; foc_set_params(&p);
+                STOP_AT(0.5);
+                M.b = 0.002; M.t_load = 0.02;
+                g_foc_telem.fault_count = 0;
+                ctrl_set_current(30);
+                for (int k = 0; k < (int)(tacc[a] * 1000); k++) { ctrl_alive(); RUN_CTRL(0.001); }
+                double w0 = ERPM(sim_omega_e(&M));
+                ctrl_set_current(0);
+                for (int k = 0; k < (int)(trel[r] * 1000); k++) { ctrl_alive(); RUN_CTRL(0.001); }
+                double w1 = ERPM(sim_omega_e(&M));
+                ctrl_set_current(30);
+                double imin = 1e9, wmin = 1e9;
+                int idle_ms = 0;
+                for (int k = 0; k < 1500; k++) {
+                    ctrl_alive(); RUN_CTRL(0.001);
+                    if (g_foc_telem.iq < imin) imin = g_foc_telem.iq;
+                    double w = ERPM(sim_omega_e(&M));
+                    if (w < wmin) wmin = w;
+                    if (foc_state() != FOC_ST_RUN && foc_state() != FOC_ST_START) idle_ms++;
+                }
+                bool ok = g_foc_telem.fault_count == 0 && idle_ms < 50 && foc_state() == FOC_ST_RUN;
+                printf("  poussee %.2f s (%.0f ERPM), relache %.2f s (%.0f ERPM) : iq min %.0f A, vitesse min %.0f, hors marche %d ms, defauts %u -> %s\n",
+                       tacc[a], w0, trel[r], w1, imin, wmin, idle_ms, (unsigned)g_foc_telem.fault_count, ok ? "ok" : "PROBLEME");
+                if (!ok) bad++;
+                ctrl_release(); RUN_CTRL(0.05);
+            }
+        }
+        check("courant clavier : relache puis reprise sans defaut ni temps mort (12 cas)", bad == 0);
+    }
 
     p = p0;
     STOP_AT(0.5);
