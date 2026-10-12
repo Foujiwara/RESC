@@ -13,9 +13,8 @@ typedef struct {
     const char *name;
 } conf_field_t;
 
-/* Profils de configuration : VESC700 (defaut, VESC Tool officiel) ou RESC (RESC Tool).
- * Les structures internes contiennent les champs des deux profils ; chaque profil
- * ne serialise que les siens. Les champs hors profil gardent leur valeur interne. */
+/* Configuration : format RESC (RESC Tool) ; le format 7.00 ne sert qu'a relire une ancienne
+ * configuration enregistree. Les structures contiennent les champs des deux formats. */
 
 typedef struct {
     uint8_t   pwm_mode;
@@ -235,12 +234,10 @@ typedef struct {
 #define RESCP_MCCONF_SIGNATURE   1812452519u
 #define VESC700_MCCONF_SER_SIZE 488
 #define RESCP_MCCONF_SER_SIZE   438
-#ifdef RESC_CONF_PROFILE_RESC
+#ifndef VESC_MCCONF_SIGNATURE            /* les tests peuvent viser le format 7.00 */
 #define VESC_MCCONF_SIGNATURE RESCP_MCCONF_SIGNATURE
-#else
-#define VESC_MCCONF_SIGNATURE VESC700_MCCONF_SIGNATURE
+#define VESC_MCCONF_SER_MAX RESCP_MCCONF_SER_SIZE
 #endif
-#define VESC_MCCONF_SER_MAX 488
 /* signature RESC et choix dependant de la carte (description de la carte compilee) */
 extern const uint32_t g_rescp_mcconf_sig;
 extern const uint8_t g_keepb_foc_control_sample_mode[], g_keepb_foc_control_sample_mode_n;
@@ -392,12 +389,10 @@ typedef struct {
 #define RESCP_APPCONF_SIGNATURE   3017840187u
 #define VESC700_APPCONF_SER_SIZE 284
 #define RESCP_APPCONF_SER_SIZE   284
-#ifdef RESC_CONF_PROFILE_RESC
+#ifndef VESC_APPCONF_SIGNATURE            /* les tests peuvent viser le format 7.00 */
 #define VESC_APPCONF_SIGNATURE RESCP_APPCONF_SIGNATURE
-#else
-#define VESC_APPCONF_SIGNATURE VESC700_APPCONF_SIGNATURE
+#define VESC_APPCONF_SER_MAX RESCP_APPCONF_SER_SIZE
 #endif
-#define VESC_APPCONF_SER_MAX 284
 /* signature RESC et choix dependant de la carte (description de la carte compilee) */
 extern const uint32_t g_rescp_appconf_sig;
 extern const uint8_t g_keepb_imu_conf_type[], g_keepb_imu_conf_type_n;

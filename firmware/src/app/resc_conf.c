@@ -323,25 +323,14 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     /* Observateur et compensations */
     fp->obs_type = mc->foc_observer_type <= 13 ? mc->foc_observer_type : 7;
     fp->obs_gain_slow = fm_sat(mc->foc_observer_gain_slow, 0.0f, 1.0f);
-#ifdef RESC_CONF_PROFILE_RESC
     fp->obs_offset = fm_sat(mc->foc_observer_offset, -3.0f, 3.0f);
-#else
-    /* profil VESC : -1 (valeur par defaut de la reference) = pas de correction supplementaire */
-    fp->obs_offset = fm_sat(mc->foc_observer_offset + 1.0f, -3.0f, 3.0f);
-#endif
     fp->speed_source = mc->foc_speed_soure;
     fp->sat_comp_mode = mc->foc_sat_comp_mode & 3u;
     fp->sat_comp = fm_sat(mc->foc_sat_comp, 0.0f, 0.7f);
     fp->i_sat_ref = i_max_eff;
     fp->temp_comp = mc->foc_temp_comp != 0 && BOARD_TMOT_CH != HW_ADC_CH_NONE && mc->m_motor_temp_sens_type != TEMP_SENSOR_DISABLED;
     fp->temp_comp_base = mc->foc_temp_comp_base_temp;
-#ifdef RESC_CONF_PROFILE_RESC
     fp->decoupling = mc->foc_cc_decoupling & 3u;
-#else
-    /* profil VESC : la valeur par defaut de la reference est 'desactive' ; RESC garde au minimum
-     * l'anticipation de FEM, sans laquelle les reprises (relais, reprise au vol) sont moins douces */
-    fp->decoupling = (mc->foc_cc_decoupling & 3u) | 2u;
-#endif
     fp->mtpa_mode = mc->foc_mtpa_mode <= 2 ? mc->foc_mtpa_mode : 0;
     fp->fw_i_max = fm_sat(mc->foc_fw_current_max, 0.0f, i_max_eff);
     fp->fw_duty_start = fm_sat(mc->foc_fw_duty_start, 0.3f, 0.99f);

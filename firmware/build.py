@@ -63,11 +63,11 @@ def run(cmd, fatal=True):
     return r.returncode == 0
 
 
-def board_description(board, conf, out):
+def board_description(board, out):
     """Description de configuration (commande 250) avec les vraies valeurs par defaut et plages
     de la carte : defauts releves en executant le code de configuration du firmware sur PC."""
     gcc = find_tool("gcc", HOST_DIRS)
-    defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"', "-DRESC_HOST"] + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else [])
+    defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"', "-DRESC_HOST"]
     exe = os.path.join(out, "dump_defaults.exe")
     srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
             "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
@@ -78,18 +78,18 @@ def board_description(board, conf, out):
     open(jpath, "w").write(js)
     c = os.path.join(out, "conf_xml_board.c")
     print("Description de configuration de la carte (commande 250) :")
-    run([sys.executable, "-I", os.path.join(ROOT, "tools", "resc_conf", "board_xml.py"), jpath, conf, c,
+    run([sys.executable, "-I", os.path.join(ROOT, "tools", "resc_conf", "board_xml.py"), jpath, c,
          os.path.join(out, "conf_xml")])
     return c
 
 
-def build(board, conf):
+def build(board):
     gcc = find_tool("arm-none-eabi-gcc", ARM_DIRS)
     objcopy = find_tool("arm-none-eabi-objcopy", ARM_DIRS)
     size = find_tool("arm-none-eabi-size", ARM_DIRS)
-    out = os.path.join(HERE, "build", board.replace("/", "_") + ("_resc" if conf == "resc" else ""))
+    out = os.path.join(HERE, "build", board.replace("/", "_"))
     os.makedirs(out, exist_ok=True)
-    defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"'] + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else [])
+    defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"']
     try:
         ghash = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], cwd=ROOT, capture_output=True,
                                text=True).stdout.strip() or "local"
@@ -99,7 +99,7 @@ def build(board, conf):
     incs = ["-I" + i for i in INC]
     objs = []
     failed = []
-    board_xml = board_description(board, conf, out)
+    board_xml = board_description(board, out)
     for d in SRC_DIRS:
         for c in sorted(glob.glob(os.path.join(HERE, d, "*.c"))) + ([board_xml] if d == "src/vesc" else []):
             if os.path.basename(c) == "conf_xml.c":
@@ -149,12 +149,11 @@ def sim():
     sys.exit(r.returncode)
 
 
-def check_cmd250(conf):
+def check_cmd250():
     """Decompresse les XML reconstitues par le test de la commande 250 et les compare aux sources."""
     import struct
     import zlib
-    files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if conf == "resc" else \
-            {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
+    files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"}
     import xml.etree.ElementTree as ET
 
     def tabs(root):
@@ -163,10 +162,9 @@ def check_cmd250(conf):
 
     ok = True
     blobs = [(k, f, f"cmd250_{k}.bin", True) for k, f in files.items()]
-    if conf == "resc":
-        blobs += [("mc", files["mc"], "cmd250_mc_pm.bin", False), ("mc", files["mc"], "cmd250_mc_acim.bin", False),
-                  ("app", files["app"], "cmd250_app_cond.bin", False),
-                  ("mc", files["mc"], "vis_conf_xml_mc.bin", "vis"), ("app", files["app"], "vis_conf_xml_app.bin", "vis")]
+    blobs += [("mc", files["mc"], "cmd250_mc_pm.bin", False), ("mc", files["mc"], "cmd250_mc_acim.bin", False),
+              ("app", files["app"], "cmd250_app_cond.bin", False),
+              ("mc", files["mc"], "vis_conf_xml_mc.bin", "vis"), ("app", files["app"], "vis_conf_xml_app.bin", "vis")]
     for k, f, bname, full in blobs:
         blob = open(os.path.join(HERE, "build", bname), "rb").read()
         src = open(os.path.join(HERE, "conf", f), "rb").read()
@@ -194,8 +192,8 @@ def check_cmd250(conf):
 
 
 def tests(board):
-    """Tests PC : configuration (serialisation, bornage), configuration generee (deux profils,
-    commande 250) et applications (entrees simulees)."""
+    """Tests PC : configuration (serialisation, bornage), configuration generee (RESC et ancien
+    format 7.00, commande 250), migration et applications (entrees simulees)."""
     gcc = find_tool("gcc", HOST_DIRS)
     out = os.path.join(HERE, "build")
     os.makedirs(out, exist_ok=True)
@@ -218,20 +216,23 @@ def tests(board):
         run([gcc] + flags + srcs + ["-lm", "-o", exe])
         print(f"== {name}")
         rc |= subprocess.run([exe], cwd=HERE).returncode
-    gen = ["tests/test_conf_gen.c", "src/vesc/vesc_conf.c", "src/vesc/conf_xml.c", "src/comm/conf_desc.c",
-           "tests/ref/vesc_conf_ref.c"]
-    for conf in ("vesc700", "resc"):
-        exe = os.path.join(out, f"test_conf_gen_{conf}.exe")
-        run([gcc] + flags + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else []) + gen + ["-lm", "-o", exe])
-        print(f"== test_conf_gen (profil {conf})")
-        rc |= subprocess.run([exe], cwd=HERE).returncode
-        rc |= 0 if check_cmd250(conf) else 1
-        exe = os.path.join(out, f"test_migrate_{conf}.exe")
-        mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
-               "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
-        run([gcc] + flags + (["-DRESC_CONF_PROFILE_RESC"] if conf == "resc" else []) + mig + ["-lm", "-o", exe])
-        print(f"== test_migrate (profil {conf})")
-        rc |= subprocess.run([exe], cwd=HERE).returncode
+    # serialiseur de reference 7.00 : compile a part, signature et taille du format 7.00
+    ref_o = os.path.join(out, "vesc_conf_ref.o")
+    run([gcc] + flags + ["-DVESC_MCCONF_SIGNATURE=VESC700_MCCONF_SIGNATURE", "-DVESC_MCCONF_SER_MAX=VESC700_MCCONF_SER_SIZE",
+                         "-DVESC_APPCONF_SIGNATURE=VESC700_APPCONF_SIGNATURE", "-DVESC_APPCONF_SER_MAX=VESC700_APPCONF_SER_SIZE",
+                         "-c", "tests/ref/vesc_conf_ref.c", "-o", ref_o])
+    gen = ["tests/test_conf_gen.c", "src/vesc/vesc_conf.c", "src/vesc/conf_xml.c", "src/comm/conf_desc.c", ref_o]
+    exe = os.path.join(out, "test_conf_gen.exe")
+    run([gcc] + flags + gen + ["-lm", "-o", exe])
+    print("== test_conf_gen")
+    rc |= subprocess.run([exe], cwd=HERE).returncode
+    rc |= 0 if check_cmd250() else 1
+    exe = os.path.join(out, "test_migrate.exe")
+    mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+           "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
+    run([gcc] + flags + mig + ["-lm", "-o", exe])
+    print("== test_migrate")
+    rc |= subprocess.run([exe], cwd=HERE).returncode
     print("== audit des parametres (inutilises invisibles, utilises visibles)")
     rc |= subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "resc_conf", "audit_params.py"), "--strict"],
                          cwd=ROOT).returncode
@@ -244,8 +245,6 @@ def main():
     ap.add_argument("--sim", action="store_true")
     ap.add_argument("--clean", action="store_true")
     ap.add_argument("--tests", action="store_true")
-    ap.add_argument("--conf", choices=["vesc700", "resc"], default="vesc700",
-                    help="profil de configuration : vesc700 (VESC Tool officiel) ou resc (RESC Tool)")
     a = ap.parse_args()
     if a.clean:
         shutil.rmtree(os.path.join(HERE, "build"), ignore_errors=True)
@@ -254,7 +253,7 @@ def main():
         sim()
     if a.tests:
         tests(a.board)
-    build(a.board, a.conf)
+    build(a.board)
 
 
 if __name__ == "__main__":

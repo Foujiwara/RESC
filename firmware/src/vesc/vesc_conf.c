@@ -815,13 +815,8 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     return true;
 }
 
-#ifdef RESC_CONF_PROFILE_RESC
 int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c) { return rescp_mcconf_serialize(buf, c); }
 bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c) { return rescp_mcconf_deserialize(buf, len, c); }
-#else
-int32_t vesc_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c) { return vesc700_mcconf_serialize(buf, c); }
-bool vesc_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c) { return vesc700_mcconf_deserialize(buf, len, c); }
-#endif
 
 void vesc_mcconf_defaults(vesc_mcconf_t *c)
 {
@@ -1063,12 +1058,10 @@ void vesc_mcconf_defaults(vesc_mcconf_t *c)
 #define MCCONF_FOC_RESC_DUTY_BASIC 0
 #endif
     c->foc_resc_duty_basic = (uint8_t)(MCCONF_FOC_RESC_DUTY_BASIC);
-#ifdef RESC_CONF_PROFILE_RESC
-    /* defauts propres au profil RESC (valeurs du XML RESC) */
+    /* defauts de RESC differents de la reference 7.00 (valeurs du XML RESC) */
     c->foc_observer_offset = (float)(0);
     c->foc_cc_decoupling = (uint8_t)(3);
     c->foc_observer_type = (uint8_t)(7);
-#endif
 }
 
 const conf_field_t vesc_mcconf_fields[] = {
@@ -1780,13 +1773,8 @@ bool rescp_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *
     return true;
 }
 
-#ifdef RESC_CONF_PROFILE_RESC
 int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c) { return rescp_appconf_serialize(buf, c); }
 bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c) { return rescp_appconf_deserialize(buf, len, c); }
-#else
-int32_t vesc_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c) { return vesc700_appconf_serialize(buf, c); }
-bool vesc_appconf_deserialize(const uint8_t *buf, int32_t len, vesc_appconf_t *c) { return vesc700_appconf_deserialize(buf, len, c); }
-#endif
 
 void vesc_appconf_defaults(vesc_appconf_t *c)
 {
@@ -1939,9 +1927,7 @@ void vesc_appconf_defaults(vesc_appconf_t *c)
 #define APPCONF_ADC_RESC_HYBRID_BAND 0.15
 #endif
     c->app_adc_conf_resc_hybrid_band = (float)(APPCONF_ADC_RESC_HYBRID_BAND);
-#ifdef RESC_CONF_PROFILE_RESC
-    /* defauts propres au profil RESC (valeurs du XML RESC) */
-#endif
+    /* defauts de RESC differents de la reference 7.00 (valeurs du XML RESC) */
 }
 
 const conf_field_t vesc_appconf_fields[] = {

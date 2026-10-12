@@ -41,7 +41,6 @@ int main(void)
     check("deserialisation MCCONF", vesc_mcconf_deserialize(a, n1, &m2));
     int32_t n2 = vesc_mcconf_serialize(b, &m2);
     check("aller-retour MCCONF identique octet a octet", n1 == n2 && !memcmp(a, b, (size_t)n1));
-    check("signature MCCONF en tete (1470992211)", a[0] == 0x57 && a[1] == 0xAD && a[2] == 0x8F && a[3] == 0x53);
     a[0] ^= 1;
     check("signature fausse refusee", !vesc_mcconf_deserialize(a, n1, &m2));
     int32_t na = vesc_appconf_serialize(a, &g_appconf);

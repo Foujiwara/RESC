@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
 """
 Genere toute la couche de configuration de RESC a partir des descriptions XML (format
-ConfigParams de VESC Tool), pour les deux profils :
+ConfigParams de VESC Tool) :
 
-  VESC700 : firmware/conf/vesc700/parameters_{mcconf,appconf}.xml  (officiels 7.00, non modifies)
-  RESC    : firmware/conf/resc_{mcconf,appconf}.xml                 (parametres propres a RESC)
+  RESC    : firmware/conf/resc_{mcconf,appconf}.xml                 (configuration de RESC)
+  VESC700 : firmware/conf/vesc700/parameters_{mcconf,appconf}.xml  (officiels 7.00, non modifies) :
+            reference des types et des defauts, et ancien format de stockage a migrer
+
+Le firmware ne parle que le format RESC (RESC Tool lit la description par la commande 250). Le
+serialiseur 7.00 ne sert qu'a relire une ancienne configuration enregistree.
 
 Sorties (ne pas editer a la main) :
-  firmware/src/vesc/vesc_conf.h   structures internes (union des deux profils), signatures,
-                                  table des champs (stockage par nom, terminal), prototypes
-  firmware/src/vesc/vesc_conf.c   defauts, serialisation / deserialisation des deux profils,
+  firmware/src/vesc/vesc_conf.h   structures internes, signatures, table des champs (stockage
+                                  par nom, terminal), prototypes
+  firmware/src/vesc/vesc_conf.c   defauts, serialisation / deserialisation (RESC et ancien 7.00),
                                   table des champs
-  firmware/src/vesc/conf_xml.c    XML compresses (qCompress) du profil compile, commande 250
+  firmware/src/vesc/conf_xml.c    XML compresse (qCompress), commande 250
 
 Signature (identique a ConfigParams::getSignature de VESC Tool) :
   crc32c( pour chaque nom de <SerOrder> : nom + str(type) + str(vTx) + enumNames concatenes )
@@ -175,19 +179,12 @@ def main():
         sig = prof["vesc700"][k][2]
         if sig != REF_SIG[k]:
             raise SystemExit("signature VESC700 %s calculee %u != reference %u : XML non officiel ?" % (k, sig, REF_SIG[k]))
-    # vue RESC Tool du profil VESC700 : embarquee pour la commande 250, meme signature exigee
-    view = {k: load(os.path.join(CONF, "vesc700_view", f)) for k, f in
-            (("mc", "parameters_mcconf.xml"), ("app", "parameters_appconf.xml"))}
-    for k in ("mc", "app"):
-        if view[k][2] != REF_SIG[k] or [p.name for p in view[k][1]] != [p.name for p in prof["vesc700"][k][1]]:
-            raise SystemExit("vue VESC700 %s : signature ou ordre de serialisation different de l'officiel" % k)
 
     h, c = [], []
     h.append("/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */")
     h.append("#ifndef VESC_CONF_H\n#define VESC_CONF_H\n\n#include <stdint.h>\n#include <stdbool.h>\n")
-    h.append("/* Profils de configuration : VESC700 (defaut, VESC Tool officiel) ou RESC (RESC Tool).")
-    h.append(" * Les structures internes contiennent les champs des deux profils ; chaque profil")
-    h.append(" * ne serialise que les siens. Les champs hors profil gardent leur valeur interne. */")
+    h.append("/* Configuration : format RESC (RESC Tool) ; le format 7.00 ne sert qu'a relire une ancienne")
+    h.append(" * configuration enregistree. Les structures contiennent les champs des deux formats. */")
     c.append("/* GENERE par tools/resc_conf/gen_resc_conf.py depuis les XML de firmware/conf - ne pas editer. */")
     c.append('#include <stddef.h>\n#include "vesc_conf.h"\n#include "vesc_buffer.h"\n#include "vesc_compat_defaults.h"\n')
     c.append("/* Profil RESC : listes reduites aux choix pris en charge. Position affichee <-> valeur interne")
@@ -224,12 +221,10 @@ def main():
         sz_r = 4 + sum(ser_size(p) for p in r_ps)
         h.append("#define VESC700_%s_SER_SIZE %d" % (up, sz_v))
         h.append("#define RESCP_%s_SER_SIZE   %d" % (up, sz_r))
-        h.append("#ifdef RESC_CONF_PROFILE_RESC")
+        h.append("#ifndef VESC_%s_SIGNATURE            /* les tests peuvent viser le format 7.00 */" % up)
         h.append("#define VESC_%s_SIGNATURE RESCP_%s_SIGNATURE" % (up, up))
-        h.append("#else")
-        h.append("#define VESC_%s_SIGNATURE VESC700_%s_SIGNATURE" % (up, up))
+        h.append("#define VESC_%s_SER_MAX RESCP_%s_SER_SIZE" % (up, up))
         h.append("#endif")
-        h.append("#define VESC_%s_SER_MAX %d" % (up, max(sz_v, sz_r)))
         h.append("/* signature RESC et choix dependant de la carte (description de la carte compilee) */")
         h.append("extern const uint32_t g_rescp_%s_sig;" % lname)
         for f in sorted(board_enum.FLAT[k]):
@@ -256,13 +251,8 @@ def main():
             for p in ps:
                 c.append("    " + deser_line(p, ct[p.c], pre == "rescp"))
             c.append("    return true;\n}\n")
-        c.append("#ifdef RESC_CONF_PROFILE_RESC")
         c.append("int32_t vesc_%s_serialize(uint8_t *buf, const %s *c) { return rescp_%s_serialize(buf, c); }" % (lname, sname, lname))
-        c.append("bool vesc_%s_deserialize(const uint8_t *buf, int32_t len, %s *c) { return rescp_%s_deserialize(buf, len, c); }" % (lname, sname, lname))
-        c.append("#else")
-        c.append("int32_t vesc_%s_serialize(uint8_t *buf, const %s *c) { return vesc700_%s_serialize(buf, c); }" % (lname, sname, lname))
-        c.append("bool vesc_%s_deserialize(const uint8_t *buf, int32_t len, %s *c) { return vesc700_%s_deserialize(buf, len, c); }" % (lname, sname, lname))
-        c.append("#endif\n")
+        c.append("bool vesc_%s_deserialize(const uint8_t *buf, int32_t len, %s *c) { return rescp_%s_deserialize(buf, len, c); }\n" % (lname, sname, lname))
 
         # defauts
         c.append("void vesc_%s_defaults(%s *c)\n{" % (lname, sname))
@@ -273,13 +263,11 @@ def main():
                 macro = p.cdefine or ("RESC_DEF_" + p.c.upper())
                 c.append("#ifndef %s\n#define %s %s\n#endif" % (macro, macro, xml_default(p)))
                 c.append("    c->%s = (%s)(%s);" % (p.c, ct[p.c], macro))
-        c.append("#ifdef RESC_CONF_PROFILE_RESC")
-        c.append("    /* defauts propres au profil RESC (valeurs du XML RESC) */")
+        c.append("    /* defauts de RESC differents de la reference 7.00 (valeurs du XML RESC) */")
         for p in r_ps:
             vp = vmap.get(p.c)
             if vp is not None and p.c not in EMAP and xml_default(p) != xml_default(vp):
                 c.append("    c->%s = (%s)(%s);" % (p.c, ct[p.c], xml_default(p)))
-        c.append("#endif")
         c.append("}\n")
 
         # table des champs (stockage par nom, terminal)
@@ -292,7 +280,7 @@ def main():
         h.append("extern const uint16_t vesc_%s_nfields;" % lname)
 
     # type de la table, avant les structures
-    i0 = h.index("/* Profils de configuration : VESC700 (defaut, VESC Tool officiel) ou RESC (RESC Tool).")
+    i0 = h.index("/* Configuration : format RESC (RESC Tool) ; le format 7.00 ne sert qu'a relire une ancienne")
     h[i0:i0] = ["/* Champ de configuration : crc32 du nom, decalage, type (0 float, 1 u8, 2 i8, 3 u16, 4 i16, 5 u32, 6 i32) */",
                 "typedef struct {\n    uint32_t hash;\n    uint16_t offset;\n    uint8_t  ctype;\n    const char *name;\n} conf_field_t;\n"]
     h.append("\n#endif")
@@ -301,14 +289,11 @@ def main():
     x = ['/* GENERE par tools/resc_conf/gen_resc_conf.py - description de la commande 250. */',
          '#include "hw_config.h"', '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
     sizes = {}
-    for pname, macro in (("resc", "#ifdef RESC_CONF_PROFILE_RESC"), ("vesc700", "#else")):
-        x.append(macro)
-        for k in ("mc", "app"):
-            raw = view[k][0] if pname == "vesc700" else prof[pname][k][0]
-            vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if pname == "resc" else {}
-            sizes["%s_%s" % (pname, k)] = (len(raw), len(zlib.compress(raw, 9)))
-            x += desc_vis.c_lines(raw, ET.fromstring(raw), k, vis, EMAP if pname == "resc" else None)
-    x.append("#endif")
+    for k in ("mc", "app"):
+        raw = prof["resc"][k][0]
+        vis = desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP
+        sizes["resc_%s" % k] = (len(raw), len(zlib.compress(raw, 9)))
+        x += desc_vis.c_lines(raw, ET.fromstring(raw), k, vis, EMAP)
 
     # valeurs generiques (faibles) : la description de la carte compilee les remplace
     for k in ("mc", "app"):
@@ -316,10 +301,9 @@ def main():
     open(os.path.join(OUT, "vesc_conf.h"), "w", encoding="utf-8", newline="\n").write("\n".join(h) + "\n")
     open(os.path.join(OUT, "vesc_conf.c"), "w", encoding="utf-8", newline="\n").write("\n".join(c) + "\n")
     open(os.path.join(OUT, "conf_xml.c"), "w", encoding="utf-8", newline="\n").write("\n".join(x) + "\n")
-    for pname in ("vesc700", "resc"):
-        for k in ("mc", "app"):
-            print("%-8s %-4s signature %10u  %3d parametres  XML %6d -> %6d octets" % (
-                pname, k, prof[pname][k][2], len(prof[pname][k][1]), *sizes["%s_%s" % (pname, k)]))
+    for k in ("mc", "app"):
+        print("resc     %-4s signature %10u  %3d parametres  XML %6d -> %6d octets" % (
+            k, prof["resc"][k][2], len(prof["resc"][k][1]), *sizes["resc_%s" % k]))
 
 
 if __name__ == "__main__":

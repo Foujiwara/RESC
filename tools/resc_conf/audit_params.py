@@ -54,7 +54,6 @@ def main():
     src = firmware_source()
     bad = 0
     for prof, files in (("vesc700", ("vesc700/parameters_mcconf.xml", "vesc700/parameters_appconf.xml")),
-                        ("vesc700 (vue RESC Tool)", ("vesc700_view/parameters_mcconf.xml", "vesc700_view/parameters_appconf.xml")),
                         ("resc", ("resc_mcconf.xml", "resc_appconf.xml"))):
         for f in files:
             p = os.path.join(ROOT, "firmware", "conf", f)
