@@ -82,6 +82,9 @@ int main(void)
     M.off[0] = 2041; M.off[1] = 2055; M.off[2] = 2049;
     M.noise_lsb = 1.0;
     M.pf_tau = 100e-6;
+    /* offsets reels des diviseurs de tension de phase (+0.35 / -0.25 / 0 V), corriges par la calibration
+     * au demarrage ; sans elle l'observateur decroche en roue libre (SIM_NOVPHOFF=1 : mesure ideale) */
+    if (!getenv("SIM_NOVPHOFF")) { M.vph_off[0] = 0.35; M.vph_off[1] = -0.25; M.vph_off[2] = 0.0; }
     sim_init(&M);
 
     foc_params_t p;

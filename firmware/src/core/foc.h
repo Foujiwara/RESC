@@ -258,6 +258,9 @@ typedef struct {
     uint32_t last_fault_line;     /* origine du dernier defaut (ligne de foc.c, 0 = externe) */
     struct { uint32_t code, line, ticks; } fault_log[8];   /* 8 derniers defauts (circulaire, ticks = periodes FOC) */
     uint32_t fault_log_n;
+    uint32_t obs_resync;
+    float off_vph_used[3];        /* V : offsets de tension pont coupe en service */
+    bool off_vph_boot;            /* calibres au demarrage (moteur a l'arret) */          /* reprises ou l'observateur a ete recale sur les Hall */
     uint8_t hall;                 /* etat Hall courant */
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST
@@ -268,6 +271,7 @@ typedef struct {
 
 /* ------------------------------------------------------------ API */
 void foc_init(const foc_params_t *p);
+void foc_dbg_obs_reset(float theta, float omega);   /* essais : decrochage simule de l'observateur */
 void foc_set_params(const foc_params_t *p);   /* pris en compte a la periode suivante */
 const foc_params_t *foc_params(void);
 

@@ -37,6 +37,13 @@
             if (fabs(g_foc_telem.iq) > iq_coast_max) iq_coast_max = fabs(g_foc_telem.iq);
         }
         report("roue libre 1.5 s");
+        if (sc == 1) {
+            /* decrochage de l'observateur en roue libre (vu sur la machine : 2914 ERPM affiches a 38000) */
+            foc_dbg_obs_reset(0.0f, 0.08f * (float)sim_omega_e(&M));
+            run(0.0005);
+            printf("  observateur force a %.0f ERPM (vrai %.0f)\n", g_foc_telem.omega * 60 / (2 * M_PI),
+                   sim_omega_e(&M) * 60 / (2 * M_PI));
+        }
         printf("  roue libre : %d changements d'etat, %d ms en RUN, |iq| max %.1f A, defaut %u\n", transitions, n_run,
                iq_coast_max, (unsigned)g_foc_telem.fault);
         check("roue libre : pont relache et stable (pas de coupures / reprises)", transitions <= 1 && foc_state() == FOC_ST_IDLE);
@@ -66,10 +73,41 @@
         ctrl_release();
         RUN_CTRL(0.05);
     }
+    /* Sensorless : l'observateur doit retrouver seul le moteur en roue libre (sans Hall) */
+    printf("== 27b. Sensorless : observateur fausse en roue libre, il doit se recaler seul\n");
+    p.sensor_mode = FOC_SENSOR_SENSORLESS;
+    foc_set_params(&p);
+    M.b = 2e-4; M.t_load = 0.05; M.omega_m = 0;
+    RUN_CTRL(0.3);
+    for (int k = 0; k < 8000 && sim_omega_e(&M) * 60 / (2 * M_PI) < 6000; k++) { ctrl_set_current_rel(0.4f); RUN_CTRL(0.001); }
+    ctrl_set_current_rel(0.0f);
+    for (int k = 0; k < 300; k++) { ctrl_alive(); RUN_CTRL(0.001); }
+    foc_dbg_obs_reset(1.0f, 0.1f * (float)sim_omega_e(&M));
+    int t_rec = -1;
+    for (int k = 0; k < 500; k++) {
+        ctrl_alive(); RUN_CTRL(0.001);
+        if (t_rec < 0 && fabs(g_foc_telem.omega / sim_omega_e(&M) - 1) < 0.05 && fabs(ang_err()) < 10 * M_PI / 180) t_rec = k;
+    }
+    report("roue libre recalee");
+    printf("  observateur fausse (10 %% de la vitesse) : recale seul apres %d ms\n", t_rec);
+    check("sensorless : l'observateur retrouve seul vitesse et angle en roue libre (< 100 ms)", t_rec >= 0 && t_rec < 100);
+    {
+        g_trip_peak = 0;
+        double iq_min = 0, iq_max = 0;
+        for (int k = 0; k < 200; k++) {
+            ctrl_set_current_rel(0.4f); RUN_CTRL(0.001);
+            if (g_foc_telem.iq > iq_max) iq_max = g_foc_telem.iq;
+            if (g_foc_telem.iq < iq_min) iq_min = g_foc_telem.iq;
+        }
+        printf("  reprise sensorless : iq %.1f..%.1f A, crete phase %.1f A\n", iq_min, iq_max, g_trip_peak);
+        check("sensorless : reprise sans couple inverse ni pic", iq_min > -2.0 && iq_max < 20.0);
+        ctrl_release(); RUN_CTRL(0.05);
+    }
     p = p_saved;
     foc_set_params(&p);
     L = L_saved;
     ctrl_set_limits(&L);
     M.b = b_saved; M.t_load = tl_saved;
-    RUN_CTRL(0.2);
+    M.omega_m = 0;                   /* moteur arrete pour les essais suivants */
+    RUN_CTRL(0.5);
 }
