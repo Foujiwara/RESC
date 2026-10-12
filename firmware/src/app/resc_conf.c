@@ -3,6 +3,7 @@
  */
 #include <string.h>
 #include "resc_conf.h"
+#include "flash.h"
 #include "stats.h"
 #include "abs_enc.h"
 #include "vesc_compat_defaults.h"
@@ -590,6 +591,7 @@ void resc_conf_poll(void)
 
 static uint8_t s_buf[16 + REC_SIZE * 320u];
 static resc_conf_load_t s_load_mc, s_load_app;
+static bool s_restored;
 
 resc_conf_load_t resc_conf_load_status(bool app) { return app ? s_load_app : s_load_mc; }
 
@@ -682,11 +684,9 @@ bool resc_conf_store_backup(void)
 }
 
 /* Lit un emplacement : format par nom ou ancien format. Retourne l'etat de la lecture. */
-static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, uint16_t n,
-                             bool (*old_deser)(const uint8_t *, int32_t, void *))
+static resc_conf_load_t load_from(const uint8_t *p, uint32_t len, uint32_t slot, void *conf, const conf_field_t *t,
+                                  uint16_t n, bool (*old_deser)(const uint8_t *, int32_t, void *))
 {
-    uint32_t len;
-    const uint8_t *p = plat_conf_read(slot, &len);
     if (!p || len < sizeof(conf_hdr_t)) return RESC_LOAD_EMPTY;
     conf_hdr_t h;
     memcpy(&h, p, sizeof(h));
@@ -732,6 +732,59 @@ static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, u
     return RESC_LOAD_FAILED;
 }
 
+static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, uint16_t n,
+                             bool (*old_deser)(const uint8_t *, int32_t, void *))
+{
+    uint32_t len;
+    const uint8_t *p = plat_conf_read(slot, &len);
+    return load_from(p, len, slot, conf, t, n, old_deser);
+}
+
+/* --------------------------------------------- copie pendant la mise a jour
+ * Le bootloader efface les secteurs de configuration. Avant de lui passer la main, les deux
+ * enregistrements (en-tete + champs) sont copies a la fin du tampon de mise a jour ; au
+ * demarrage suivant, une configuration vide est restauree depuis cette copie, puis la copie est
+ * effacee. Format : magic, longueur moteur, longueur app, crc32, puis les deux enregistrements. */
+#define UPD_MAGIC  0x4B414252u     /* 'RBAK' */
+
+static uint32_t slot_used(uint32_t slot, const uint8_t **pp)
+{
+    uint32_t len;
+    const uint8_t *p = plat_conf_read(slot, &len);
+    *pp = p;
+    if (!p || len < sizeof(conf_hdr_t)) return 0;
+    conf_hdr_t h;
+    memcpy(&h, p, sizeof(h));
+    if (h.magic == 0xFFFFFFFFu || h.len > len - sizeof(h)) return 0;
+    return (uint32_t)sizeof(h) + h.len;
+}
+
+bool resc_conf_backup_for_update(void)
+{
+    const uint8_t *pm, *pa;
+    uint32_t lm = slot_used(SLOT_MC, &pm), la = slot_used(SLOT_APP, &pa);
+    if (lm + la == 0 || 16u + lm + la > 0x2000u || !flash_upd_backup_free()) return false;
+    uint32_t hd[4] = { UPD_MAGIC, lm, la, 0 };
+    uint32_t crc = crc32(pm, lm);
+    hd[3] = crc ^ crc32(pa, la);
+    return flash_upd_backup_write(16u, pm, lm) && flash_upd_backup_write(16u + lm, pa, la) &&
+           flash_upd_backup_write(0, (const uint8_t *)hd, 16u);
+}
+
+static const uint8_t *upd_backup(uint32_t *lm, uint32_t *la)
+{
+    const uint8_t *base = flash_upd_backup_ptr();
+    if (!base) return 0;
+    uint32_t hd[4];
+    memcpy(hd, base, sizeof(hd));
+    if (hd[0] != UPD_MAGIC || hd[1] + hd[2] + 16u > 0x2000u) return 0;
+    const uint8_t *d = base + 16u;
+    if ((crc32(d, hd[1]) ^ crc32(d + hd[1], hd[2])) != hd[3]) return 0;
+    *lm = hd[1];
+    *la = hd[2];
+    return d;
+}
+
 static bool old_mc(const uint8_t *b, int32_t n, void *c) { return vesc700_mcconf_deserialize(b, n, (vesc_mcconf_t *)c); }
 static bool old_app(const uint8_t *b, int32_t n, void *c) { return vesc700_appconf_deserialize(b, n, (vesc_appconf_t *)c); }
 
@@ -744,6 +797,14 @@ void resc_conf_init(void)
     mc = g_mcconf;
     app = g_appconf;
     s_load_mc = load(SLOT_MC, &mc, vesc_mcconf_fields, vesc_mcconf_nfields, old_mc);
+    /* configuration effacee par le bootloader : copie faite avant la mise a jour */
+    uint32_t bl_mc = 0, bl_app = 0;
+    const uint8_t *bk = upd_backup(&bl_mc, &bl_app);
+    bool restored_mc = false, restored_app = false;
+    if (s_load_mc == RESC_LOAD_EMPTY && bk && bl_mc) {
+        resc_conf_load_t r2 = load_from(bk, bl_mc, SLOT_MC, &mc, vesc_mcconf_fields, vesc_mcconf_nfields, old_mc);
+        if (r2 == RESC_LOAD_OK || r2 == RESC_LOAD_MIGRATED) { s_load_mc = r2; restored_mc = true; }
+    }
     if (s_load_mc == RESC_LOAD_MIGRATED) {
         /* RESC 0.x ignorait ces champs (comportement fixe) : la migration conserve le comportement
          * essaye ; les nouvelles fonctions s'activent ensuite une par une. */
@@ -758,6 +819,10 @@ void resc_conf_init(void)
         g_mcconf = mc;
     }
     s_load_app = load(SLOT_APP, &app, vesc_appconf_fields, vesc_appconf_nfields, old_app);
+    if (s_load_app == RESC_LOAD_EMPTY && bk && bl_app) {
+        resc_conf_load_t r2 = load_from(bk + bl_mc, bl_app, SLOT_APP, &app, vesc_appconf_fields, vesc_appconf_nfields, old_app);
+        if (r2 == RESC_LOAD_OK || r2 == RESC_LOAD_MIGRATED) { s_load_app = r2; restored_app = true; }
+    }
     if (s_load_app == RESC_LOAD_OK || s_load_app == RESC_LOAD_MIGRATED) {
         resc_conf_clamp_app(&app);
         g_appconf = app;
@@ -765,4 +830,11 @@ void resc_conf_init(void)
     /* migration : reecriture immediate dans le format par nom */
     if (s_load_mc == RESC_LOAD_MIGRATED) resc_conf_store_mc();
     if (s_load_app == RESC_LOAD_MIGRATED) resc_conf_store_app();
+    /* restauration : reecrite dans les secteurs de configuration, puis copie effacee */
+    if (restored_mc && s_load_mc != RESC_LOAD_MIGRATED) resc_conf_store_mc();
+    if (restored_app && s_load_app != RESC_LOAD_MIGRATED) resc_conf_store_app();
+    if (restored_mc || restored_app) s_restored = true;
+    if (bk) flash_upd_backup_erase();
 }
+
+bool resc_conf_restored_after_update(void) { return s_restored; }

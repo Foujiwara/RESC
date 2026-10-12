@@ -264,7 +264,8 @@ void terminal_process(char *line)
           (f & (1u << 31)) ? " basse consommation" : "", (f & (1u << 26)) ? " (broche NRST)" : "");
         static const char *ld[] = { "VIDE (zone effacee : defauts)", "relue", "migree (ancien format)", "REFUSEE (crc / format : defauts)" };
         int lm = (int)resc_conf_load_status(false), la = (int)resc_conf_load_status(true);
-        P("Configuration au demarrage : moteur %s, app %s", lm >= 0 && lm < 4 ? ld[lm] : "?", la >= 0 && la < 4 ? ld[la] : "?");
+        P("Configuration au demarrage : moteur %s, app %s%s", lm >= 0 && lm < 4 ? ld[lm] : "?", la >= 0 && la < 4 ? ld[la] : "?",
+          resc_conf_restored_after_update() ? " (restauree depuis la copie faite avant la mise a jour)" : "");
         uint32_t hf[4];
         if (hardfault_info(hf))
             P("Plantage enregistre : pc=0x%08lx lr=0x%08lx cfsr=0x%08lx hfsr=0x%08lx", (unsigned long)hf[0],

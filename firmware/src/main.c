@@ -314,6 +314,8 @@ int main(void)
             board_power_off();
         }
         if (g_req_bootloader && idle) {
+            resc_conf_store_backup();                       /* odometre */
+            resc_conf_backup_for_update();                  /* la configuration survit au bootloader */
             for (volatile int i = 0; i < 200000; i++) { }
             flash_jump_to_bootloader();
             g_req_bootloader = false;                       /* pas de bootloader : on reste */

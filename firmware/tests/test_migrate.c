@@ -33,6 +33,12 @@ const uint8_t *plat_conf_read(uint32_t s, uint32_t *n)
     *n = flash_len[s];
     return flash[s];
 }
+/* zone de copie pendant la mise a jour (fin du tampon), simulee */
+static uint8_t upd[0x2000];
+bool flash_upd_backup_free(void) { for (int k = 0; k < 0x2000; k++) if (upd[k] != 0xFF) return false; return true; }
+bool flash_upd_backup_write(uint32_t o, const uint8_t *d, uint32_t n) { if (o + n > sizeof upd) return false; memcpy(upd + o, d, n); return true; }
+bool flash_upd_backup_erase(void) { memset(upd, 0xFF, sizeof upd); return true; }
+const uint8_t *flash_upd_backup_ptr(void) { return upd; }
 uint8_t plat_default_controller_id(void) { return 42; }
 void plat_pwm_set_freq(float f, uint8_t m) { (void)f; (void)m; }
 void plat_sensor_config(uint8_t m, uint32_t c, uint8_t p, const abs_enc_sincos_t *s) { (void)m; (void)c; (void)p; (void)s; }
@@ -140,6 +146,30 @@ int main(void)
         stats_set_odometer_m(123500u);
         resc_conf_store_backup();
         check("odometre change : enregistre a l'arret", n_writes == w0 + 1);
+    }
+
+    printf("== Mise a jour du firmware : le bootloader efface la configuration\n");
+    {
+        memset(upd, 0xFF, sizeof upd);
+        g_mcconf.l_current_max = 187.0f;
+        g_appconf.app_adc_conf_ctrl_type = 15;
+        resc_conf_store_mc();
+        resc_conf_store_app();
+        check("copie faite avant le bootloader", resc_conf_backup_for_update());
+        flash_len[0] = flash_len[1] = 0;                 /* secteurs effaces par le bootloader */
+        memset(&g_mcconf, 0, sizeof g_mcconf);
+        resc_conf_init();
+        check("configuration restauree (moteur 187 A, ADC type 15)", g_mcconf.l_current_max == 187.0f &&
+              g_appconf.app_adc_conf_ctrl_type == 15 && resc_conf_restored_after_update());
+        check("reecrite dans les secteurs, copie effacee", flash_len[0] > 0 && flash_len[1] > 0 && upd[0] == 0xFF);
+        flash_len[0] = flash_len[1] = 0;
+        resc_conf_init();
+        check("sans copie : defauts (pas de vieille restauration)", resc_conf_load_status(false) == RESC_LOAD_EMPTY);
+        resc_conf_store_mc();
+        resc_conf_store_app();
+        upd[0] = 0x00;
+        check("copie refusee si la zone n'est pas vierge", !resc_conf_backup_for_update());
+        memset(upd, 0xFF, sizeof upd);
     }
 
     printf("== Flash illisible\n");
