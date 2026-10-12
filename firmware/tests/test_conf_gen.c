@@ -1,7 +1,7 @@
 /*
  * test_conf_gen.c — Tests de la configuration generee depuis les XML :
- *  - profil VESC700 identique au serialiseur de reference (octets, defauts, lecture)
- *  - aller-retour serialisation / deserialisation des deux profils
+ *  - ancien format 7.00 identique au serialiseur de reference (octets, lecture)
+ *  - aller-retour serialisation / deserialisation du format RESC
  *  - commande 250 : reconstitution par morceaux de 400 octets, bornes ; les blocs
  *    reconstitues sont ecrits dans build/ pour la verification de decompression (Python)
  */
@@ -100,9 +100,7 @@ int main(void)
     static vesc_appconf_t p1, p2;
     int32_t n1, n2;
 
-#ifndef RESC_CONF_PROFILE_RESC
-    /* la reference ecrit la signature du profil actif : comparaison dans le profil VESC700 seulement */
-    printf("== Profil VESC700 : identique au serialiseur de reference\n");
+    printf("== Ancien format 7.00 : identique au serialiseur de reference\n");
     int same = 1;
     for (unsigned seed = 1; seed <= 50; seed++) {
         randomize(&m1, vesc_mcconf_fields, vesc_mcconf_nfields, seed);
@@ -113,12 +111,7 @@ int main(void)
         if (n1 != n2 || memcmp(a, b, (size_t)n1)) same = 0;
     }
     check("50 configurations aleatoires : octets identiques (mcconf et appconf)", same);
-    vesc_mcconf_defaults(&m1); ref_mcconf_defaults(&m2);
-    n1 = vesc700_mcconf_serialize(a, &m1); n2 = ref_mcconf_serialize(b, &m2);
-    check("defauts mcconf identiques", n1 == n2 && !memcmp(a, b, (size_t)n1));
-    vesc_appconf_defaults(&p1); ref_appconf_defaults(&p2);
-    n1 = vesc700_appconf_serialize(a, &p1); n2 = ref_appconf_serialize(b, &p2);
-    check("defauts appconf identiques", n1 == n2 && !memcmp(a, b, (size_t)n1));
+    vesc_mcconf_defaults(&m1);
     check("taille mcconf 7.00 = 488 octets", vesc700_mcconf_serialize(a, &m1) == 488);
     randomize(&m1, vesc_mcconf_fields, vesc_mcconf_nfields, 7);
     n1 = ref_mcconf_serialize(a, &m1);
@@ -130,7 +123,6 @@ int main(void)
     a[0] ^= 0xFF;
     check("signature fausse refusee", !vesc700_mcconf_deserialize(a, n1, &m2));
     check("taille insuffisante refusee", !vesc700_mcconf_deserialize(b, 10, &m2));
-#endif
 
     printf("== Profil RESC : aller-retour\n");
     vesc_mcconf_defaults(&m1);
@@ -147,7 +139,6 @@ int main(void)
           RESCP_MCCONF_SIGNATURE != VESC700_MCCONF_SIGNATURE && RESCP_APPCONF_SIGNATURE != VESC700_APPCONF_SIGNATURE);
     check("une configuration 7.00 n'est pas lue comme RESC", !rescp_mcconf_deserialize(a, n1, &m2));
 
-#ifdef RESC_CONF_PROFILE_RESC
     printf("== Profil RESC : listes reduites (position affichee <-> valeur interne)\n");
     {
         vesc_mcconf_defaults(&m1);
@@ -166,7 +157,6 @@ int main(void)
         (void)f;
         check("motor_type garde sa liste complete (FOC = 2 pour RESC Tool)", m2.motor_type == 2);
     }
-#endif
 
     printf("== Commande 250\n");
     static uint8_t blob[64 * 1024];
@@ -178,17 +168,6 @@ int main(void)
         snprintf(t, sizeof t, "conf %d : %d octets reconstitues par morceaux <= 400", conf, (int)got);
         check(t, ok && got == total && total > 1000);
     }
-#ifndef RESC_CONF_PROFILE_RESC
-    {
-        /* profil VESC700 : onglets fixes, la variante complete est la meme description */
-        static uint8_t b0[64 * 1024], b1[64 * 1024];
-        int ok0, ok1;
-        int32_t t0, t1, g0 = fetch250(0, b0, &t0, &ok0), g1 = fetch250(0x80, b1, &t1, &ok1);
-        check("VESC700, 0x80 : meme octet en reponse, meme description, sans visibleIf ni <Pages>",
-              ok0 && ok1 && g0 == g1 && !memcmp(b0, b1, (size_t)g0));
-    }
-#endif
-#ifdef RESC_CONF_PROFILE_RESC
     printf("== Commande 250 : onglets selon la configuration\n");
     {
         static vesc_mcconf_t mc;
@@ -277,7 +256,6 @@ int main(void)
         check("variante complete identique quelle que soit la configuration", got3 == got4 && !memcmp(blob, blob2, (size_t)got3));
         conf_desc_source(0, 0);
     }
-#endif
     {
         uint8_t req[9], out[512];
         int32_t i = 0, j;

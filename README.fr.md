@@ -20,22 +20,18 @@ Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs exista
 | Détections manuelles : offsets courant et tension, R/L (3 paliers), flux, Hall, codeur, induction | `foc.c`, `app/detect_app.c` | simulation OK |
 | Contrôle : courant, frein, duty (mode tension, frein de descente), vitesse, position, boucle ouverte, limitations | `firmware/src/core/ctrl.c` | simulation OK |
 | Applications : PPM, ADC (+ boutons, marche arrière intelligente et commande hybride courant / rapport cyclique de RESC), VESC Remote, PAS, multi-contrôleurs CAN avec antipatinage, arrêt d'urgence | `firmware/src/app/apps.c`, `bsp/inputs.c` | tests PC OK |
-| Configuration : profils VESC700 / RESC générés depuis les XML, stockage par nom avec migration, description envoyée à RESC Tool (commande 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | tests PC OK |
+| Configuration : générée depuis les XML, stockage par nom avec migration, description envoyée à RESC Tool (commande 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | tests PC OK |
 | Fonctions de VESC 7.00 : échantillonnage V0/V7, surmodulation, frein tenu jusqu'à l'arrêt avec court-circuit par les low-sides, frein à main, échantillonnage pour l'outil, statistiques, odomètre, codeurs absolus (tous les modes du port capteur de VESC sauf Custom : AS5047, MT6816, AS5x47U, TLE5012, AMT22, MA782, BiSS-C, TS5700N8501, AD2S1205, sin/cos, PWM, PWM + ABI), IMU (BMI160), BMS VESC par CAN, assistant (détection automatique, CAN compris), mise à jour du firmware sur le bus CAN | `core/`, `bsp/abs_enc.c`, `app/imu.c`, `app/bms.c`, `app/detect_all.c`, `comm/sampler.c` | simulation et tests PC OK |
 | Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break, survitesse | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partiellement simulé |
 | STM32F405 : TIM1, ADC triple, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **à valider sur carte** |
 
-## Profils de configuration
+## Configuration
 
-| | Profil VESC700 (défaut) | Profil RESC |
-|---|---|---|
-| Outil | VESC Tool officiel, Android, et RESC Tool | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 179 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; seuls les choix pris en charge par RESC et par la carte restent dans les listes |
-| Dans RESC Tool | Paramètres inutilisés cachés | **Seuls les paramètres utilisés par les réglages en cours sont affichés** (voir ci-dessous) |
+RESC a son propre jeu de paramètres : 179 paramètres moteur et 111 d'application, dérivés de VESC 7.00 (sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; ajoutés : moteur à induction, bande passante de la boucle de courant, commande hybride courant / rapport cyclique, Basic Duty Mode, marche arrière intelligente de l'ADC...). Seuls les choix pris en charge par RESC et par la carte restent dans les listes. Le firmware envoie sa propre description des paramètres à **RESC Tool** (commande 250), l'outil n'a donc pas besoin de liste intégrée. Le VESC Tool officiel, qui a la liste de VESC 7.00 intégrée, ne peut pas lire cette configuration.
 
 **Motor Type** (Motor > General > General) : **FOC Permanent Magnets (PMSM / BLDC / IPM)** ou **FOC Induction (ACIM)**.
 
-En profil RESC, le firmware construit les onglets envoyés à RESC Tool d'après la configuration en cours : type de moteur, source d'angle (sans capteur, codeur, Hall, HFI, VSS), options (sonde de température, défluxage, filtre de phase...) et types de commande des applications. Un paramètre n'apparaît que s'il est utilisé ; les onglets et groupes vides disparaissent. Les valeurs cachées restent transmises et conservées. Après un changement de type de moteur ou de capteur, écrire la configuration puis se reconnecter pour mettre la liste à jour. Les règles d'affichage sont dans [tools/resc_conf/desc_vis.py](tools/resc_conf/desc_vis.py).
+Le firmware construit les onglets envoyés à RESC Tool d'après la configuration en cours : type de moteur, source d'angle (sans capteur, codeur, Hall, HFI, VSS), options (sonde de température, défluxage, filtre de phase...) et types de commande des applications. Un paramètre n'apparaît que s'il est utilisé ; les onglets et groupes vides disparaissent. Les valeurs cachées restent transmises et conservées. Après un changement de type de moteur ou de capteur, écrire la configuration puis se reconnecter pour mettre la liste à jour. Les règles d'affichage sont dans [tools/resc_conf/desc_vis.py](tools/resc_conf/desc_vis.py).
 
 **Affichage dynamique (commande 250, bit 7) :** un RESC Tool qui envoie `0x80 | conf` reçoit tous les onglets, chacun avec sa condition `visibleIf`, plus une section `<Pages>`. Il affiche et cache alors les paramètres pendant l'édition, sans écrire ni se reconnecter. Sans le bit, la réponse ne change pas. Exemples de flux : [tools/resc_conf/samples/](tools/resc_conf/samples/).
 
@@ -43,10 +39,6 @@ En profil RESC, le firmware construit les onglets envoyés à RESC Tool d'après
 
 ```bash
 python firmware/build.py
-```
-
-```bash
-python firmware/build.py --conf resc
 ```
 
 ```bash
@@ -58,8 +50,7 @@ python firmware/build.py --tests
 ```
 
 Images prêtes à flasher dans `firmware/release/` :
-- `resc_ubox_single_85_200.bin` / `.hex` : profil VESC700 (VESC Tool et RESC Tool).
-- `resc_ubox_single_85_200_profil_resc.bin` : profil RESC (uniquement avec un RESC Tool qui lit la description ; à ne pas distribuer avant cette version de l'outil).
+- `resc_ubox_single_85_200.bin` / `.hex` : le firmware. Il fonctionne avec **RESC Tool** (la version qui lit la description envoyée par le firmware), pas avec le VESC Tool officiel, dont la liste de paramètres intégrée est différente.
 
 Console : `python tools/resc_cli.py`. Le terminal (`help`) liste toutes les commandes, dont les détections (`detect_rl`, `detect_acim`...) et `get` / `set` / `list` pour tous les paramètres.
 
@@ -88,7 +79,7 @@ Console : `python tools/resc_cli.py`. Le terminal (`help`) liste toutes les comm
 | 11 | [Cartes supportées](docs/11_cartes_vesc.md) | Configuration matérielle compatible VESC, recensement, carte Ubox de référence |
 | 12 | [Premier essai au banc](docs/12_essai_banc.md) | Sauvegarde, flashage, vérifications, détections, premiers tours |
 | 13 | [Audit du code et indépendance du FOC](docs/13_audit_code_et_independance_foc.md) | Ce qui vient de VESC, ce qui est propre à RESC |
-| 14 | [Fonctions RESC 1.0](docs/14_fonctions_v1.md) | Observateurs, capteurs, sensorless, filtres de phase, applications, induction, profils |
+| 14 | [Fonctions RESC 1.0](docs/14_fonctions_v1.md) | Observateurs, capteurs, sensorless, filtres de phase, applications, induction, configuration |
 | — | [RESC 0.1 vs VESC 7.00 (PDF, anglais)](docs/RESC_vs_VESC_FOC_observer.pdf) | Comparatif du cœur FOC et de l'observateur, **version 0.1** (dépassé : pas de HFI, un seul observateur à l'époque) |
 
 ## Configuration matérielle

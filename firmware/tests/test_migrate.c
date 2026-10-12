@@ -1,5 +1,5 @@
 /*
- * test_migrate.c — Stockage par nom et migration de la configuration (compile dans les deux profils) :
+ * test_migrate.c — Stockage par nom et migration de la configuration  :
  *  - ancien format (serialisation 7.00 + en-tete 'RESC') relu, valeurs conservees, reecrit par nom
  *  - format par nom relu a l'identique ; champs inconnus ignores, champs nouveaux aux defauts
  *  - odometre enregistre avec la configuration des applications, relu, ecrit seulement s'il change

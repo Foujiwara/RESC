@@ -15,15 +15,13 @@ Ce document décrit ce que fait chaque fonction ajoutée en version 1.0 et le pa
 | 4 | MXV : intégrateur, module ramené à λ s'il le dépasse | VESC 7.00 |
 | 5 | MXV_LAMBDA_COMP : MXV + λ estimé (comme Ortega) | VESC 7.00 |
 | 6 | MXV_LAMBDA_COMP_LIN : MXV + λ suivi par filtre passe-bas du module | VESC 7.00 |
-| 7 | RESC_ACTIVE_FLUX : flux actif avec correction non linéaire, module λ + (Ld − Lq)·id (moteurs saillants) | RESC, celui essayé sur la carte ; défaut du profil RESC |
+| 7 | RESC_ACTIVE_FLUX : flux actif avec correction non linéaire, module λ + (Ld − Lq)·id (moteurs saillants) | RESC, celui essayé sur la carte ; valeur par défaut |
 | 8 | RESC_RADIAL : même flux actif, module ramené linéairement vers λ avec un gain de 2·\|ω\| (rien à régler) | RESC |
 | 9 | RESC_ACTIVE_FLUX_LAMBDA : 7 + λ réestimé en marche à partir de \|e\|/\|ω\| (1 s, ±30 %) | RESC |
 | 10 | RESC_RADIAL_LAMBDA : 8 + λ réestimé | RESC |
 | 11 | RESC_BEMF : observateur de FEM (Luenberger sur le courant, sans dérivée du courant, retard compensé), angle indépendant de λ | RESC |
 | 12 | RESC_BEMF_LAMBDA : 11 + λ réestimé | RESC |
 | 13 | RESC_HYBRID_LAMBDA : flux actif à basse vitesse, FEM à haute vitesse, λ réestimé | RESC |
-
-En profil VESC 7.00, la liste de VESC Tool s'arrête à 6. Les observateurs RESC se choisissent alors au terminal, par exemple `set foc_observer_type 7`.
 
 **Migration depuis RESC 0.1.** RESC 0.1 ignorait le type d'observateur, le gain réduit à l'arrêt, le découplage, le filtre de phase et le mélange Hall : son comportement était fixe. Au premier démarrage de la 1.0, la migration de la configuration règle donc ces champs sur le comportement que tu as essayé :
 - observateur 7 (RESC_ACTIVE_FLUX) ;
@@ -37,7 +35,7 @@ Les nouvelles fonctions s'activent ensuite une par une. Une configuration neuve,
 Autres réglages :
 - **λ adaptatif :** ré-estimé en marche à partir de |e|/|ω|, avec une constante de temps de 1 s, borné à ±30 % de la valeur configurée.
 - **`foc_observer_gain_slow` :** fraction du gain gardée à l'arrêt.
-- **`foc_observer_offset` :** avance d'angle en périodes. En profil VESC, la valeur par défaut −1 correspond à « aucune correction ».
+- **`foc_observer_offset` :** avance d'angle en périodes. Valeur par défaut : 0.
 - **`foc_speed_soure` :** source de la vitesse, soit l'angle de commande (via une PLL), soit l'observateur.
 
 ## 2. Capteurs (`foc_sensor_mode`)
@@ -68,7 +66,7 @@ Réglages HFI :
 | `foc_start_curr_dec` / `_rpm` | Courant réduit à basse vitesse |
 | `foc_sat_comp_mode` / `foc_sat_comp` | Compensation de la saturation (inductances, λ) |
 | `foc_temp_comp` / `_base_temp` | R (+0,393 %/K) et λ (−0,11 %/K) selon la température du moteur |
-| `foc_cc_decoupling` | Anticipation croisée et FEM. En profil VESC, l'anticipation de FEM reste toujours active |
+| `foc_cc_decoupling` | Anticipation croisée et FEM |
 | `foc_mtpa_mode` | MTPA sur la consigne ou sur le courant mesuré (moteurs saillants) |
 | `foc_fw_current_max`, `_duty_start`, `_ramp_time`, `_q_current_factor` | Défluxage |
 
@@ -105,7 +103,7 @@ Valeurs par défaut VESC : filtre actif jusqu'à 4000 ERPM, défaut désactivé.
 | VESC Remote | Manette (`app_chuk_conf.*`) | Courant, sans marche arrière, bidirectionnel ; régulateur (bouton C) ; marche arrière (bouton Z), intelligente ou non ; frein de roue libre |
 | PAS | Capteur de pédalage en quadrature sur TX/RX | Cadence ou couple constant ; ADC + PAS (la poignée prime) |
 
-Options RESC de l'app ADC (App > ADC > General, profil RESC) :
+Options RESC de l'app ADC (App > ADC > General) :
 - **Marche arrière intelligente** (`resc_smart_rev`, types courant avec marche arrière : centre, bouton, bouton + frein ADC2, bouton + frein au centre). Demande de marche arrière en roulant en avant au-dessus de `resc_smart_rev_erpm` : frein proportionnel à la demande. En dessous : recul à rapport cyclique limité (`resc_smart_rev_max_duty`), atteint en `resc_smart_rev_ramp_time`.
 - **Commande hybride courant / rapport cyclique** (`resc_hybrid`, types courant). Le courant reste proportionnel aux gaz, et le rapport cyclique est limité proportionnellement aux gaz : limite = gaz × `resc_hybrid_duty` × `l_max_duty`. Le courant décroît linéairement sur `resc_hybrid_band` (fraction de la limite) et s'annule à la limite, sans coupure brutale. À mi-gaz : mi-couple et, à vide, environ mi-vitesse (0,51 en simulation, sans dépassement). En courant seul, quelques pourcents de gaz suffisent à amener un moteur à vide à pleine vitesse. Le frein n'est pas concerné. La régulation tourne dans `ctrl.c` à 1 kHz, avec le pont maintenu à courant nul.
 
@@ -143,7 +141,7 @@ Dans tous les cas, le moteur doit être arrêté. Par défaut : arrêt après 30
 - **Défauts supplémentaires (`l_additional_faults`) :** survitesse et survitesse absolue.
 - **`m_fault_stop_time_ms` :** temps minimal avant le réarmement après un défaut.
 
-## 7. Moteur à induction (profil RESC, ou terminal en profil VESC)
+## 7. Moteur à induction
 
 Réglage : **Motor Type** (General, General ; `foc_motor_kind`) = **FOC Induction (ACIM)**. L'autre choix est **FOC Permanent Magnets (PMSM / BLDC / IPM)**. Procédure :
 1. `detect_rl` : mesure Rs et l'inductance transitoire σLs, qui devient « Motor L ».
@@ -162,33 +160,33 @@ Commandes du terminal pour l'induction :
 - **`detect_acim [A]`** : identification de Lm, Lr et Rr.
 - **`conf` et `status` :** affichent les grandeurs propres à l'induction quand ce mode est actif.
 
-## 8. Profils de configuration
+## 8. Configuration
 
-| | Profil VESC700 (défaut) | Profil RESC |
-|---|---|---|
-| Compilation | `python firmware/build.py` | `python firmware/build.py --conf resc` |
-| Outil | VESC Tool officiel, Android | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 179 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; avec aides RESC, induction, bande passante, courant de mesure R |
-| Version annoncée | 7.00 | 1.00 |
+RESC a son propre jeu de paramètres, décrit par `firmware/conf/resc_{mcconf,appconf}.xml` et envoyé à l'outil par la commande 250. Il fonctionne avec **RESC Tool uniquement** : le VESC Tool officiel a la liste de VESC 7.00 intégrée et refuserait la configuration (signature différente).
 
-Points communs aux deux profils :
-- **Description de la configuration :** la commande 250 envoie le XML du profil compilé.
-- **Affichage selon la configuration (profil RESC) :** les onglets envoyés par la commande 250 sont construits par le firmware à chaque connexion. Seuls les paramètres utilisés avec les réglages en cours y figurent :
+| | RESC |
+|---|---|
+| Compilation | `python firmware/build.py` |
+| Paramètres | 179 moteur et 111 application, dérivés de VESC 7.00 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; avec aides RESC, induction, bande passante, courant de mesure R, options de l'ADC |
+| Version annoncée | 1.00 |
+
+Le format 7.00 (`firmware/conf/vesc700/`) ne sert plus qu'à relire une ancienne configuration enregistrée, et de référence de types et de valeurs par défaut.
+
+- **Description de la configuration :** la commande 250 envoie le XML de la configuration, avec les valeurs par défaut et les plages de la carte compilée.
+- **Affichage selon la configuration :** les onglets envoyés par la commande 250 sont construits par le firmware à chaque connexion. Seuls les paramètres utilisés avec les réglages en cours y figurent :
   - type de moteur : en induction, plus de flux de l'aimant, de Ld - Lq, de MTPA, de défluxage ni de choix d'observateur ; en aimants permanents, plus de paramètres d'induction ;
   - source d'angle : table Hall, codeur, injection (HFI, VSS) et démarrage I/f selon le capteur choisi ; plus d'observateur avec un codeur seul ;
   - options : sonde de température, compensation de saturation et de température, filtre de phase, défluxage ;
   - applications : réglages propres au type de commande PPM et ADC (centre, ADC2, PID, marche arrière), antipatinage seulement en multi-contrôleurs, messages CAN seulement si leur fréquence n'est pas nulle.
 
   Les valeurs cachées restent transmises et conservées. Après un changement de type de moteur ou de capteur, écrire la configuration puis se reconnecter pour mettre la liste à jour. Les conditions sont dans `tools/resc_conf/desc_vis.py`.
-- **Affichage dynamique (bit 7 de la commande 250, profil RESC) :** avec l'octet `0x80 | conf`, le firmware répond avec le même octet et envoie tous les onglets, chacun avec son attribut `visibleIf`, plus une section `<Pages>`. RESC Tool évalue ces conditions pendant l'édition, sans écrire ni se reconnecter. La syntaxe est `|| && ! == != < <= > >= in [..] &` avec parenthèses. Un enum se compare à sa position dans la liste (réduite pour la carte), un booléen à 0 / 1. Seules les conditions qui ne dépendent que de la carte sont évaluées par le firmware. Sans le bit, la réponse est la même qu'avant. Le profil VESC700 renvoie la même description dans les deux cas. Exemples de flux : `tools/resc_conf/samples/` (`conf_xml_*.bin` sans le bit, `vis_conf_xml_*.bin` avec).
-- **Stockage en flash :** champ par champ, par nom. On peut passer d'un profil à l'autre, ou changer de version, sans perdre les réglages.
+- **Affichage dynamique (bit 7 de la commande 250) :** avec l'octet `0x80 | conf`, le firmware répond avec le même octet et envoie tous les onglets, chacun avec son attribut `visibleIf`, plus une section `<Pages>`. RESC Tool évalue ces conditions pendant l'édition, sans écrire ni se reconnecter. La syntaxe est `|| && ! == != < <= > >= in [..] &` avec parenthèses. Un enum se compare à sa position dans la liste (réduite pour la carte), un booléen à 0 / 1. Seules les conditions qui ne dépendent que de la carte sont évaluées par le firmware. Sans le bit, la réponse est la même qu'avant. Exemples de flux : `tools/resc_conf/samples/` (`conf_xml_*.bin` sans le bit, `vis_conf_xml_*.bin` avec).
+- **Stockage en flash :** champ par champ, par nom. On peut changer de version sans perdre les réglages.
 - **Ancien format de RESC 0.1 :** relu au premier démarrage, puis réécrit. `status` affiche « MIGRÉE ».
 
 **Paramètres visibles.**
-- **Profil RESC :** 179 paramètres moteur et 111 paramètres d'application, tous utilisés par le firmware et tous visibles (selon les réglages en cours).
-- **Choix selon la carte (profil RESC) :** les choix qui n'existent pas sur la carte compilée sont retirés des listes (V0 et V7 sans shunts en ligne, modes à trois capteurs, codeurs SPI1 / PWM / sin/cos sans leurs broches, IMU interne). Règles : `tools/resc_conf/board_enum.py`.
-- **Profil VESC700 :** la description envoyée à RESC Tool par la commande 250 est l'officielle, avec la même sérialisation et la même signature. Seule différence : les paramètres inutilisés sont retirés des onglets, donc invisibles (141/202 et 80/121 visibles), et les aides décrivent le comportement de RESC.
-- **VESC Tool officiel :** il ne demande pas la description et affiche toujours tous les paramètres de VESC 7.00. On ne peut rien y cacher sans casser la compatibilité.
+- **Paramètres :** 179 paramètres moteur et 111 paramètres d'application, tous utilisés par le firmware et tous visibles (selon les réglages en cours).
+- **Choix selon la carte :** les choix qui n'existent pas sur la carte compilée sont retirés des listes (V0 et V7 sans shunts en ligne, modes à trois capteurs, codeurs SPI1 / PWM / sin/cos sans leurs broches, IMU interne). Règles : `tools/resc_conf/board_enum.py`.
 - **Onglets BLDC, DC et GPD :** ils restent présents, mais vides.
 
 **Valeurs affichées.** La description envoyée à l'outil est générée pour la carte compilée :
@@ -199,12 +197,9 @@ Points communs aux deux profils :
 Le script est `tools/resc_conf/board_xml.py`. Il est lancé par `build.py`, à partir des valeurs relevées par `tests/dump_defaults.c`.
 
 **Binaires dans `firmware/release/` :**
-- `resc_ubox_single_85_200.bin` : profil VESC700. Fonctionne avec VESC Tool et avec RESC Tool.
-- `resc_ubox_single_85_200_profil_resc.bin` : profil RESC. Uniquement avec un RESC Tool qui lit la description, c'est-à-dire compilé depuis le source qui contient la commande 250.
+- `resc_ubox_single_85_200.bin` / `.hex` : le firmware. Uniquement avec un RESC Tool qui lit la description, c'est-à-dire compilé depuis le source qui contient la commande 250.
 
 Le contrôle est automatique dans `python firmware/build.py --tests`, via `tools/resc_conf/audit_params.py`.
-
-**Ne pas distribuer le profil RESC avant la version de RESC Tool qui lit la description.**
 
 Génération : `python -I tools/resc_conf/make_resc_xml.py` (XML RESC), puis `python -I tools/resc_conf/gen_resc_conf.py` (code). Tests : `python firmware/build.py --tests`.
 

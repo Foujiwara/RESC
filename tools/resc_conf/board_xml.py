@@ -2,8 +2,7 @@
 """
 Description de configuration propre a une carte, pour la commande 250.
 
-Part des XML du profil (RESC : firmware/conf/resc_*.xml ; VESC700 : firmware/conf/vesc700_view/)
-et y inscrit, pour la carte compilee :
+Part des XML de RESC (firmware/conf/resc_*.xml) et y inscrit, pour la carte compilee :
   - les vraies valeurs par defaut du firmware (defauts + reglages prudents de la carte + bornes),
     relevees par firmware/tests/dump_defaults.c ;
   - les plages limitees au materiel (courants, tension, ERPM, frequence PWM, duty, temperature) ;
@@ -11,7 +10,7 @@ et y inscrit, pour la carte compilee :
 Les noms, types, encodages et choix ne changent pas : signature et serialisation identiques
 (verifie). Ecrit le fichier C des tableaux compresses (qCompress) a compiler avec le firmware.
 
-Usage : python -I board_xml.py <defauts.json> <profil vesc700|resc> <sortie.c> [<dossier des XML ecrits>]
+Usage : python -I board_xml.py <defauts.json> <sortie.c> [<dossier des XML ecrits>]
 """
 import json
 import os
@@ -115,32 +114,29 @@ def patch(root, dflt, lim, emap):
 
 
 def main():
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 3:
         raise SystemExit(__doc__)
     data = json.load(open(sys.argv[1]))
-    prof, out = sys.argv[2], sys.argv[3]
-    files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"} if prof == "resc" else \
-            {"mc": "vesc700_view/parameters_mcconf.xml", "app": "vesc700_view/parameters_appconf.xml"}
-    lines = ["/* GENERE par tools/resc_conf/board_xml.py pour %s (profil %s) - ne pas editer. */" % (data["board"], prof),
+    out = sys.argv[2]
+    files = {"mc": "resc_mcconf.xml", "app": "resc_appconf.xml"}
+    lines = ["/* GENERE par tools/resc_conf/board_xml.py pour %s - ne pas editer. */" % data["board"],
              '#include "hw_config.h"', '#include "vesc_conf.h"', '#include "conf_desc.h"', '']
     for k, f in files.items():
         root = ET.parse(os.path.join(CONF, f)).getroot()
-        emap = json.load(open(os.path.join(CONF, "resc_enum_map.json"))) if prof == "resc" else {}
-        if prof == "resc":
-            # choix absents sur cette carte : retires de la liste (signature et table de la carte)
-            emap = board_enum.reduce(root, emap, set(data.get("caps", [])), k)
+        emap = json.load(open(os.path.join(CONF, "resc_enum_map.json")))
+        # choix absents sur cette carte : retires de la liste (signature et table de la carte)
+        emap = board_enum.reduce(root, emap, set(data.get("caps", [])), k)
         sig0 = signature(root)
         n = patch(root, data[k], data["limits"], emap)
         if signature(root) != sig0:
             raise SystemExit("signature modifiee : interdit")
-        if prof == "resc":
-            lines += board_enum.c_lines(k, emap, sig0)
+        lines += board_enum.c_lines(k, emap, sig0)
         ET.indent(root, space="    ")
         raw = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
-        if len(sys.argv) > 4:
-            os.makedirs(sys.argv[4], exist_ok=True)
-            open(os.path.join(sys.argv[4], os.path.basename(f)), "wb").write(raw)
-        vis = (desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP) if prof == "resc" else {}
+        if len(sys.argv) > 3:
+            os.makedirs(sys.argv[3], exist_ok=True)
+            open(os.path.join(sys.argv[3], os.path.basename(f)), "wb").write(raw)
+        vis = desc_vis.VIS_MC if k == "mc" else desc_vis.VIS_APP
         lines += desc_vis.c_lines(raw, root, k, vis, emap)
         print("  %s : %d valeurs par defaut de la carte, XML %d octets, %d parametres a affichage conditionnel" % (
             k, n, len(raw), len(vis)))

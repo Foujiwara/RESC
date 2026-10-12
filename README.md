@@ -20,22 +20,18 @@ For interoperability with VESC Tool, displays and existing controllers, RESC reu
 | Manual detections: current and voltage offsets, R/L (3 steps), flux, Hall, encoder, induction | `foc.c`, `app/detect_app.c` | simulation OK |
 | Control: current, brake, duty (voltage mode, down-ramp brake), speed, position, open loop, limits | `firmware/src/core/ctrl.c` | simulation OK |
 | Apps: PPM, ADC (+ buttons, RESC smart reverse and hybrid current / duty control), VESC Remote, PAS, multi-ESC over CAN with traction control, kill switch | `firmware/src/app/apps.c`, `bsp/inputs.c` | PC tests OK |
-| Configuration: VESC700 / RESC profiles generated from the XMLs, storage by name with migration, description sent to RESC Tool (command 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | PC tests OK |
+| Configuration: generated from the XMLs, storage by name with migration, description sent to RESC Tool (command 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | PC tests OK |
 | VESC 7.00 features: V0/V7 sampling, overmodulation, brake held to standstill with low-side short, handbrake, sampled data, statistics, odometer, absolute encoders (all VESC sensor port modes except Custom: AS5047, MT6816, AS5x47U, TLE5012, AMT22, MA782, BiSS-C, TS5700N8501, AD2S1205, sin/cos, PWM, PWM + ABI), IMU (BMI160), VESC BMS over CAN, setup wizard (auto detection, CAN included), firmware update over the CAN bus | `core/`, `bsp/abs_enc.c`, `app/imu.c`, `app/bms.c`, `app/detect_all.c`, `comm/sampler.c` | simulation and PC tests OK |
 | Protections: software overcurrent + ADC watchdog, overvoltage, undervoltage, temperatures, driver fault, break, overspeed | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partly simulated |
 | STM32F405: TIM1, triple ADC, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **to validate on the board** |
 
-## Configuration profiles
+## Configuration
 
-| | VESC700 profile (default) | RESC profile |
-|---|---|---|
-| Tool | Official VESC Tool, Android, and RESC Tool | **RESC Tool only** (version that reads the description) |
-| Parameters | The 202 + 121 of VESC 7.00, byte-identical | 179 + 111: no BLDC, DC, DRV8301, UAVCAN, NRF24, slow absolute current; only the options RESC and the board support remain in the lists |
-| In RESC Tool | Unused parameters hidden | **Only the parameters used by the current settings are shown** (see below) |
+RESC has its own parameter set: 179 motor and 111 application parameters, derived from VESC 7.00 (no BLDC, DC, DRV8301, UAVCAN, NRF24, slow absolute current; added: induction motor, current loop bandwidth, hybrid current / duty control, Basic Duty Mode, smart reverse on the ADC...). Only the options RESC and the board support remain in the lists. The firmware sends its own description of the parameters to **RESC Tool** (command 250), so the tool needs no built-in list. The official VESC Tool, which has VESC 7.00's list built in, cannot read this configuration.
 
 **Motor Type** (Motor > General > General): **FOC Permanent Magnets (PMSM / BLDC / IPM)** or **FOC Induction (ACIM)**.
 
-In the RESC profile the firmware builds the tabs it sends to RESC Tool from the current configuration: motor type, angle source (sensorless, encoder, Hall, HFI, VSS), options (temperature sensor, field weakening, phase filter...) and app control types. A parameter is listed only when it is used; empty tabs and groups disappear. Hidden values are still transmitted and kept. After changing the motor type or the sensor, write the configuration and reconnect to refresh the list. The display rules are in [tools/resc_conf/desc_vis.py](tools/resc_conf/desc_vis.py).
+The firmware builds the tabs it sends to RESC Tool from the current configuration: motor type, angle source (sensorless, encoder, Hall, HFI, VSS), options (temperature sensor, field weakening, phase filter...) and app control types. A parameter is listed only when it is used; empty tabs and groups disappear. Hidden values are still transmitted and kept. After changing the motor type or the sensor, write the configuration and reconnect to refresh the list. The display rules are in [tools/resc_conf/desc_vis.py](tools/resc_conf/desc_vis.py).
 
 **Dynamic display (command 250, bit 7):** a RESC Tool that sends `0x80 | conf` receives every tab, each with a `visibleIf` condition, plus a `<Pages>` section. It then shows and hides the parameters while you edit, with no write or reconnect. Without the bit the reply is unchanged. Sample streams: [tools/resc_conf/samples/](tools/resc_conf/samples/).
 
@@ -43,10 +39,6 @@ In the RESC profile the firmware builds the tabs it sends to RESC Tool from the 
 
 ```bash
 python firmware/build.py
-```
-
-```bash
-python firmware/build.py --conf resc
 ```
 
 ```bash
@@ -58,8 +50,7 @@ python firmware/build.py --tests
 ```
 
 Ready-to-flash images in `firmware/release/`:
-- `resc_ubox_single_85_200.bin` / `.hex`: VESC700 profile (VESC Tool and RESC Tool).
-- `resc_ubox_single_85_200_profil_resc.bin`: RESC profile (RESC Tool that reads the description only; do not distribute before that RESC Tool release).
+- `resc_ubox_single_85_200.bin` / `.hex`: the firmware. It works with **RESC Tool** (the version that reads the description sent by the firmware), not with the official VESC Tool, whose built-in parameter list differs.
 
 Console: `python tools/resc_cli.py`. The terminal (`help`) gives every command, including the detections (`detect_rl`, `detect_acim`...) and `get` / `set` / `list` for all parameters.
 
@@ -88,7 +79,7 @@ Console: `python tools/resc_cli.py`. The terminal (`help`) gives every command, 
 | 11 | [Supported boards](docs/11_cartes_vesc.md) | VESC-compatible hardware configuration, survey, Ubox reference board |
 | 12 | [First bench test](docs/12_essai_banc.md) | Backup, flashing, checks, detections, first turns |
 | 13 | [Code audit and FOC independence](docs/13_audit_code_et_independance_foc.md) | What comes from VESC, what is RESC's own |
-| 14 | [RESC 1.0 functions](docs/14_fonctions_v1.md) | Observers, sensors, sensorless, phase filters, apps, induction, profiles |
+| 14 | [RESC 1.0 functions](docs/14_fonctions_v1.md) | Observers, sensors, sensorless, phase filters, apps, induction, configuration |
 | — | [RESC 0.1 vs VESC 7.00 (PDF, English)](docs/RESC_vs_VESC_FOC_observer.pdf) | FOC core and observer comparison, **version 0.1** (outdated: no HFI, single observer at the time) |
 
 ## Hardware configuration
