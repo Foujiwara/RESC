@@ -137,6 +137,9 @@ VIS_MC = {
     "foc_current_sample_mode": "(BOARD_CS_TOPOLOGY != HW_CS_LOWSIDE_2)",
     # filtre de phase
     "foc_phase_filter_max_erpm": "mc->foc_phase_filter_enable",
+    # regulateur de descente du mode duty : remplace par la roue libre en mode duty simple
+    "foc_duty_dowmramp_kp": "!mc->foc_resc_duty_basic",
+    "foc_duty_dowmramp_ki": "!mc->foc_resc_duty_basic",
     "foc_phase_filter_disable_fault": "mc->foc_phase_filter_enable",
 }
 for _k in range(8):

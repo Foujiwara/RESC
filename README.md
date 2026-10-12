@@ -30,7 +30,7 @@ For interoperability with VESC Tool, displays and existing controllers, RESC reu
 | | VESC700 profile (default) | RESC profile |
 |---|---|---|
 | Tool | Official VESC Tool, Android, and RESC Tool | **RESC Tool only** (version that reads the description) |
-| Parameters | The 202 + 121 of VESC 7.00, byte-identical | 178 + 111: no BLDC, DC, DRV8301, UAVCAN, NRF24, slow absolute current; only the options RESC and the board support remain in the lists |
+| Parameters | The 202 + 121 of VESC 7.00, byte-identical | 179 + 111: no BLDC, DC, DRV8301, UAVCAN, NRF24, slow absolute current; only the options RESC and the board support remain in the lists |
 | In RESC Tool | Unused parameters hidden | **Only the parameters used by the current settings are shown** (see below) |
 
 **Motor Type** (Motor > General > General): **FOC Permanent Magnets (PMSM / BLDC / IPM)** or **FOC Induction (ACIM)**.

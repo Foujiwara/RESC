@@ -350,6 +350,15 @@ MC_ADD = [
         description=html("Highest current step of the resistance measurement, as a fraction of Motor Current "
                          "Max. Steps at 1/2, 3/4 and 1 of it; R is the slope dV/dI.")),
      "FOC", "Advanced", None),
+    ("foc_resc_duty_basic", "foc_temp_comp", dict(
+        longName="Basic Duty Mode", cDefine="MCCONF_FOC_RESC_DUTY_BASIC", valInt="0",
+        description=html("Duty control: when the requested duty drops below the present duty, the motor is "
+                         "released: no braking and no acceleration (zero current, the bridge stays on), until "
+                         "the duty falls to the request, then it follows it again. Example: at 100 % the request "
+                         "goes down to 50 %, the motor coasts down to 50 % duty and takes over.",
+                         "Off: the Duty Downramp regulator brakes (regenerates) to follow a falling request. "
+                         "A request of zero always releases the motor.")),
+     "FOC", "Advanced", None),
 ]
 
 # App ADC : marche arriere intelligente et commande hybride courant / rapport cyclique

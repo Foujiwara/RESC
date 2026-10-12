@@ -251,8 +251,10 @@ void terminal_process(char *line)
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
         P("Bootloader (secteur 11, mise a jour par VESC Tool) : %s", flash_bootloader_present() ? "present" : "ABSENT");
     }
-    else if (!strcmp(c, "faults")) P("Defaut actif : %s (%u), crete de phase vue : %.1f A", fault_name(g_foc_telem.fault),
-                                     (unsigned)g_foc_telem.fault, (double)g_foc_telem.i_phase_max);
+    else if (!strcmp(c, "faults")) P("Defaut actif : %s (%u) ; dernier : %s (%u), %u depuis le demarrage ; crete de phase vue : %.1f A",
+                                     fault_name(g_foc_telem.fault), (unsigned)g_foc_telem.fault,
+                                     fault_name(g_foc_telem.last_fault), (unsigned)g_foc_telem.last_fault,
+                                     (unsigned)g_foc_telem.fault_count, (double)g_foc_telem.i_phase_max);
     else if (!strcmp(c, "clear")) {
         if (board_gate_fault()) { P("Refuse : la ligne de defaut du driver est encore active"); return; }
         ctrl_release();

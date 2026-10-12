@@ -135,6 +135,7 @@ typedef struct {
     bool  pf_no_fault;
     float pf_omega;       /* rad/s : tensions mesurees pour l'observateur en dessous */
     /* Mode duty : regulateur de descente (frein) */
+    bool  duty_basic;     /* mode duty simple : roue libre (courant nul) quand la consigne descend sous le duty */
     float duty_dr_kp;     /* A par unite de duty */
     float duty_dr_ki;     /* A/s par unite de duty */
     /* Moteur a induction (motor_kind = 1) : r = Rs, ld = lq = sigma Ls (inductance transitoire) */
@@ -252,6 +253,8 @@ typedef struct {
     uint32_t n_overrun;
     float off_cs[3];
     uint32_t fault;               /* mc_fault_code */
+    uint32_t last_fault;          /* dernier defaut vu (reste apres l'effacement automatique) */
+    uint32_t fault_count;         /* nombre de defauts depuis le demarrage */
     uint8_t hall;                 /* etat Hall courant */
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST

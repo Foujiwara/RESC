@@ -248,6 +248,76 @@
         check("hybride : vitesse stable (ondulation < 3 %)", rip[0] < 0.03 * wss[0] && rip[1] < 0.03 * wss[1]);
     }
 
+    /* ------------------------------------------------------------------ */
+    printf("== 35. Duty : relache en roue libre, affichage du duty, reprise au vol\n");
+    p = p0;
+    foc_set_params(&p);
+    {
+        STOP_AT(0.5);
+        M.b = 0.0005; M.t_load = 0.02;
+        ctrl_set_duty(0.4f);
+        for (int k = 0; k < 20; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+        double w0 = ERPM(sim_omega_e(&M));
+        ctrl_set_duty(0.0f);                          /* relache : roue libre */
+        RUN_CTRL(0.05);
+        bool idle = foc_state() == FOC_ST_IDLE;
+        double dshow = g_foc_telem.duty, w1 = ERPM(sim_omega_e(&M));
+        printf("  vitesse %.0f -> %.0f ERPM, etat %s, duty affiche %.3f\n", w0, w1, st_name(foc_state()), dshow);
+        check("relache : pont coupe (roue libre, pas de frein)", idle && w1 > 0.8 * w0);
+        check("relache : le duty affiche suit le rotor (FEM), pas 0", dshow > 0.5 * 0.4 && dshow < 1.3 * 0.4);
+        ctrl_set_duty(0.4f);                          /* reprise pendant l'elan */
+        double imin = 1e9, wmin = 1e9;
+        for (int k = 0; k < 500; k++) {
+            ctrl_alive(); RUN_CTRL(0.001);
+            if (g_foc_telem.iq < imin) imin = g_foc_telem.iq;
+            double w = ERPM(sim_omega_e(&M));
+            if (w < wmin) wmin = w;
+        }
+        printf("  reprise : iq min %.1f A, vitesse min %.0f ERPM, etat %s\n", imin, wmin, st_name(foc_state()));
+        check("reprise au vol en duty : pas de coup de frein (iq > -8 A)", imin > -8.0 && foc_state() == FOC_ST_RUN);
+        check("reprise au vol en duty : pas de perte de vitesse (> 90 %)", wmin > 0.9 * w1);
+        ctrl_release(); RUN_CTRL(0.05);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ------------------------------------------------------------------ */
+    printf("== 36. Mode duty simple (Basic Duty Mode) : 0.8 -> 0.4, roue libre jusqu'a la consigne\n");
+    {
+        double imin_b[2], imax_b[2], t_hit[2], dfin[2];
+        bool run_b[2] = { false, false };
+        for (int basic = 0; basic < 2; basic++) {
+            p = p0;
+            p.duty_basic = basic;
+            p.duty_dr_kp = 20; p.duty_dr_ki = 400;
+            foc_set_params(&p);
+            STOP_AT(0.5);
+            M.b = 0.004; M.t_load = 0.02;
+            ctrl_set_duty(0.8f);
+            for (int k = 0; k < 40; k++) { ctrl_alive(); RUN_CTRL(0.1); }
+            ctrl_set_duty(0.4f);
+            imin_b[basic] = 1e9; imax_b[basic] = -1e9; t_hit[basic] = -1;
+            for (int k = 0; k < 8000; k++) {
+                ctrl_alive(); RUN_CTRL(0.001);
+                if (k > 30 && k < 600) {
+                    if (g_foc_telem.iq < imin_b[basic]) imin_b[basic] = g_foc_telem.iq;
+                    if (g_foc_telem.iq > imax_b[basic]) imax_b[basic] = g_foc_telem.iq;
+                }
+                if (t_hit[basic] < 0 && fabs(g_foc_telem.duty) < 0.405) t_hit[basic] = k * 0.001;
+            }
+            dfin[basic] = g_foc_telem.duty;
+            run_b[basic] = foc_state() == FOC_ST_RUN;
+            printf("  basic=%d : iq pendant la descente %.1f .. %.1f A, consigne atteinte a %.2f s, duty final %.3f, etat %s\n",
+                   basic, imin_b[basic], imax_b[basic], t_hit[basic], dfin[basic], st_name(foc_state()));
+            ctrl_release(); RUN_CTRL(0.05);
+        }
+        check("duty simple : ni frein ni couple pendant la descente (|iq| < 4 A)", imin_b[1] > -4.0 && imax_b[1] < 4.0);
+        check("duty normal : le regulateur de descente freine (iq < -10 A)", imin_b[0] < -10.0);
+        check("duty simple : reprend la consigne 0.4 (+/- 0.02) en marche", fabs(dfin[1] - 0.4) < 0.02 && run_b[1]);
+        check("duty simple : plus lent que le frein pour atteindre la consigne", t_hit[1] > t_hit[0]);
+    }
+    p = p0;
+    foc_set_params(&p);
+
     p = p0;
     STOP_AT(0.5);
     foc_set_params(&p);

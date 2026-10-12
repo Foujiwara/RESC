@@ -228,12 +228,13 @@ typedef struct {
     float     foc_acim_base_erpm;
     float     foc_resc_cc_bw;
     float     foc_resc_rl_frac;
+    uint8_t   foc_resc_duty_basic;
 } vesc_mcconf_t;
 
 #define VESC700_MCCONF_SIGNATURE 1470992211u
-#define RESCP_MCCONF_SIGNATURE   3387911185u
+#define RESCP_MCCONF_SIGNATURE   1812452519u
 #define VESC700_MCCONF_SER_SIZE 488
-#define RESCP_MCCONF_SER_SIZE   437
+#define RESCP_MCCONF_SER_SIZE   438
 #ifdef RESC_CONF_PROFILE_RESC
 #define VESC_MCCONF_SIGNATURE RESCP_MCCONF_SIGNATURE
 #else
