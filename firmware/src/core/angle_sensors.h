@@ -20,7 +20,8 @@ typedef struct {
     float since_edge;      /* s */
     float omega;           /* rad/s */
     int8_t last_dir;
-    float theta;
+    float theta;           /* angle de sortie (glisse vers la cible, sans saut) */
+    bool init;
     bool ok;               /* etat courant valide */
     uint32_t n_invalid;
 } hall_t;
