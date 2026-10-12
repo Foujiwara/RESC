@@ -2,7 +2,7 @@
 
 Ce document décrit ce que fait chaque fonction ajoutée en version 1.0 et le paramètre qui la règle. Les noms sont ceux de VESC Tool / RESC Tool. Le terminal accepte les mêmes noms avec `get`, `set` et `list` (les `.` et `__` du XML y deviennent `_`, par exemple `app_ppm_conf_ctrl_type`).
 
-État : tout est **validé en simulation** (137 vérifications) et par des **tests PC** (configuration, migration, commande 250, applications). Rien n'a encore été essayé sur la carte : les essais se font par paliers, comme dans [12_essai_banc.md](12_essai_banc.md).
+État : tout est **validé en simulation** (143 vérifications) et par des **tests PC** (configuration, migration, commande 250, applications). Rien n'a encore été essayé sur la carte : les essais se font par paliers, comme dans [12_essai_banc.md](12_essai_banc.md).
 
 ## 1. Observateurs (`foc_observer_type`)
 
@@ -168,7 +168,7 @@ Commandes du terminal pour l'induction :
 |---|---|---|
 | Compilation | `python firmware/build.py` | `python firmware/build.py --conf resc` |
 | Outil | VESC Tool officiel, Android | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 178 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; avec aides RESC, induction, bande passante, courant de mesure R |
+| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques (inutilisés cachés dans RESC Tool) | 179 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; avec aides RESC, induction, bande passante, courant de mesure R |
 | Version annoncée | 7.00 | 1.00 |
 
 Points communs aux deux profils :
@@ -185,7 +185,7 @@ Points communs aux deux profils :
 - **Ancien format de RESC 0.1 :** relu au premier démarrage, puis réécrit. `status` affiche « MIGRÉE ».
 
 **Paramètres visibles.**
-- **Profil RESC :** 178 paramètres moteur et 111 paramètres d'application, tous utilisés par le firmware et tous visibles (selon les réglages en cours).
+- **Profil RESC :** 179 paramètres moteur et 111 paramètres d'application, tous utilisés par le firmware et tous visibles (selon les réglages en cours).
 - **Choix selon la carte (profil RESC) :** les choix qui n'existent pas sur la carte compilée sont retirés des listes (V0 et V7 sans shunts en ligne, modes à trois capteurs, codeurs SPI1 / PWM / sin/cos sans leurs broches, IMU interne). Règles : `tools/resc_conf/board_enum.py`.
 - **Profil VESC700 :** la description envoyée à RESC Tool par la commande 250 est l'officielle, avec la même sérialisation et la même signature. Seule différence : les paramètres inutilisés sont retirés des onglets, donc invisibles (141/202 et 80/121 visibles), et les aides décrivent le comportement de RESC.
 - **VESC Tool officiel :** il ne demande pas la description et affiche toujours tous les paramètres de VESC 7.00. On ne peut rien y cacher sans casser la compatibilité.
@@ -218,6 +218,8 @@ Toutes passent par les paramètres et les commandes de VESC Tool, avec les même
 - **`foc_overmod_factor`** (surmodulation), **`foc_mag_vd_max`** (part de la tension pour l'axe d), **`foc_current_filter_const`** (filtre des courants affichés et des limites), **`foc_fw_backoff`** (défluxage réduit quand iq dépasse sa consigne).
 - **`foc_short_ls_on_zero_duty`** : tension nulle = low-sides passants en continu.
 - **Frein (`SET_CURRENT_BRAKE`) comme VESC :** courant opposé à la vitesse ; quand il n'est plus atteignable (basse vitesse, changement de sens), phases en court-circuit, jusqu'à l'arrêt et à l'arrêt. Avec `foc_short_ls_on_zero_duty`, court-circuit par les low-sides.
+- **Mode duty (`SET_DUTY`)** : par défaut, quand la consigne descend sous le duty présent, le régulateur de descente (`foc_duty_dowmramp_kp/ki`) freine en régénération pour la suivre. Option RESC **Basic Duty Mode** (`foc_resc_duty_basic`, Motor > FOC > Advanced) : le moteur est libéré (courant nul, pont actif, ni frein ni couple) jusqu'à ce que le duty rejoigne la consigne, puis il la suit. Une consigne nulle libère toujours le moteur (pont coupé). Les deux réglages de descente sont masqués quand l'option est active.
+- **Reprise au vol en mode duty** : la tension de départ est la force contre-électromotrice du moteur lancé (avant, elle partait de 0 : coup de frein de plusieurs dizaines d'ampères, perte de 40 % de la vitesse en simulation). **Duty affiché** : pont coupé, il suit le rotor (duty équivalent à la FEM), comme VESC. **Dernier défaut** : `faults` (terminal) affiche aussi le dernier défaut et le nombre de défauts, utile pour un défaut qui s'efface seul.
 - **Frein à main (`SET_HANDBRAKE`)** : courant continu à angle figé. Les apps PPM et ADC ne l'écrasent plus quand les gaz sont relâchés.
 - **Démarrage I/f et VSS** : courant de démarrage = la consigne, bornée par `foc_sl_openloop_boost_q` et `foc_sl_openloop_max_q`. Auparavant, environ 30 % du courant max (≈ 20 A) quelle que soit la consigne. Après le relais vers l'observateur, la rampe douce ne limite plus que la montée du courant : une baisse de consigne est suivie tout de suite.
 - **HFI :** `foc_hfi_reset_erpm` (reprise sur l'observateur au-dessus, recherche de position en dessous) et `foc_hfi_obs_ovr_sec` (angle HFI recalé sur l'observateur après le retour à basse vitesse).

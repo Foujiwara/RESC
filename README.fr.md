@@ -30,7 +30,7 @@ Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs exista
 | | Profil VESC700 (défaut) | Profil RESC |
 |---|---|---|
 | Outil | VESC Tool officiel, Android, et RESC Tool | **RESC Tool uniquement** (version qui lit la description) |
-| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 178 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; seuls les choix pris en charge par RESC et par la carte restent dans les listes |
+| Paramètres | Les 202 + 121 de VESC 7.00, octets identiques | 179 + 111 : sans BLDC, DC, DRV8301, UAVCAN, NRF24, limite lente du courant absolu ; seuls les choix pris en charge par RESC et par la carte restent dans les listes |
 | Dans RESC Tool | Paramètres inutilisés cachés | **Seuls les paramètres utilisés par les réglages en cours sont affichés** (voir ci-dessous) |
 
 **Motor Type** (Motor > General > General) : **FOC Permanent Magnets (PMSM / BLDC / IPM)** ou **FOC Induction (ACIM)**.

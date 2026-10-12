@@ -348,6 +348,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->fw_ramp_time = fm_max(mc->foc_fw_ramp_time, 0.0f);
     fp->fw_q_factor = fm_sat(mc->foc_fw_q_current_factor, 0.0f, 1.0f);
     fp->fw_backoff = fm_sat(mc->foc_fw_backoff, 0.0f, 10.0f);
+    fp->duty_basic = mc->foc_resc_duty_basic != 0;
     fp->duty_dr_kp = fm_max(mc->foc_duty_dowmramp_kp, 0.0f);
     fp->duty_dr_ki = fm_max(mc->foc_duty_dowmramp_ki, 0.0f);
 

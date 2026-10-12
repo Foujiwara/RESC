@@ -3674,6 +3674,14 @@ p, li { white-space: pre-wrap; }
             <suffix> %</suffix>
             <vTx>7</vTx>
         </foc_resc_rl_frac>
+        <foc_resc_duty_basic>
+            <longName>Basic Duty Mode</longName>
+            <type>5</type>
+            <transmittable>1</transmittable>
+            <description>&lt;p&gt;Duty control: when the requested duty drops below the present duty, the motor is released: no braking and no acceleration (zero current, the bridge stays on), until the duty falls to the request, then it follows it again. Example: at 100 % the request goes down to 50 %, the motor coasts down to 50 % duty and takes over.&lt;/p&gt;&lt;p&gt;Off: the Duty Downramp regulator brakes (regenerates) to follow a falling request. A request of zero always releases the motor.&lt;/p&gt;</description>
+            <cDefine>MCCONF_FOC_RESC_DUTY_BASIC</cDefine>
+            <valInt>0</valInt>
+        </foc_resc_duty_basic>
     </Params>
     <SerOrder>
         <ser>motor_type</ser>
@@ -3854,6 +3862,7 @@ p, li { white-space: pre-wrap; }
         <ser>foc_acim_base_erpm</ser>
         <ser>foc_resc_cc_bw</ser>
         <ser>foc_resc_rl_frac</ser>
+        <ser>foc_resc_duty_basic</ser>
     </SerOrder>
     <Grouping>
         <group>
@@ -4130,6 +4139,7 @@ p, li { white-space: pre-wrap; }
                     <param>::sep::RESC</param>
                     <param>foc_resc_cc_bw</param>
                     <param>foc_resc_rl_frac</param>
+                    <param>foc_resc_duty_basic</param>
                 </subgroupParams>
             </subgroup>
         </group>

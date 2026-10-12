@@ -64,6 +64,7 @@ typedef struct {
     bool  duty_on;
     float vq_duty, int_hi, int_lo;
     bool  dr_on;                 /* duty : regulateur de descente actif */
+    bool  dc_on;                 /* duty simple : roue libre (courant nul) jusqu'a la consigne */
     float dr_int;
     float duty_abs;              /* modulation appliquee (0..1, Vbus/sqrt3 = 1) */
     float i_abs_f;               /* module du courant filtre (frein) */
@@ -231,6 +232,8 @@ RAMFUNC static void trip(uint32_t code)
     if (S.fault == RESC_FAULT_NONE) {
         S.fault = code;
         g_foc_telem.fault = code;
+        g_foc_telem.last_fault = code;          /* memorise : un defaut qui s'efface seul reste visible */
+        g_foc_telem.fault_count++;
     }
     if (S.det.busy) {
         S.det.error = (int)code;
@@ -400,13 +403,27 @@ RAMFUNC static void duty_loop(float kp, float ki, float vd_ff, float vq_ff, floa
     if (!S.duty_on) {
         S.duty_on = true;
         S.dr_on = false;
+        S.dc_on = false;
         S.vq_duty = S.vq;
         S.int_hi = S.int_lo = 0.0f;
     }
     float d_tgt = g_foc_cmd.duty;
     float d_now = S.vq / vref;
     bool same = d_tgt * d_now >= 0.0f;
-    if (!S.dr_on && same && fm_abs(d_tgt) < fm_abs(d_now) - 0.02f && S.p.duty_dr_kp + S.p.duty_dr_ki > 0.0f) {
+    if (S.p.duty_basic) {
+        /* mode duty simple : consigne sous le duty present -> courant nul (ni frein ni couple), pont
+         * actif ; reprise du suivi du duty quand il a rejoint la consigne (continu : vq_duty = vq) */
+        if (!S.dc_on && same && fm_abs(d_tgt) < fm_abs(d_now) - 0.01f) S.dc_on = true;
+        if (S.dc_on && (!same || fm_abs(d_now) <= fm_abs(d_tgt) + 0.003f)) S.dc_on = false;
+        if (S.dc_on) {
+            S.iq_ref += fm_sat_sym(0.0f - S.iq_ref, S.p.i_slew * dt);
+            current_loop(kp, ki, vd_ff, vq_ff, vmax);
+            S.vq_duty = S.vq;
+            S.int_hi = S.int_lo = 0.0f;
+            return;
+        }
+    }
+    if (!S.dr_on && same && !S.p.duty_basic && fm_abs(d_tgt) < fm_abs(d_now) - 0.02f && S.p.duty_dr_kp + S.p.duty_dr_ki > 0.0f) {
         S.dr_on = true;
         S.dr_int = S.iq;
     }
@@ -1425,6 +1442,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                     S.duty_sf = w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                     S.brk_w_prev = w0;
                     S.brk_vq_prev = S.duty_sf;
+                    S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);   /* mode duty : part de la FEM, pas de 0 */
                 }
                 S.slew = S.p.i_slew;
                 S.slew_t = 0.0f;
@@ -1441,6 +1459,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 S.duty_sf = (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                 S.brk_w_prev = S.obs.omega;
                 S.brk_vq_prev = S.duty_sf;
+                S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);       /* mode duty : part de la FEM, pas de 0 */
                 S.slew = S.p.i_slew;
                 S.slew_t = 0.0f;
                 S.low_t = S.flux_bad_t = 0.0f;
@@ -1975,6 +1994,9 @@ output:
         float vmag = fm_sqrt(S.vd * S.vd + S.vq * S.vq);
         float duty = S.br ? vmag / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f) : 0.0f;
         t->duty = S.vq < 0.0f ? -duty : duty;
+        /* pont coupe (roue libre) : rapport cyclique equivalent a la FEM, comme VESC -> suit le rotor */
+        if (!S.br && !acim() && S.st != FOC_ST_FAULT)
+            t->duty = fm_sat_sym(S.obs.omega * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f), 1.0f);
         /* vitesse : derivee de l'angle de commande (PLL) ou PLL de l'observateur */
         if (S.st == FOC_ST_RUN || S.st == FOC_ST_START) {
             float e = fm_wrap_pi(S.theta - S.w_pll_theta);

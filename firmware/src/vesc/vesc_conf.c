@@ -624,13 +624,14 @@ int32_t rescp_mcconf_serialize(uint8_t *buf, const vesc_mcconf_t *c)
     vb_put_f32_auto(buf, c->foc_acim_base_erpm, &i);
     vb_put_f32_auto(buf, c->foc_resc_cc_bw, &i);
     vb_put_f16(buf, c->foc_resc_rl_frac, 10000, &i);
+    buf[i++] = (uint8_t)c->foc_resc_duty_basic;
     return i;
 }
 
 bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
 {
     int32_t i = 0;
-    if (len < 437) return false;
+    if (len < 438) return false;
     if (vb_get_u32(buf, &i) != g_rescp_mcconf_sig) return false;
     c->motor_type = (uint8_t)buf[i++];
     c->l_current_max = vb_get_f32_auto(buf, &i);
@@ -810,6 +811,7 @@ bool rescp_mcconf_deserialize(const uint8_t *buf, int32_t len, vesc_mcconf_t *c)
     c->foc_acim_base_erpm = vb_get_f32_auto(buf, &i);
     c->foc_resc_cc_bw = vb_get_f32_auto(buf, &i);
     c->foc_resc_rl_frac = vb_get_f16(buf, 10000, &i);
+    c->foc_resc_duty_basic = (uint8_t)buf[i++];
     return true;
 }
 
@@ -1057,6 +1059,10 @@ void vesc_mcconf_defaults(vesc_mcconf_t *c)
 #define MCCONF_FOC_RESC_RL_FRAC 0.5
 #endif
     c->foc_resc_rl_frac = (float)(MCCONF_FOC_RESC_RL_FRAC);
+#ifndef MCCONF_FOC_RESC_DUTY_BASIC
+#define MCCONF_FOC_RESC_DUTY_BASIC 0
+#endif
+    c->foc_resc_duty_basic = (uint8_t)(MCCONF_FOC_RESC_DUTY_BASIC);
 #ifdef RESC_CONF_PROFILE_RESC
     /* defauts propres au profil RESC (valeurs du XML RESC) */
     c->foc_observer_offset = (float)(0);
@@ -1276,8 +1282,9 @@ const conf_field_t vesc_mcconf_fields[] = {
     { 0x2383936Bu, (uint16_t)offsetof(vesc_mcconf_t, foc_acim_base_erpm), 0, "foc_acim_base_erpm" },
     { 0xB0F71F09u, (uint16_t)offsetof(vesc_mcconf_t, foc_resc_cc_bw), 0, "foc_resc_cc_bw" },
     { 0x0C180EA3u, (uint16_t)offsetof(vesc_mcconf_t, foc_resc_rl_frac), 0, "foc_resc_rl_frac" },
+    { 0xD6618AEBu, (uint16_t)offsetof(vesc_mcconf_t, foc_resc_duty_basic), 1, "foc_resc_duty_basic" },
 };
-const uint16_t vesc_mcconf_nfields = 210;
+const uint16_t vesc_mcconf_nfields = 211;
 
 int32_t vesc700_appconf_serialize(uint8_t *buf, const vesc_appconf_t *c)
 {
@@ -2071,7 +2078,7 @@ const uint16_t vesc_appconf_nfields = 128;
 
 
 /* choix dependant de la carte (mcconf, tools/resc_conf/board_enum.py) */
-__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 3387911185u;
+__attribute__((weak)) const uint32_t g_rescp_mcconf_sig = 1812452519u;
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode[] = { 0, 2, 1 };
 __attribute__((weak)) const uint8_t g_keepb_foc_control_sample_mode_n = 3;
 __attribute__((weak)) const uint8_t g_keepb_foc_current_sample_mode[] = { 0, 1, 2 };
