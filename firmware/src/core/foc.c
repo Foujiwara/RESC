@@ -225,7 +225,9 @@ static bool motor_params_ok(void)
     return S.p.r > 1e-5f && S.p.ld > 1e-8f && S.p.lq > 1e-8f && S.p.lambda > 1e-6f;
 }
 
-RAMFUNC static void trip(uint32_t code)
+
+
+RAMFUNC static void trip_at(uint32_t code, uint32_t line)
 {
     foc_hw_kill();
     S.br = false;
@@ -233,7 +235,12 @@ RAMFUNC static void trip(uint32_t code)
         S.fault = code;
         g_foc_telem.fault = code;
         g_foc_telem.last_fault = code;          /* memorise : un defaut qui s'efface seul reste visible */
+        g_foc_telem.last_fault_line = line;
         g_foc_telem.fault_count++;
+        uint32_t k = g_foc_telem.fault_log_n++ & 7u;
+        g_foc_telem.fault_log[k].code = code;
+        g_foc_telem.fault_log[k].line = line;
+        g_foc_telem.fault_log[k].ticks = g_foc_telem.ticks;
     }
     if (S.det.busy) {
         S.det.error = (int)code;
@@ -244,7 +251,8 @@ RAMFUNC static void trip(uint32_t code)
     set_state(FOC_ST_FAULT);
 }
 
-void foc_raise_fault(uint32_t code) { trip(code); }
+void foc_raise_fault(uint32_t code) { trip_at(code, 0); }
+#define trip(code) trip_at((code), __LINE__)
 void foc_set_motor_temp(float t) { S.temp_mot = t; }
 
 /* Parametres moteur effectifs : temperature (R cuivre +0.393 %/K, lambda NdFeB -0.11 %/K)
@@ -1311,13 +1319,8 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         valid[a0 >= a1 ? (a0 >= a2 ? 0 : 2) : (a1 >= a2 ? 1 : 2)] = false;
     }
 
-    /* ---- 4. Protections rapides */
-    for (int x = 0; x < 3; x++) {
-        if (valid[x] && fm_abs(S.i_ph[x]) > S.p.i_abs_trip) {
-            trip(RESC_FAULT_ABS_OVER_CURRENT);
-            break;
-        }
-    }
+    /* ---- 4. Protections rapides (surintensite : sur le courant filtre, ci-dessous, comme
+     * l_slow_abs_current de VESC ; le watchdog analogique reste la coupure instantanee) */
     if (S.vbus > S.p.vbus_trip_max) trip(RESC_FAULT_OVER_VOLTAGE);
     if (S.br && S.vbus < S.p.vbus_trip_min) trip(RESC_FAULT_UNDER_VOLTAGE);
 
@@ -1325,7 +1328,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     {
         float imag = fm_sqrt(S.i_a * S.i_a + S.i_b * S.i_b);
         FM_LPF(S.i_abs_f, imag, 0.2f);                /* ~0.3 ms a 15 kHz */
-        if (imag > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
+        if (S.i_abs_f > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
         if (imag > g_foc_telem.i_phase_max) g_foc_telem.i_phase_max = imag;
     }
 
@@ -1728,7 +1731,9 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             }
             if (!sensor_ok) {
                 S.hall_bad_t += dt;
-                if (!S.use_obs && S.hall_bad_t > 0.05f) { trip(RESC_FAULT_UNDERSPEED); goto output; }
+                /* etat invalide (parasite) : l'angle Hall reste le dernier valide, comme VESC ;
+                 * defaut seulement si les capteurs restent invalides 0,5 s */
+                if (!S.use_obs && S.hall_bad_t > 0.5f) { trip(RESC_FAULT_UNDERSPEED); goto output; }
             } else {
                 S.hall_bad_t = 0.0f;
             }
@@ -1903,8 +1908,16 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         if (S.st == FOC_ST_RUN && S.use_obs && !S.brk_short) {
             if (flux_ratio < 0.5f || flux_ratio > 2.0f) S.flux_bad_t += dt; else S.flux_bad_t = 0.0f;
             if (S.flux_bad_t > 0.02f) {
-                trip(RESC_FAULT_UNDERSPEED);
-                goto output;
+                if (S.p.sensor_mode == FOC_SENSOR_HALL && sensor_ok) {
+                    /* Hall : on reste sur les capteurs (pas de coupure), l'observateur sera repris
+                     * quand son flux redevient coherent */
+                    S.use_obs = false;
+                    S.hall_mix = 0.0f;
+                    S.flux_bad_t = 0.0f;
+                } else {
+                    trip(RESC_FAULT_UNDERSPEED);
+                    goto output;
+                }
             }
         }
         S.br = true;

@@ -6,6 +6,8 @@
 #define BOARD_UBOX_SINGLE_85_200_H
 
 #define BOARD_UBOX_SINGLE_85_200
+/* Valide sur banc et en vehicule (fonctionne a pleine plage sous VESC) : limites a 100 % */
+#define BOARD_STATUS            HW_BOARD_STATUS_VALIDATED
 #include "board_ubox_100_core.h"
 
 #endif /* BOARD_UBOX_SINGLE_85_200_H */
