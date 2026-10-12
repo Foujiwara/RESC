@@ -4,6 +4,7 @@
 
 #define HALL_EDGE_TIMEOUT  0.15f    /* s sans front : vitesse consideree nulle */
 #define HALL_SECTOR_HALF   (FM_PI / 6.0f + 0.17f)   /* 30 deg + 10 deg de marge */
+#define HALL_MIN_RATE      52.0f    /* rad/s : un secteur (60 deg) parcouru en 20 ms au plus vite a l'arret */
 
 void hall_reset(hall_t *h)
 {
@@ -13,6 +14,7 @@ void hall_reset(hall_t *h)
     h->omega = 0.0f;
     h->last_dir = 0;
     h->theta = 0.0f;
+    h->init = false;
     h->ok = false;
     h->n_invalid = 0;
 }
@@ -50,14 +52,32 @@ RAMFUNC void hall_update(hall_t *h, const hall_cfg_t *c, uint8_t s, float dt)
     h->ok = true;
     if (h->since_edge > HALL_EDGE_TIMEOUT) h->omega = 0.0f;
 
+    /* Estimation continue entre les fronts : sans nouveau front, la vitesse ne peut pas depasser
+     * un secteur par temps ecoule (deceleration suivie sans attendre le front suivant) */
+    if (h->omega != 0.0f) {
+        float w_max = (FM_PI / 3.0f) / fm_max(h->since_edge, dt);
+        if (fm_abs(h->omega) > w_max) h->omega = h->omega > 0.0f ? w_max : -w_max;
+    }
+
     float center = c->angle[s];
+    float target;
     if (fm_abs(h->omega) >= c->interp_omega && h->since_edge < HALL_EDGE_TIMEOUT) {
         /* interpolation depuis le dernier front, bornee au secteur courant */
         float th = h->edge_theta + h->omega * h->since_edge;
         float d = fm_sat_sym(fm_wrap_pi(th - center), HALL_SECTOR_HALF);
-        h->theta = fm_wrap_pi(center + d);
+        target = fm_wrap_pi(center + d);
     } else {
-        h->theta = center;
+        target = center;
+    }
+
+    /* Sortie : l'angle glisse vers la cible a vitesse limitee (comme l'angle Hall limite en
+     * vitesse de VESC) : pas de saut de 60 deg entre les crans a basse vitesse */
+    if (!h->init) {
+        h->init = true;
+        h->theta = target;
+    } else {
+        float rate = fm_max(1.5f * fm_abs(h->omega), HALL_MIN_RATE);
+        h->theta = fm_wrap_pi(h->theta + fm_sat_sym(fm_wrap_pi(target - h->theta), rate * dt));
     }
 }
 
