@@ -112,7 +112,9 @@ float inputs_adc_v(int n)
 {
     uint8_t ch = n == 2 ? BOARD_ADC_EXT2_CH : BOARD_ADC_EXT1_CH;
     if (ch == HW_ADC_CH_NONE) return 0.0f;
-    return (float)motor_hw_slow_raw(ch) * (BOARD_VREF_V / 4095.0f);
+    /* moyenne sur 16 echantillons : un parasite isole (moteur lance, pont coupe) ne depasse plus
+     * la zone morte de l'accelerateur */
+    return motor_hw_slow_filt(ch) * (BOARD_VREF_V / 4095.0f);
 }
 
 bool inputs_btn_cruise(void) { return s_uart_use == IN_UART_BUTTONS && !gpio_read(BOARD_UART_TX_PIN); }

@@ -24,6 +24,7 @@ typedef struct {
     bool   pf_on;             /* filtre RC des tensions de phase commute */
     double pf_tau;            /* s */
     double vph_f[3];          /* tensions de phase filtrees */
+    double vph_off[3];        /* V : erreur d'offset de la mesure de tension de phase (diviseurs reels) */
     /* moteur asynchrone (acim = true) : r = Rs, ld = lq = sigma Ls (inductance transitoire) */
     bool   acim;
     double lm, lr, rr;        /* inductance magnetisante, rotorique, resistance rotorique ramenee */

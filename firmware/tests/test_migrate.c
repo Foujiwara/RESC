@@ -167,9 +167,22 @@ int main(void)
         check("sans copie : defauts (pas de vieille restauration)", resc_conf_load_status(false) == RESC_LOAD_EMPTY);
         resc_conf_store_mc();
         resc_conf_store_app();
+        /* zone flash occupee (ou effacee par le bootloader) : la copie en RAM CCM suffit */
         upd[0] = 0x00;
-        check("copie refusee si la zone n'est pas vierge", !resc_conf_backup_for_update());
-        memset(upd, 0xFF, sizeof upd);
+        g_mcconf.l_current_max = 155.0f;
+        resc_conf_store_mc();
+        check("zone flash occupee : copie faite en RAM", resc_conf_backup_for_update());
+        memset(upd, 0xFF, sizeof upd);                   /* le bootloader efface aussi le tampon */
+        flash_len[0] = flash_len[1] = 0;
+        memset(&g_mcconf, 0, sizeof g_mcconf);
+        resc_conf_init();
+        check("restauree depuis la RAM malgre le tampon efface (155 A)", g_mcconf.l_current_max == 155.0f &&
+              resc_conf_restored_after_update());
+        flash_len[0] = flash_len[1] = 0;
+        resc_conf_init();
+        check("copie RAM consommee : pas de seconde restauration", resc_conf_load_status(false) == RESC_LOAD_EMPTY);
+        resc_conf_store_mc();
+        resc_conf_store_app();
     }
 
     printf("== Flash illisible\n");

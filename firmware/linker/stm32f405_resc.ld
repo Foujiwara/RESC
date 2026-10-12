@@ -90,6 +90,13 @@ SECTIONS
         _eccmbss = .;
     } > CCM
 
+    /* Copie de la configuration pendant une mise a jour : adresse FIXE (lue par la version suivante),
+     * jamais remise a zero ; survit au bootloader et au reset (pas a une coupure d'alimentation) */
+    .ccmkeep 0x10008000 (NOLOAD) : {
+        KEEP(*(.ccmkeep*))
+    } > CCM
+    ASSERT(_eccmbss <= 0x10008000, "CCM : .ccmbss deborde sur la copie de configuration")
+    ASSERT(0x10008000 + 0x1000 + _min_stack <= _estack, "CCM : plus assez de place pour la pile")
     ASSERT(_eccmbss + _min_stack <= _estack, "CCM : plus assez de place pour la pile")
 
 }

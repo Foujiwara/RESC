@@ -253,6 +253,9 @@ void terminal_process(char *line)
         P("Offsets courant %.1f %.1f %.1f, reset watchdog : %s", (double)g_foc_telem.off_cs[0], (double)g_foc_telem.off_cs[1],
           (double)g_foc_telem.off_cs[2], wdg_was_reset() ? "oui" : "non");
         P("Bootloader (secteur 11, mise a jour par VESC Tool) : %s", flash_bootloader_present() ? "present" : "ABSENT");
+        P("Offsets tension pont coupe : %.3f %.3f %.3f V (%s)", (double)g_foc_telem.off_vph_used[0],
+          (double)g_foc_telem.off_vph_used[1], (double)g_foc_telem.off_vph_used[2],
+          g_foc_telem.off_vph_boot ? "calibres au demarrage" : "configuration : moteur en mouvement au demarrage");
     }
     else if (!strcmp(c, "reset")) {
         uint32_t f = wdg_reset_flags();
@@ -294,6 +297,7 @@ void terminal_process(char *line)
           fault_name(g_foc_telem.fault), (unsigned)g_foc_telem.fault,
           fault_name(g_foc_telem.last_fault), (unsigned)g_foc_telem.last_fault,
           (unsigned)g_foc_telem.fault_count, (double)g_foc_telem.i_phase_max);
+        P("Reprises en roue libre avec l'observateur recale sur les Hall : %u", (unsigned)g_foc_telem.obs_resync);
         /* historique : origine = ligne de foc.c (0 = materiel / externe), instant depuis le demarrage */
         const foc_params_t *fp = foc_params();
         float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;

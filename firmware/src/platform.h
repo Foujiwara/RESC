@@ -20,6 +20,7 @@
 #define RAMFUNC  __attribute__((section(".ramfunc"), noinline, used))
 #define CCMBSS   __attribute__((section(".ccmbss")))
 #define NOINIT   __attribute__((section(".noinit")))
+#define CCMKEEP  __attribute__((section(".ccmkeep")))
 #endif
 
 #define RESC_FW_NAME        "RESC"
@@ -27,8 +28,8 @@
 #define RESC_GIT_HASH       "local"      /* remplace a la compilation par le commit (build.py) */
 #endif
 #define RESC_FW_MAJOR       1
-#define RESC_FW_MINOR       3      /* incremente a chaque firmware livre */
-#define RESC_VERSION_STR    "RESC 1.3.0"
+#define RESC_FW_MINOR       4      /* incremente a chaque firmware livre */
+#define RESC_VERSION_STR    "RESC 1.4.0"
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 

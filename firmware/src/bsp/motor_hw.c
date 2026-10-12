@@ -51,6 +51,7 @@ static CCMBSS struct {
 } H;
 
 static uint16_t s_slow_raw[18];
+static uint32_t s_slow_acc[18];     /* moyenne glissante exponentielle (16 echantillons), x16 */
 static TIM_TypeDef *s_enc_tim;
 
 /* ------------------------------------------------------------ capteurs */
@@ -399,8 +400,14 @@ RAMFUNC void ADC_IRQHandler(void)
     if (s_abs) { uint32_t c; if (abs_enc_sample(&c)) in.enc = c; }
 
     for (int k = 0; k < 3; k++) {
-        if (H.cur_slow[k][0] != 0xFF) s_slow_raw[H.cur_slow[k][0]] = r[k][2];
-        s_slow_raw[H.cur_slow[k][1]] = r[k][3];
+        if (H.cur_slow[k][0] != 0xFF) {
+            uint8_t c0 = H.cur_slow[k][0];
+            s_slow_raw[c0] = r[k][2];
+            s_slow_acc[c0] += (uint32_t)r[k][2] - (s_slow_acc[c0] >> 4);
+        }
+        uint8_t c1 = H.cur_slow[k][1];
+        s_slow_raw[c1] = r[k][3];
+        s_slow_acc[c1] += (uint32_t)r[k][3] - (s_slow_acc[c1] >> 4);
     }
     jsqr_load();
 
@@ -516,6 +523,7 @@ void motor_hw_set_freq(float f_loop, uint8_t ctl_mode)
 
 float motor_hw_freq(void) { return H.f_pwm; }
 uint16_t motor_hw_slow_raw(uint8_t ch) { return ch < 18 ? s_slow_raw[ch] : 0; }
+float motor_hw_slow_filt(uint8_t ch) { return ch < 18 ? (float)s_slow_acc[ch] * (1.0f / 16.0f) : 0.0f; }
 uint32_t motor_hw_isr_cycles(void) { return H.cyc; }
 uint32_t motor_hw_isr_cycles_max(void) { return H.cyc_max; }
 uint32_t motor_hw_overruns(void) { return H.overruns; }

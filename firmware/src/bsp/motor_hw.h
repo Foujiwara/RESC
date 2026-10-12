@@ -9,7 +9,8 @@ void motor_hw_init(float f_loop, uint8_t ctl_mode);   /* ctl_mode 1 : boucle a 2
 void motor_hw_set_freq(float f_loop, uint8_t ctl_mode);       /* pont coupe uniquement */
 float motor_hw_freq(void);
 void motor_hw_set_awd(const float off[3], float i_trip, float i_scale);
-uint16_t motor_hw_slow_raw(uint8_t ch);     /* derniere valeur d'une voie lente (0..17) */
+uint16_t motor_hw_slow_raw(uint8_t ch);
+float motor_hw_slow_filt(uint8_t ch);       /* moyenne sur 16 echantillons (entrees ADC : rejet des parasites) */
 uint32_t motor_hw_isr_cycles(void);
 uint32_t motor_hw_isr_cycles_max(void);
 uint32_t motor_hw_overruns(void);

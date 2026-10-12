@@ -4,6 +4,7 @@
 #include <string.h>
 #include "resc_conf.h"
 #include "flash.h"
+#include "platform.h"
 #include "stats.h"
 #include "abs_enc.h"
 #include "vesc_compat_defaults.h"
@@ -747,6 +748,14 @@ static resc_conf_load_t load(uint32_t slot, void *conf, const conf_field_t *t, u
  * effacee. Format : magic, longueur moteur, longueur app, crc32, puis les deux enregistrements. */
 #define UPD_MAGIC  0x4B414252u     /* 'RBAK' */
 
+/* Deuxieme copie, en RAM CCM a adresse fixe : ne depend pas de ce que le bootloader fait du
+ * tampon de mise a jour. Meme format que la copie en flash. */
+#ifdef CCMKEEP
+CCMKEEP static volatile uint8_t s_keep[0x1000];
+#else
+static uint8_t s_keep[0x1000];
+#endif
+
 static uint32_t slot_used(uint32_t slot, const uint8_t **pp)
 {
     uint32_t len;
@@ -763,17 +772,22 @@ bool resc_conf_backup_for_update(void)
 {
     const uint8_t *pm, *pa;
     uint32_t lm = slot_used(SLOT_MC, &pm), la = slot_used(SLOT_APP, &pa);
-    if (lm + la == 0 || 16u + lm + la > 0x2000u || !flash_upd_backup_free()) return false;
+    if (lm + la == 0 || 16u + lm + la > 0x2000u) return false;
+    if (lm + la == 0 || 16u + lm + la > sizeof(s_keep)) return false;
     uint32_t hd[4] = { UPD_MAGIC, lm, la, 0 };
     uint32_t crc = crc32(pm, lm);
     hd[3] = crc ^ crc32(pa, la);
+    /* copie en RAM CCM (toujours), puis en flash si la zone est libre */
+    memcpy((uint8_t *)s_keep + 16u, pm, lm);
+    memcpy((uint8_t *)s_keep + 16u + lm, pa, la);
+    memcpy((uint8_t *)s_keep, hd, 16u);
+    if (!flash_upd_backup_free()) return true;
     return flash_upd_backup_write(16u, pm, lm) && flash_upd_backup_write(16u + lm, pa, la) &&
            flash_upd_backup_write(0, (const uint8_t *)hd, 16u);
 }
 
-static const uint8_t *upd_backup(uint32_t *lm, uint32_t *la)
+static const uint8_t *keep_check(const uint8_t *base, uint32_t *lm, uint32_t *la)
 {
-    const uint8_t *base = flash_upd_backup_ptr();
     if (!base) return 0;
     uint32_t hd[4];
     memcpy(hd, base, sizeof(hd));
@@ -783,6 +797,12 @@ static const uint8_t *upd_backup(uint32_t *lm, uint32_t *la)
     *lm = hd[1];
     *la = hd[2];
     return d;
+}
+
+static const uint8_t *upd_backup(uint32_t *lm, uint32_t *la)
+{
+    const uint8_t *b = keep_check((const uint8_t *)s_keep, lm, la);
+    return b ? b : keep_check(flash_upd_backup_ptr(), lm, la);
 }
 
 static bool old_mc(const uint8_t *b, int32_t n, void *c) { return vesc700_mcconf_deserialize(b, n, (vesc_mcconf_t *)c); }
@@ -834,7 +854,9 @@ void resc_conf_init(void)
     if (restored_mc && s_load_mc != RESC_LOAD_MIGRATED) resc_conf_store_mc();
     if (restored_app && s_load_app != RESC_LOAD_MIGRATED) resc_conf_store_app();
     if (restored_mc || restored_app) s_restored = true;
-    if (bk) flash_upd_backup_erase();
+    /* copies consommees : effacees (une vieille copie ne doit jamais reservir) */
+    s_keep[0] = 0;
+    if (keep_check(flash_upd_backup_ptr(), &bl_mc, &bl_app)) flash_upd_backup_erase();
 }
 
 bool resc_conf_restored_after_update(void) { return s_restored; }

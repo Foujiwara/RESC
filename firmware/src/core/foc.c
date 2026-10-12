@@ -45,6 +45,8 @@ typedef struct {
     uint32_t cal_n;
     float cal_acc[3];
     float off[3];
+    float cal_vacc[3], cal_vmin[3], cal_vmax[3];   /* tensions de phase pont coupe (calibration au demarrage) */
+    float off_vph[3];            /* offsets de tension pont coupe utilises (demarrage ou configuration) */
     bool calibrated;
 
     /* mesures */
@@ -252,6 +254,8 @@ RAMFUNC static void trip_at(uint32_t code, uint32_t line)
 }
 
 void foc_raise_fault(uint32_t code) { trip_at(code, 0); }
+/* Essais (simulation) : observateur force sur un etat donne, comme un decrochage en roue libre */
+void foc_dbg_obs_reset(float theta, float omega) { obs_reset(&S.obs, &S.oc, theta, omega); }
 #define trip(code) trip_at((code), __LINE__)
 void foc_set_motor_temp(float t) { S.temp_mot = t; }
 
@@ -326,6 +330,7 @@ void foc_init(const foc_params_t *p)
     enc_reset(&S.enc);
     g_foc_cmd.run = 0;
     g_foc_cmd.dir = 1;
+    for (int x = 0; x < 3; x++) S.off_vph[x] = S.p.off_vph[x];
     set_state(FOC_ST_CALIB);
 }
 
@@ -1261,14 +1266,20 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     for (int x = 0; x < 3; x++) {
         S.raw_cs[x] = cs[x];
         S.vph_raw[x] = (float)vr[x] * S.p.vph_scale;
-        vph[x] = S.vph_raw[x] - S.p.off_vph[x];
+        vph[x] = S.vph_raw[x] - S.off_vph[x];
     }
 
     /* ---- 2. Calibration des offsets (pont coupe) */
     if (S.st == FOC_ST_INIT || S.st == FOC_ST_CALIB) {
         bridge_off();
         if (S.st_time > 0.05f) {
-            for (int x = 0; x < 3; x++) S.cal_acc[x] += (float)cs[x];
+            for (int x = 0; x < 3; x++) {
+                S.cal_acc[x] += (float)cs[x];
+                if (S.cal_n == 0) { S.cal_vacc[x] = 0.0f; S.cal_vmin[x] = S.cal_vmax[x] = S.vph_raw[x]; }
+                S.cal_vacc[x] += S.vph_raw[x];
+                S.cal_vmin[x] = fm_min(S.cal_vmin[x], S.vph_raw[x]);
+                S.cal_vmax[x] = fm_max(S.cal_vmax[x], S.vph_raw[x]);
+            }
             S.cal_n++;
             if (S.cal_n >= 2048) {
                 bool ok = true;
@@ -1287,6 +1298,19 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                         if (fm_abs(S.p.stored_off_cs[x] - S.off[x]) < 80.0f) S.off[x] = S.p.stored_off_cs[x];
                         g_foc_telem.off_cs[x] = S.off[x];
                     }
+                }
+                /* Offsets de tension pont coupe, comme la calibration au demarrage de VESC : ecart de chaque
+                 * phase a la moyenne des trois, moteur a l'arret (sinon : valeurs de la configuration). Ils ne
+                 * servent qu'en roue libre (l'observateur suit alors les tensions mesurees). */
+                {
+                    float vm = (S.cal_vacc[0] + S.cal_vacc[1] + S.cal_vacc[2]) / (3.0f * (float)S.cal_n);
+                    bool still = true;
+                    for (int x = 0; x < 3; x++) if (S.cal_vmax[x] - S.cal_vmin[x] > 0.5f) still = false;
+                    if (still) {
+                        for (int x = 0; x < 3; x++) S.off_vph[x] = fm_sat_sym(S.cal_vacc[x] / (float)S.cal_n - vm, 2.0f);
+                    }
+                    for (int x = 0; x < 3; x++) g_foc_telem.off_vph_used[x] = S.off_vph[x];
+                    g_foc_telem.off_vph_boot = still;
                 }
                 if (ok) {
                     S.calibrated = true;
@@ -1363,8 +1387,12 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             g_foc_telem.acim_slip = S.ws;
         }
         motor_comp();
-        S.oc.id = S.id;
-        S.oc.iq = S.iq;
+        /* pont coupe (moteur non pilote) : courant nul pour l'observateur, comme VESC (« The current is 0
+         * when the motor is undriven ») ; les shunts bas ne donnent alors pas de mesure exploitable et un
+         * faux courant fait deriver le flux estime pendant la roue libre */
+        const bool driven = S.br_p1 || S.br_p2;
+        S.oc.id = driven ? S.id : 0.0f;
+        S.oc.iq = driven ? S.iq : 0.0f;
         S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* RESC _LAMBDA : seulement en marche observee */
         float va, vb;
         applied_voltage(vph, &va, &vb);
@@ -1373,8 +1401,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
 #endif
         /* niveau de tension pour le gain a basse vitesse : modulation appliquee ou FEM
          * (pont coupe, la modulation est nulle mais la FEM renseigne la vitesse) */
-        float m_obs = fm_max(S.duty_abs, fm_abs(S.obs.omega) * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f));
-        obs_update(&S.obs, &S.oc, va, vb, S.i_a, S.i_b, m_obs, dt);
+        /* pont coupe : modulation equivalente a la tension mesuree (comme VESC), pas a la vitesse estimee :
+         * un observateur qui deriverait ne baisse pas lui-meme son gain */
+        float m_obs = driven ? fm_max(S.duty_abs, fm_abs(S.obs.omega) * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f))
+                             : fm_sqrt(va * va + vb * vb) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+        obs_update(&S.obs, &S.oc, va, vb, driven ? S.i_a : 0.0f, driven ? S.i_b : 0.0f, m_obs, dt);
         S.lam_eff = S.obs.lambda;
     }
     float flux_ratio = S.obs.flux / S.lam_eff;
@@ -1436,6 +1467,15 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             if ((S.p.sensor_mode == FOC_SENSOR_HFI || S.p.sensor_mode == FOC_SENSOR_VSS) && S.p.hfi.reset_omega > 0.0f &&
                 fm_abs(S.obs.omega) > S.p.hfi.reset_omega && obs_ok0)
                 obs_fast = true;
+            /* Hall : l'observateur a pu decrocher pendant la roue libre (vitesse fausse) ; s'il s'ecarte de
+             * plus de 20 % de la vitesse des sondes, il est recale sur elles avant la reprise, qui part
+             * alors de la FEM a la vitesse des sondes (sinon pointe de courant a la reprise) */
+            if (S.p.sensor_mode == FOC_SENSOR_HALL && sensor_ok && fm_abs(S.hall.omega) > 0.5f * S.p.sl_omega &&
+                (!obs_ok0 || fm_abs(S.obs.omega - S.hall.omega) > 0.2f * fm_abs(S.hall.omega))) {
+                obs_reset(&S.obs, &S.oc, S.hall.theta, S.hall.omega);
+                obs_fast = false;
+                g_foc_telem.obs_resync++;
+            }
             if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
