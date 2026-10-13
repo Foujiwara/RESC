@@ -375,9 +375,13 @@ RAMFUNC static void cmd_fetch(void)
     if (g_foc_cmd.seq == q) S.cmd = t;
 }
 
+/* Hors ISR. p_pending est retire avant la copie : une copie inachevee n'est jamais appliquee. */
 void foc_set_params(const foc_params_t *p)
 {
+    S.p_pending = false;
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
     S.p_next = *p;
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
     S.p_pending = true;
 }
 
