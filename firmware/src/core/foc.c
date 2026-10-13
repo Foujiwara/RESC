@@ -1410,6 +1410,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         valid[a0 >= a1 ? (a0 >= a2 ? 0 : 2) : (a1 >= a2 ? 1 : 2)] = false;
     }
 
+    const bool br_was_on = S.br;                  /* une coupure a ce tour : sortie immediate (pont coupe) */
     /* ---- 4. Protections rapides : surintensite echantillon par echantillon (pas de filtre : la carte
      * n'a pas de protection materielle independante ; le watchdog analogique double cette coupure) */
     for (int x = 0; x < 3; x++) {
@@ -1431,6 +1432,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         if (imag > S.p.i_abs_trip) trip(RESC_FAULT_ABS_OVER_CURRENT);
         if (imag > g_foc_telem.i_phase_max) g_foc_telem.i_phase_max = imag;
     }
+    if (br_was_on && !S.br) goto output;
 
     /* ---- 5. Observateur (toujours actif : suit aussi un moteur en roue libre) */
     {
