@@ -58,6 +58,13 @@ typedef struct {
     float rv_th_prev, rv_w;      /* angle de la tension mesuree, vitesse qui s'en deduit (rad/s el.) */
     float rv_flux;               /* angle du flux deduit de la tension mesuree (recalage) */
     float resume_wait_t;         /* s : reprise demandee, refusee faute d'observateur coherent */
+    /* perte de synchronisation : courant mesure compare a la prediction du modele d/q sur une periode */
+    float pr_id, pr_iq;          /* courant d/q de la periode precedente */
+    float pr_vd1, pr_vq1, pr_vd2, pr_vq2;   /* tensions commandees aux deux periodes precedentes */
+    uint16_t pr_n;               /* periodes de marche consecutives enregistrees */
+    bool pr_meas, pr_meas_prev;  /* courant mesure (et non predit) a cette periode, a la precedente */
+    float sync_r;                /* residu filtre (1 = seuil) */
+    uint8_t sync_bad;
     bool calibrated;
 
     /* mesures */
@@ -1433,7 +1440,12 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     if (S.ov_n >= 4) trip(RESC_FAULT_OVER_VOLTAGE);
     if (S.uv_n >= 4) trip(RESC_FAULT_UNDER_VOLTAGE);
 
-    reconstruct_currents(valid);
+    {
+        uint32_t np0 = g_foc_telem.n_predicted;
+        reconstruct_currents(valid);
+        S.pr_meas_prev = S.pr_meas;
+        S.pr_meas = g_foc_telem.n_predicted == np0;
+    }
     {
         float imag = fm_sqrt(S.i_a * S.i_a + S.i_b * S.i_b);
         FM_LPF(S.i_abs_f, imag, 0.2f);                /* ~0.3 ms a 15 kHz */
@@ -2140,6 +2152,29 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.iq = -s * S.i_a + c * S.i_b;
     }
     FM_LPF(S.iq_lpf, S.iq, 0.01f);
+    /* Perte de synchronisation (doc 07 §7.7, indicateur I1) : sur une periode, le courant suit
+     *   L di/dt = v - R i - e(w, i)   (repere rotor, e = FEM et termes croises)
+     * avec v = moyenne des deux dernieres commandes (appliquees a cheval sur l'intervalle). Un angle faux
+     * met la FEM reelle hors de l'axe attendu : l'ecart grandit avec la vitesse (175 A par periode a 90 deg
+     * et 40000 ERPM sur 14 uH ; ecart normal : bruit et erreurs de modele, < 1 A sur le moteur simule, ~5 A
+     * pour 1 V d'erreur sur 14 uH). Seuil : 5 % de la coupure (au moins 3 A), 4 periodes de suite apres
+     * filtrage. Hors injection HFI, court-circuit de frein, surmodulation, et sur des courants mesures. */
+    if (S.st == FOC_ST_RUN && S.br_p1 && S.br_p2 && S.pr_n >= 20u && S.pr_meas && S.pr_meas_prev && !S.hfi_on &&
+        !S.brk_short && S.duty_abs < 0.98f && S.oc.ld > 1e-8f && S.oc.lq > 1e-8f) {
+        float w = S.omega;
+        float vd = 0.5f * (S.pr_vd1 + S.pr_vd2), vq = 0.5f * (S.pr_vq1 + S.pr_vq2);
+        float pd = S.pr_id + dt / S.oc.ld * (vd - S.oc.r * S.pr_id + w * S.oc.lq * S.pr_iq);
+        float pq = S.pr_iq + dt / S.oc.lq * (vq - S.oc.r * S.pr_iq - w * S.oc.ld * S.pr_id - w * S.lam_eff);
+        float ed = S.id - pd, eq = S.iq - pq;
+        float r = fm_sqrt(ed * ed + eq * eq) / fm_max(0.05f * S.p.i_abs_trip, 3.0f);
+        FM_LPF(S.sync_r, r, 0.25f);
+        if (S.sync_r > g_foc_telem.sync_resid_max) g_foc_telem.sync_resid_max = S.sync_r;
+        S.sync_bad = S.sync_r > 1.0f ? (uint8_t)(S.sync_bad < 255 ? S.sync_bad + 1 : 255) : 0;
+        if (S.sync_bad >= 4) { trip(RESC_FAULT_UNDERSPEED); goto output; }
+    } else {
+        S.sync_r *= 0.9f;
+        S.sync_bad = 0;
+    }
     if (S.st == FOC_ST_RUN && S.brk_short) {
         S.vd = S.vq = 0.0f;
         S.int_d = S.int_q = 0.0f;
@@ -2180,6 +2215,15 @@ output:
         S.duty_h_prev[x] = S.duty_h[x];
         S.duty_h[x] = S.duty[x];          /* seconde moitie identique, sauf mise a jour interpolee */
     }
+    if (S.st == FOC_ST_RUN && S.br) {
+        S.pr_vd2 = S.pr_vd1; S.pr_vq2 = S.pr_vq1;
+        S.pr_vd1 = S.vd;     S.pr_vq1 = S.vq;
+        S.pr_id = S.id;      S.pr_iq = S.iq;
+        if (S.pr_n < 0xFFFFu) S.pr_n++;
+    } else {
+        S.pr_n = 0;
+    }
+    g_foc_telem.sync_resid = S.sync_r;
     S.br_p2 = S.br_p1;
     S.br_p1 = S.br;
 

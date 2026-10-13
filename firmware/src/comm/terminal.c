@@ -330,6 +330,9 @@ void terminal_process(char *line)
         P("Observateur recale en roue libre (Hall ou tension mesuree) : %u ; reprise au vol refusee : %u periodes ; "
           "ecart FEM mesuree / observateur : %.1f deg", (unsigned)g_foc_telem.obs_resync,
           (unsigned)g_foc_telem.resume_refused, (double)(g_foc_telem.resume_err * 57.29578f));
+        P("Perte de synchro (residu de prediction du courant, coupure a 1.00) : actuel %.2f, max vu %.2f",
+          (double)g_foc_telem.sync_resid, (double)g_foc_telem.sync_resid_max);
+        g_foc_telem.sync_resid_max = 0.0f;
         /* historique : origine = ligne de foc.c (0 = materiel / externe), instant depuis le demarrage */
         const foc_params_t *fp = foc_params();
         float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;

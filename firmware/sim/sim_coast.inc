@@ -132,6 +132,29 @@
         check("reprise validee : crete de phase < 15 A (demande 4 A)", g_trip_peak < 15.0);
         ctrl_release(); RUN_CTRL(0.05);
     }
+
+    printf("== 27e. Sensorless : decrochage en pleine marche (observateur retourne de 180 deg a 20 A)\n");
+    {
+        M.b = 2e-4; M.t_load = 0.05; M.omega_m = 0;
+        RUN_CTRL(0.3);
+        for (int k = 0; k < 8000 && sim_omega_e(&M) * 60 / (2 * M_PI) < 8000; k++) { ctrl_set_current_rel(0.5f); RUN_CTRL(0.001); }
+        double erpm0 = sim_omega_e(&M) * 60 / (2 * M_PI);
+        foc_dbg_obs_reset((float)(sim_theta_e(&M) + M_PI), (float)sim_omega_e(&M));
+        g_trip_peak = 0;
+        int t_fault = -1;
+        for (int k = 0; k < 600 && t_fault < 0; k++) {
+            if (k % 15 == 0) { ctrl_set_current_rel(0.5f); ctrl_update(ms++, 0.001f); }
+            run(1.0 / M.f_pwm);
+            if (foc_state() == FOC_ST_FAULT) t_fault = k;
+        }
+        printf("  decrochage a %.0f ERPM : defaut apres %d periodes (%u, ligne %u), crete phase %.1f A (coupure %.0f A)\n",
+               erpm0, t_fault, (unsigned)g_foc_telem.last_fault, (unsigned)g_foc_telem.last_fault_line, g_trip_peak,
+               (double)p.i_abs_trip);
+        check("decrochage detecte en moins de 30 periodes (2 ms)", t_fault >= 0 && t_fault < 30);
+        check("decrochage : crete de phase < 50 % de la coupure", g_trip_peak < 0.5 * p.i_abs_trip);
+        ctrl_release(); RUN_CTRL(0.05);
+        foc_clear_fault(); RUN_CTRL(0.6);
+    }
     p = p_saved;
     foc_set_params(&p);
     L = L_saved;

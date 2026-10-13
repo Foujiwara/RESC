@@ -267,7 +267,9 @@ typedef struct {
     bool off_vph_boot;            /* calibres au demarrage (moteur a l'arret) */
     float off_vph_sd;             /* V : ecart-type entre phases pendant la calibration (arret si < 0.3) */
     float resume_err;             /* rad : ecart FEM mesuree / FEM attendue de l'observateur (pont coupe) */
-    uint32_t resume_refused;      /* periodes ou une reprise au vol a ete refusee (observateur incoherent) */
+    uint32_t resume_refused;
+    float sync_resid;             /* residu de prediction du courant filtre (1 = seuil de perte de synchro) */
+    float sync_resid_max;         /* plus grand residu vu en marche (marge avant la coupure, remis a 0 par faults) */      /* periodes ou une reprise au vol a ete refusee (observateur incoherent) */
     uint8_t hall;                 /* etat Hall courant */
     bool angle_from_sensor;       /* angle de commande issu d'un capteur */
 #ifdef RESC_HOST
