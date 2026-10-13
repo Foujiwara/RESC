@@ -418,6 +418,24 @@ int main(void)
     report("apres timeout");
     check("timeout de commande : pont relache", ctrl_stats()->timeout && foc_state() != FOC_ST_RUN);
 
+    printf("== 12b. Surintensites repetees : verrou apres 3 en 10 s, leve par 'clear'\n");
+    {
+        ctrl_release();
+        int n_rearm = 0;
+        for (int n = 0; n < 4; n++) {
+            foc_raise_fault(RESC_FAULT_ABS_OVER_CURRENT);
+            RUN_CTRL(0.01);
+            for (int k = 0; k < 100 && foc_state() == FOC_ST_FAULT; k++) RUN_CTRL(0.01);     /* 1 s au plus */
+            if (foc_state() != FOC_ST_FAULT) n_rearm++;
+        }
+        printf("  rearmements automatiques : %d sur 4 surintensites, verrou %s\n", n_rearm, ctrl_oc_locked() ? "pose" : "absent");
+        check("2 rearmements automatiques puis verrou (defaut tenu)", n_rearm == 2 && ctrl_oc_locked() && foc_state() == FOC_ST_FAULT);
+        ctrl_fault_unlock();
+        foc_clear_fault();
+        RUN_CTRL(0.05);
+        check("'clear' : verrou leve, defaut efface", !ctrl_oc_locked() && foc_state() == FOC_ST_IDLE);
+    }
+
     /* ------------------------------------------------------------------ */
     printf("== 13. Boucle ouverte commandee (foc_openloop, foc_openloop_duty)\n");
     run(1.0);

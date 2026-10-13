@@ -46,6 +46,7 @@ typedef struct {
     float s_iq_hold;                 /* sortie du PID vitesse entre deux pas */
     uint32_t oc_count;
     uint32_t oc_window_ms;
+    bool oc_locked;                  /* 3 surintensites en 10 s : plus de rearmement automatique */
 
     /* Control Settings (consigne de courant relatif) */
     uint8_t x_phase;                 /* 0 avant / neutre, 1 freinage, 2 recul */
@@ -208,6 +209,17 @@ void ctrl_set_temps(float t1, float t2, float t3, float tm)
     FM_LPF(C.st.tfet, t, 0.05f);
     FM_LPF(C.st.tmot, tm, 0.05f);
 }
+
+/* Effacement manuel des defauts (terminal clear) : leve aussi le verrou des surintensites repetees */
+void ctrl_fault_unlock(void)
+{
+    uint32_t k = plat_ctrl_lock();
+    C.oc_locked = false;
+    C.oc_count = 0;
+    C.oc_window_ms = C.now_ms;
+    plat_ctrl_unlock(k);
+}
+bool ctrl_oc_locked(void) { return C.oc_locked; }
 
 void ctrl_reset_counters(void)
 {
@@ -792,15 +804,19 @@ void ctrl_update(uint32_t now_ms, float dt)
         run = false;
         if (C.fault_ms == 0) C.fault_ms = now_ms ? now_ms : 1;
         if (t->fault == RESC_FAULT_ABS_OVER_CURRENT && C.fault_clear_t == 0.0f) {
-            if (now_ms - C.oc_window_ms > 10000) { C.oc_window_ms = now_ms; C.oc_count = 0; }
+            /* fenetre de 10 s ; apres la 3e surintensite, verrou jusqu'a 'clear' ou au redemarrage (doc 07 §7.4) */
+            if (!C.oc_locked && now_ms - C.oc_window_ms > 10000) { C.oc_window_ms = now_ms; C.oc_count = 0; }
             C.oc_count++;
+            if (C.oc_count >= 3 && !C.oc_locked) { C.oc_locked = true; ctrl_log(CLOG_OC_LOCK, (float)C.oc_count); }
         }
-        bool released = C.mode == CTRL_MODE_NONE || fm_abs(v) <= l->cc_min_current;
+        /* consigne relachee : courant sous cc_min_current, ou consigne relative quasi nulle */
+        float v_abs = C.mode == CTRL_MODE_CURRENT_REL ? fm_abs(v) * fm_max(l->i_max, -l->i_min) : fm_abs(v);
+        bool released = C.mode == CTRL_MODE_NONE || v_abs <= l->cc_min_current;
         /* Rearmement automatique seulement si la cause a disparu ; les defauts materiels
          * (driver, break, offsets, watchdog) restent verrouilles jusqu'a 'clear' ou redemarrage. */
         bool cause_gone;
         switch (t->fault) {
-        case RESC_FAULT_ABS_OVER_CURRENT: cause_gone = C.oc_count < 3; break;
+        case RESC_FAULT_ABS_OVER_CURRENT: cause_gone = !C.oc_locked; break;
         case RESC_FAULT_UNDERSPEED:       cause_gone = true; break;
         case RESC_FAULT_OVER_VOLTAGE:     cause_gone = t->vbus < l->regen_cut_start; break;
         case RESC_FAULT_UNDER_VOLTAGE:    cause_gone = t->vbus > l->batt_cut_start; break;

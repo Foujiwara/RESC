@@ -330,6 +330,7 @@ void terminal_process(char *line)
         P("Observateur recale en roue libre (Hall ou tension mesuree) : %u ; reprise au vol refusee : %u periodes ; "
           "ecart FEM mesuree / observateur : %.1f deg", (unsigned)g_foc_telem.obs_resync,
           (unsigned)g_foc_telem.resume_refused, (double)(g_foc_telem.resume_err * 57.29578f));
+        if (ctrl_oc_locked()) P("Surintensites repetees (3 en 10 s) : rearmement automatique bloque, 'clear' pour reprendre");
         P("Perte de synchro (residu de prediction du courant, coupure a 1.00) : actuel %.2f, max vu %.2f",
           (double)g_foc_telem.sync_resid, (double)g_foc_telem.sync_resid_max);
         g_foc_telem.sync_resid_max = 0.0f;
@@ -348,6 +349,7 @@ void terminal_process(char *line)
     else if (!strcmp(c, "clear")) {
         if (board_gate_fault()) { P("Refuse : la ligne de defaut du driver est encore active"); return; }
         ctrl_release();
+        ctrl_fault_unlock();
         foc_clear_fault();
         motor_hw_reset_stats();
         g_foc_telem.i_phase_max = 0;

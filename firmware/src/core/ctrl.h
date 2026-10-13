@@ -117,6 +117,7 @@ enum {
     CLOG_REV_ARMED,      /* re-press : recul arme */
     CLOG_REV_DISARMED,   /* re-press : recul desarme (val : 1 neutre trop long, 2 accelerateur) */
     CLOG_RUN,            /* la commande demande (1) ou relache (0) le pont */
+    CLOG_OC_LOCK,        /* surintensites repetees : verrou jusqu'a 'clear' (val = nombre) */
 };
 void ctrl_log(uint8_t code, float val);
 int ctrl_log_count(void);
@@ -165,5 +166,7 @@ void ctrl_set_temps(float tfet1, float tfet2, float tfet3, float tmot);
 
 const ctrl_stats_t *ctrl_stats(void);
 void ctrl_reset_counters(void);
+void ctrl_fault_unlock(void);     /* effacement manuel : leve le verrou des surintensites repetees */
+bool ctrl_oc_locked(void);
 
 #endif /* CTRL_H */
