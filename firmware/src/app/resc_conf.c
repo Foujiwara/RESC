@@ -299,8 +299,9 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->vbus_trip_max = mc->l_max_vin;
     fp->vbus_trip_min = mc->l_min_vin;
 
-    /* courant moteur toujours sous la coupure (marge de 10 % pour l'ondulation et les depassements) */
-    float i_max_eff = fm_min(fm_min(mc->l_current_max, (float)HWLIM_I_MOTOR_A * cap), 0.9f * fp->i_abs_trip);
+    /* courant moteur toujours sous la coupure (marge de 20 % pour l'ondulation, les depassements et le retard
+     * d'une periode de la coupure logicielle) */
+    float i_max_eff = fm_min(fm_min(mc->l_current_max, (float)HWLIM_I_MOTOR_A * cap), 0.8f * fp->i_abs_trip);
     /* Courant de demarrage comme VESC : la consigne, au moins foc_sl_openloop_boost_q, au plus
      * foc_sl_openloop_max_q (si > 0). Plancher de 0,5 A pour que le calage reste possible. */
     fp->st_i_max = mc->foc_sl_openloop_max_q > 0.0f ? fm_min(mc->foc_sl_openloop_max_q, i_max_eff) : i_max_eff;
@@ -438,7 +439,7 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
 
     memset(cl, 0, sizeof(*cl));
     cl->i_max = i_max_eff;
-    cl->i_min = fm_max(fm_max(mc->l_current_min, -(float)HWLIM_I_MOTOR_A * cap), -0.9f * fp->i_abs_trip);
+    cl->i_min = fm_max(fm_max(mc->l_current_min, -(float)HWLIM_I_MOTOR_A * cap), -0.8f * fp->i_abs_trip);
     cl->i_max_scale = mc->l_current_max_scale;
     cl->i_min_scale = mc->l_current_min_scale;
     cl->i_in_max = fm_min(mc->l_in_current_max, (float)HWLIM_I_INPUT_A * cap);

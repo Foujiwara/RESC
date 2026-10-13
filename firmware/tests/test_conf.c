@@ -64,7 +64,7 @@ int main(void)
     check("echelle courant -0.252 A/LSB (polarite inversee)", fabsf(fp.i_scale + 0.2521f) < 0.001f);
     check("echelle Vbus 27.6 mV/LSB", fabsf(fp.v_scale - 0.02765f) < 0.0002f);
     check("courant max = 30 A (defaut prudent)", fabsf(cl.i_max - 30.0f) < 0.01f);
-    check("coupure absolue = l_abs_current_max (carte validee, 100 %)", fabsf(fp.i_abs_trip - fminf(g_mcconf.l_abs_current_max, 420.0f)) < 0.01f);
+    check("coupure absolue = l_abs_current_max (carte validee, 100 %)", fabsf(fp.i_abs_trip - fminf(g_mcconf.l_abs_current_max, 350.0f)) < 0.01f);
     check("Vbus 12..82 V", fabsf(fp.vbus_trip_min - 12.0f) < 0.01f && fabsf(fp.vbus_trip_max - 82.0f) < 0.01f);
     check("shunts low-side, 3 phases", fp.cs_lowside && !fp.cs_two_shunts);
     check("sensorless par defaut", fp.sensor_mode == 0);
@@ -79,11 +79,14 @@ int main(void)
     m.foc_sensor_mode = FOC_SENSOR_MODE_HALL;     /* table Hall vide */
     resc_conf_clamp_mc(&m);
     check("l_current_max <= 300 A (HWLIM)", m.l_current_max <= 300.0f);
-    check("l_abs_current_max <= 420 A", m.l_abs_current_max <= 420.0f);
+    check("l_abs_current_max <= 350 A (HWLIM abaisse, doc 15)", m.l_abs_current_max <= 350.0f);
     check("l_max_vin <= 85 V", m.l_max_vin <= 85.0f);
     check("f_zv <= 2 x 40 kHz", m.foc_f_zv <= 80000.0f);
     resc_conf_build(&m, &g_appconf, &fp, &cl);
-    check("courant effectif = 300 A (carte validee, plafond HWLIM)", fabsf(cl.i_max - 300.0f) < 0.01f);
+    /* plafond : min(HWLIM_I_MOTOR_A = 300 A, 80 % de la coupure = 0.8 x 350 A) */
+    check("courant effectif = 280 A (80 % de la coupure, sous le plafond HWLIM)", fabsf(cl.i_max - 280.0f) < 0.01f);
+    check("courant moteur toujours sous 80 % de la coupure", cl.i_max <= 0.8f * fp.i_abs_trip + 0.01f &&
+                                                              -cl.i_min <= 0.8f * fp.i_abs_trip + 0.01f);
     check("table Hall vide -> reste en sensorless", fp.sensor_mode == 0);
     m.foc_motor_r = 0.06f; m.foc_motor_l = 100e-6f; m.foc_motor_flux_linkage = 0.018f;
     g_mcconf = m;

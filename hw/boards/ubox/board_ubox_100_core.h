@@ -111,7 +111,10 @@
 #if defined(BOARD_UBOX_SINGLE_85_200)
 #define HWLIM_I_MOTOR_A         300
 #define HWLIM_I_INPUT_A         300
-#define HWLIM_I_ABS_TRIP_A      420
+/* VESC : 420 A. Abaisse a 350 A (defaut 300 A) : pas de protection materielle (BOARD_HW_OCP 0), coupure
+ * logicielle avec une periode PWM de retard et pleine echelle des shunts a 516 A (doc 15, S1). A relever
+ * quand les MOSFET (I_DM) seront identifies, doc 08 U1. */
+#define HWLIM_I_ABS_TRIP_A      350
 #define HWLIM_VBUS_MIN_V        11
 #define HWLIM_VBUS_MAX_V        85
 #elif defined(BOARD_UBOX_SINGLE_80)
@@ -137,7 +140,7 @@
 #define DEF_VBUS_MIN_V          12
 #if defined(BOARD_UBOX_SINGLE_85_200)
 #define DEF_VBUS_MAX_V          82
-#define DEF_I_ABS_TRIP_A        400
+#define DEF_I_ABS_TRIP_A        300     /* VESC : 400 A ; voir HWLIM_I_ABS_TRIP_A */
 #define DEF_I_INPUT_MAX_A       250
 #define DEF_I_INPUT_MIN_A       (-200)
 #elif defined(BOARD_UBOX_SINGLE_80)
