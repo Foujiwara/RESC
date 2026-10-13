@@ -105,7 +105,7 @@ int main(void)
         foc_params_t f2;
         ctrl_limits_t c2;
         resc_conf_build(&z, &g_appconf, &f2, &c2);
-        float m_lim = (0.5f - 3e-6f * 40000.0f) * (4.0f / 1.7320508f);
+        float m_lim = (0.5f - 2.0f * 3e-6f * 40000.0f) * (4.0f / 1.7320508f);   /* fenetre totale 2 t_win */
         check("modulation bornee pour garder 2 phases mesurables a 40 kHz", f2.m_max <= m_lim + 1e-4f);
     }
 

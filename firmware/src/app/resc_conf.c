@@ -277,8 +277,9 @@ void resc_conf_build(const vesc_mcconf_t *mc, const vesc_appconf_t *app, foc_par
     fp->t_win = (float)HWLIM_T_WIN_MIN_NS * 1e-9f;
     if (fp->cs_lowside) {
         /* En SVPWM lineaire, la 2e meilleure fenetre low-side vaut (0.5 - sqrt3/4 * m) Ts :
-         * on borne m pour garder en permanence au moins deux phases mesurables. */
-        float m_win = (0.5f - fp->t_win * fp->f_pwm) * (4.0f / FM_SQRT3);
+         * on borne m pour garder en permanence au moins deux phases mesurables. L'echantillon est au centre
+         * de la fenetre (declenchement fixe au sommet) : il faut une fenetre totale de 2 t_win (doc 04 §4.4). */
+        float m_win = (0.5f - 2.0f * fp->t_win * fp->f_pwm) * (4.0f / FM_SQRT3);
         if (m_win < fp->m_max) fp->m_max = m_win;
         if (fp->m_max < 0.3f) fp->m_max = 0.3f;
     }

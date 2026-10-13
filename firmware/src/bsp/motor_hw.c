@@ -38,7 +38,7 @@
 static CCMBSS struct {
     uint32_t arr;
     float f_pwm;
-    float win_frac;              /* fenetre minimale en fraction de periode */
+    float win_frac;              /* fenetre low-side minimale (totale, 2 t_win) en fraction de periode */
     uint8_t slow_ch[3][8];
     uint8_t slow_n[3];
     uint8_t slow_idx[3];
@@ -521,7 +521,7 @@ void motor_hw_init(float f_loop, uint8_t ctl_mode)
 #endif
     H.ctl_mode = ctl_mode;
     float f = ctl_mode == 1 ? 0.5f * f_loop : f_loop;
-    H.win_frac = (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;
+    H.win_frac = 2.0f * (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;   /* fenetre totale = 2 t_win (doc 04 §4.4) */
     adc_init();
     tim1_init(f);
     fault_exti_init();
@@ -540,7 +540,7 @@ void motor_hw_set_freq(float f_loop, uint8_t ctl_mode)
     else { TIM1->DIER &= ~TIM_DIER_UIE; NVIC_DisableIRQ(TIM1_UP_TIM10_IRQn); }
     H.f_pwm = f;
     H.arr = (uint32_t)((float)TIM1_CLK_HZ / (2.0f * f));
-    H.win_frac = (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;
+    H.win_frac = 2.0f * (float)HWLIM_T_WIN_MIN_NS * 1e-9f * f;   /* fenetre totale = 2 t_win (doc 04 §4.4) */
     TIM1->ARR = H.arr;
     TIM1->CCR4 = H.arr - TRIG_ADVANCE;
     TIM1->CCR1 = TIM1->CCR2 = TIM1->CCR3 = H.arr / 2;

@@ -1408,7 +1408,9 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     /* ---- 3. Validite des echantillons (fenetre low-side de la periode echantillonnee) */
     bool valid[3] = { true, true, true };
     if (S.p.cs_lowside && S.br_p1) {
-        float wmin = S.p.t_win * S.p.f_pwm;
+        /* echantillon au centre de la fenetre low-side (declenchement fixe au sommet) : il faut t_win AVANT lui,
+         * soit une fenetre totale de 2 t_win (doc 04 §4.4) */
+        float wmin = 2.0f * S.p.t_win * S.p.f_pwm;
         for (int x = 0; x < 3; x++) valid[x] = (1.0f - fm_max(S.duty_p1[x], S.duty_h[x])) >= wmin;
         /* foc_current_sample_mode 0 (plus longue fenetre) : la phase a la fenetre la plus courte est
          * reconstruite des deux autres des que sa fenetre approche la limite */
