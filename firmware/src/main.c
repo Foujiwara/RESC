@@ -36,6 +36,7 @@
 #include "imu.h"
 #include "bms.h"
 #include "abs_enc.h"
+#include "blackbox.h"
 
 /* ------------------------------------------------------------ interfaces */
 static uart_t *s_uart1, *s_uart2;
@@ -274,6 +275,7 @@ int main(void)
     SCB->VTOR = 0x08000000u;
     NVIC_SetPriorityGrouping(3);       /* 4 bits de preemption */
 
+    blackbox_init();                   /* garde un enregistrement de defaut d'avant le redemarrage */
     resc_conf_init();
     foc_params_t fp;
     ctrl_limits_t cl;

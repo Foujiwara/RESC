@@ -36,7 +36,7 @@ bool obs_lambda_comp(obs_kind_t k)
            k == OBS_MXV_LAMBDA_COMP_LIN || resc_lambda(k);
 }
 
-void obs_reset(obs_t *o, const obs_cfg_t *c, float theta, float omega)
+RAMFUNC void obs_reset(obs_t *o, const obs_cfg_t *c, float theta, float omega)
 {
     float s, co;
     fm_sincos(theta, &s, &co);

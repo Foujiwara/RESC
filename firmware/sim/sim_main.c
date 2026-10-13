@@ -12,6 +12,7 @@
 #include "sim_motor.h"
 #include "ctrl.h"
 #include "fault_codes.h"
+#include "blackbox.h"
 
 static sim_motor_t M;
 static foc_adc_t ADC;
@@ -80,6 +81,7 @@ int main(void)
 {
     /* --- Moteur type moyeu (valeurs representatives) */
     sim_reseed(0);
+    blackbox_init();
     memset(&M, 0, sizeof(M));
     M.r = 0.06; M.ld = 90e-6; M.lq = 110e-6; M.lambda = 0.018; M.pp = 7;
     M.j = 0.004; M.b = 2e-4; M.t_load = 0.05;   /* a vide pour l'identification */

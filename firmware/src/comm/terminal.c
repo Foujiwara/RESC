@@ -7,6 +7,7 @@
 #include "commands.h"
 #include "detect_app.h"
 #include "foc.h"
+#include "blackbox.h"
 #include "ctrl.h"
 #include "resc_conf.h"
 #include "hw_config.h"
@@ -217,6 +218,7 @@ static void cmd_help(void)
     P("  faults                         : defaut actif, 8 derniers defauts avec leur origine, crete de courant vue");
     P("  reset                          : cause du dernier demarrage, redemarrages, plantage, config relue au demarrage");
     P("  ctrl_log                       : journal de la commande (modes, timeouts, ADC, etats du moteur, recul arme)");
+    P("  fault_dump [reset]             : enregistreur pre-defaut (256 periodes autour du 1er defaut, CSV) | relance");
     P("  prof [reset]                   : chronometrage des taches (blocages de la boucle principale et 1 kHz)");
     P("  sensor                         : mode capteur, etat Hall, source d'angle active");
     P("  acim                           : moteur a induction : parametres, flux, glissement, ce qui manque");
@@ -304,10 +306,33 @@ void terminal_process(char *line)
             P("Plantage enregistre : pc=0x%08lx lr=0x%08lx cfsr=0x%08lx hfsr=0x%08lx", (unsigned long)hf[0],
               (unsigned long)hf[1], (unsigned long)hf[2], (unsigned long)hf[3]);
     }
+    else if (!strcmp(c, "fault_dump")) {
+        if (argc >= 2 && !strcmp(argv[1], "reset")) { blackbox_release(); P("Enregistreur pre-defaut relance"); return; }
+        uint32_t line = 0, ticks = 0, code = blackbox_fault(&line, &ticks);
+        if (!blackbox_frozen()) {
+            P("Enregistreur pre-defaut : aucun defaut enregistre (%d periodes en memoire)", blackbox_count());
+            return;
+        }
+        const foc_params_t *fp = foc_params();
+        float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;
+        int n = blackbox_count(), trg = blackbox_trigger_index();
+        P("Defaut %s (%u), ligne %u, a %.3f s%s ; %d periodes de %.1f us, defaut a la ligne %d",
+          fault_name(code), (unsigned)code, (unsigned)line, (double)((float)ticks / f_loop),
+          blackbox_from_previous_boot() ? " (avant le dernier redemarrage)" : "", n, (double)(1e6f / f_loop), trg);
+        P("k,ia,ib,ic,id,iq,vd,vq,theta,omega,vbus,etat,duty");
+        for (int k = 0; k < n; k++) {
+            blackbox_rec_t r;
+            if (!blackbox_get(k, &r)) break;
+            P("%d,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.4f,%d,%.2f,%u,%.3f", k - trg, (double)(r.i[0] * 0.1f),
+              (double)(r.i[1] * 0.1f), (double)(r.i[2] * 0.1f), (double)(r.id * 0.1f), (double)(r.iq * 0.1f),
+              (double)(r.vd * 0.1f), (double)(r.vq * 0.1f), (double)(r.theta * 1e-4f), (int)r.omega,
+              (double)(r.vbus * 0.01f), (unsigned)r.state, (double)(r.duty * 0.005f));
+        }
+    }
     else if (!strcmp(c, "ctrl_log")) {
         static const char *names[] = { "?", "mode", "TIMEOUT commande", "etat FOC", "ADC1 HORS PLAGE",
                                        "SAFE START bloque", "app : sortie nulle", "RUN demande, coeur a l'arret",
-                                       "recul ARME", "recul DESARME", "commande : pont" };
+                                       "recul ARME", "recul DESARME", "commande : pont", "SURINTENSITES : verrou" };
         int n = ctrl_log_count();
         P("Journal de commande (%d evenements, t depuis le demarrage) :", n);
         for (int k = 0; k < n; k++) {
@@ -316,7 +341,7 @@ void terminal_process(char *line)
             float er = 0.0f, fx = 0.0f, cm = 0.0f, iq = 0.0f;
             ctrl_log_get_ctx(k, &er, &fx, &cm, &iq);
             P("  t=%8lu ms  %-28s %7.3f | erpm %6.0f flux %4.2f consigne %7.3f iq %6.1f", (unsigned long)ms,
-              code < 11 ? names[code] : "?", (double)val, (double)er, (double)fx, (double)cm, (double)iq);
+              code < 12 ? names[code] : "?", (double)val, (double)er, (double)fx, (double)cm, (double)iq);
         }
         P("modes : 0 aucun 1 courant 2 frein 3 duty 4 erpm 5 frein a main 6 position 7 BO courant 8 BO duty 9 hybride 10 relatif");
         P("etats FOC : 2 arret (pont coupe) 3 demarrage 4 marche 6 defaut ; desarme : 1 neutre trop long, 2 accelerateur");
@@ -350,6 +375,7 @@ void terminal_process(char *line)
         if (board_gate_fault()) { P("Refuse : la ligne de defaut du driver est encore active"); return; }
         ctrl_release();
         ctrl_fault_unlock();
+        blackbox_release();
         foc_clear_fault();
         motor_hw_reset_stats();
         g_foc_telem.i_phase_max = 0;

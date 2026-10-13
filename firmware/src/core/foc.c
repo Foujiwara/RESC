@@ -15,6 +15,7 @@
 #include "fmath.h"
 #include "fault_codes.h"
 #include "platform.h"
+#include "blackbox.h"
 
 /* ------------------------------------------------------------------ etat */
 typedef enum { ST_ALIGN = 0, ST_RAMP, ST_FORCED, ST_HFI, ST_MAG } start_sub_t;   /* ST_MAG : magnetisation (induction) */   /* ST_FORCED : boucle ouverte commandee */
@@ -198,7 +199,7 @@ static void set_state(foc_state_t s)
     g_foc_telem.state = s;
 }
 
-static void obs_cfg_from_params(void)
+RAMFUNC static void obs_cfg_from_params(void)
 {
     S.oc.kind = S.p.obs_type < OBS_COUNT ? (obs_kind_t)S.p.obs_type : OBS_RESC_ACTIVE_FLUX;
     S.oc.hyb_w1 = S.p.st_omega;
@@ -217,9 +218,18 @@ static void obs_cfg_from_params(void)
     S.oc.pll_ki = S.p.pll_ki;
 }
 
-static void apply_params(const foc_params_t *p)
+/* Copie mot a mot executee en RAM (une affectation de structure appellerait memcpy, en flash) */
+RAMFUNC static void ram_copy_params(foc_params_t *d, const foc_params_t *src)
 {
-    S.p = *p;
+    _Static_assert(sizeof(foc_params_t) % 4u == 0u, "foc_params_t : taille multiple de 4");
+    volatile uint32_t *o = (volatile uint32_t *)(void *)d;
+    const volatile uint32_t *i = (const volatile uint32_t *)(const void *)src;
+    for (uint32_t k = 0; k < sizeof(foc_params_t) / 4u; k++) o[k] = i[k];
+}
+
+RAMFUNC static void apply_params(const foc_params_t *p)
+{
+    ram_copy_params(&S.p, p);
     /* valeurs neutres si non renseignees (0) */
     if (!(S.p.overmod >= 1.0f)) S.p.overmod = 1.0f;
     if (S.p.overmod > 1.5f) S.p.overmod = 1.5f;
@@ -240,7 +250,7 @@ static bool acim_ok(void)
 }
 static float acim_tr(void) { return S.p.acim_lr / fm_max(S.p.acim_rr, 1e-6f); }
 
-static bool motor_params_ok(void)
+RAMFUNC static bool motor_params_ok(void)
 {
     if (acim())
         return S.p.r > 1e-5f && S.p.ld > 1e-8f && S.p.acim_lm > 1e-7f && S.p.acim_lr > S.p.acim_lm &&
@@ -265,6 +275,7 @@ RAMFUNC static void trip_at(uint32_t code, uint32_t line)
         g_foc_telem.fault_log[k].code = code;
         g_foc_telem.fault_log[k].line = line;
         g_foc_telem.fault_log[k].ticks = g_foc_telem.ticks;
+        blackbox_freeze(code, line, g_foc_telem.ticks);
     }
     if (S.det.busy) {
         S.det.error = (int)code;
@@ -279,7 +290,7 @@ __attribute__((weak)) void foc_hw_rearm(void) { }
 
 /* Defaut detecte hors ISR (SysTick, break, EXTI, watchdog analogique) : le pont est coupe tout de suite,
  * l'etat du coeur n'est modifie que par l'ISR (pas d'ecriture concurrente de S.st / S.br). */
-void foc_raise_fault(uint32_t code)
+RAMFUNC void foc_raise_fault(uint32_t code)
 {
     foc_hw_kill();
     uint32_t none = RESC_FAULT_NONE;              /* premier defaut conserve ; LDREX/STREX sur cible */
@@ -2287,6 +2298,22 @@ output:
         t->lambda_est = S.lam_eff;
         t->fw_id = S.fw_id;
         t->state = S.st;
+    }
+
+    /* ---- 10. Enregistreur pre-defaut */
+    {
+        blackbox_rec_t r;
+        for (int x = 0; x < 3; x++) r.i[x] = (int16_t)fm_sat_sym(S.i_ph[x] * 10.0f, 32767.0f);
+        r.id = (int16_t)fm_sat_sym(S.id * 10.0f, 32767.0f);
+        r.iq = (int16_t)fm_sat_sym(S.iq * 10.0f, 32767.0f);
+        r.vd = (int16_t)fm_sat_sym(S.vd * 10.0f, 32767.0f);
+        r.vq = (int16_t)fm_sat_sym(S.vq * 10.0f, 32767.0f);
+        r.theta = (int16_t)fm_sat_sym(S.theta * 10000.0f, 32767.0f);
+        r.omega = (int16_t)fm_sat_sym(S.omega, 32767.0f);
+        r.vbus = (uint16_t)fm_sat(S.vbus * 100.0f, 0.0f, 65535.0f);
+        r.state = (uint8_t)S.st;
+        r.duty = (uint8_t)fm_sat(S.duty_abs * 200.0f, 0.0f, 255.0f);
+        blackbox_push(&r);
     }
 }
 

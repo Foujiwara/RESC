@@ -14,6 +14,7 @@ import argparse
 import glob
 import os
 import shutil
+import re
 import subprocess
 import sys
 
@@ -69,7 +70,7 @@ def board_description(board, out):
     gcc = find_tool("gcc", HOST_DIRS)
     defs = [f'-DRESC_BOARD_HEADER="boards/{board}.h"', "-DRESC_HOST"]
     exe = os.path.join(out, "dump_defaults.exe")
-    srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+    srcs = ["tests/dump_defaults.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c", "src/core/blackbox.c",
             "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
     run([gcc, "-std=gnu11", "-O1"] + defs + ["-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm",
                                              "-Isrc/bsp"] + srcs + ["-lm", "-o", exe])
@@ -122,6 +123,7 @@ def build(board):
     open(os.path.join(out, "resc_app.bin"), "wb").write(full[0xC000:])      # 0x0800C000
     run([size, elf])
     check_ramfunc(os.path.join(out, "resc.map"))
+    check_ram_calls(elf)
     print(f"\nOK : {os.path.relpath(elf, ROOT)}")
 
 
@@ -138,12 +140,36 @@ def check_ramfunc(mapfile):
         print("Chemin FOC en RAM : OK (" + ", ".join(need) + ")")
 
 
+# Fonctions en RAM autorisees a appeler la flash : hors du chemin de regulation et de protection
+RAM_CALLS_OK = {"det_step", "abs_enc_sample", "sampler_isr"}
+
+
+def check_ram_calls(elf):
+    """Une fonction en RAM qui appelle la flash (veneer) s'arrete pendant un effacement flash : le chemin FOC
+    ne doit pas le faire (liste blanche : identification, codeur sin/cos, echantillonneur)."""
+    objdump = find_tool("arm-none-eabi-objdump", ARM_DIRS)
+    txt = subprocess.run([objdump, "-d", "--no-show-raw-insn", elf], capture_output=True, text=True).stdout
+    fn, bad = "", set()
+    for line in txt.splitlines():
+        m = re.match(r"^([0-9a-f]{8}) <(.+)>:$", line)
+        if m:
+            fn = m.group(2) if m.group(1).startswith("2") else ""
+            continue
+        v = re.search(r"\sb(?:l|\.w)?\s+[0-9a-f]+ <__(\w+)_veneer>", line)
+        if fn and v and fn not in RAM_CALLS_OK:
+            bad.add(f"{fn} -> {v.group(1)}")
+    if bad:
+        print("ATTENTION : code en RAM qui appelle la flash :", ", ".join(sorted(bad)))
+    else:
+        print("Appels RAM -> flash : aucun sur le chemin FOC")
+
+
 def sim():
     gcc = find_tool("gcc", HOST_DIRS)
     out = os.path.join(HERE, "build", "sim")
     os.makedirs(out, exist_ok=True)
     exe = os.path.join(out, "sim.exe")
-    srcs = ["sim/sim_main.c", "sim/sim_motor.c", "src/core/foc.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
+    srcs = ["sim/sim_main.c", "sim/sim_motor.c", "src/core/foc.c", "src/core/blackbox.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
     run([gcc, "-std=gnu11", "-O2", "-Wall", "-Wextra", "-DRESC_HOST", "-Isrc", "-Isrc/core", "-Isim"] + srcs + ["-lm", "-o", exe])
     r = subprocess.run([exe], cwd=HERE)
     sys.exit(r.returncode)
@@ -201,13 +227,13 @@ def tests(board):
              "-I../hw", "-Isrc", "-Isrc/core", "-Isrc/app", "-Isrc/vesc", "-Isrc/comm", "-Isrc/bsp", "-Isim"]
     suites = {
         "test_conf": ["tests/test_conf.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/comm/packet.c",
-                      "src/core/foc.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"],
+                      "src/core/foc.c", "src/core/blackbox.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"],
         "test_apps": ["tests/test_apps.c", "src/app/apps.c", "src/vesc/vesc_conf.c"],
         "test_sampler": ["tests/test_sampler.c", "src/comm/sampler.c", "src/comm/packet.c"],
         "test_abs_enc": ["tests/test_abs_enc.c"],
         "test_ahrs": ["tests/test_ahrs.c", "src/app/ahrs.c"],
         "test_wizard": ["tests/test_wizard.c", "src/app/resc_conf.c", "src/app/stats.c", "src/app/detect_app.c",
-                        "src/app/detect_all.c", "src/vesc/vesc_conf.c", "src/core/foc.c", "src/core/observer.c",
+                        "src/app/detect_all.c", "src/vesc/vesc_conf.c", "src/core/foc.c", "src/core/blackbox.c", "src/core/observer.c",
                         "src/core/angle_sensors.c", "src/core/ctrl.c", "sim/sim_motor.c"],
     }
     rc = 0
@@ -228,7 +254,7 @@ def tests(board):
     rc |= subprocess.run([exe], cwd=HERE).returncode
     rc |= 0 if check_cmd250() else 1
     exe = os.path.join(out, "test_migrate.exe")
-    mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c",
+    mig = ["tests/test_migrate.c", "src/app/resc_conf.c", "src/app/stats.c", "src/vesc/vesc_conf.c", "src/core/foc.c", "src/core/blackbox.c",
            "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
     run([gcc] + flags + mig + ["-lm", "-o", exe])
     print("== test_migrate")

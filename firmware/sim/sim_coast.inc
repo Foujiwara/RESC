@@ -137,6 +137,7 @@
     {
         M.b = 2e-4; M.t_load = 0.05; M.omega_m = 0;
         RUN_CTRL(0.3);
+        blackbox_release();
         for (int k = 0; k < 8000 && sim_omega_e(&M) * 60 / (2 * M_PI) < 8000; k++) { ctrl_set_current_rel(0.5f); RUN_CTRL(0.001); }
         double erpm0 = sim_omega_e(&M) * 60 / (2 * M_PI);
         foc_dbg_obs_reset((float)(sim_theta_e(&M) + M_PI), (float)sim_omega_e(&M));
@@ -152,6 +153,24 @@
                (double)p.i_abs_trip);
         check("decrochage detecte en moins de 30 periodes (2 ms)", t_fault >= 0 && t_fault < 30);
         check("decrochage : crete de phase < 50 % de la coupure", g_trip_peak < 0.5 * p.i_abs_trip);
+        {
+            /* enregistreur pre-defaut : fige sur ce defaut, 32 periodes apres, crete visible avant le defaut */
+            for (int k = 0; k < 40; k++) run(1.0 / M.f_pwm);
+            uint32_t bl = 0, code = blackbox_fault(&bl, 0);
+            int trg = blackbox_trigger_index(), n = blackbox_count();
+            double imax = 0;
+            for (int k = 0; k < n; k++) {
+                blackbox_rec_t r;
+                blackbox_get(k, &r);
+                for (int x = 0; x < 3; x++) if (fabs(r.i[x] * 0.1) > imax) imax = fabs(r.i[x] * 0.1);
+            }
+            printf("  enregistreur : defaut %u ligne %u, %d periodes dont %d avant, crete enregistree %.1f A\n",
+                   (unsigned)code, (unsigned)bl, n, trg, imax);
+            check("enregistreur pre-defaut fige sur la perte de synchro, 32 periodes apres",
+                  blackbox_frozen() && code == RESC_FAULT_UNDERSPEED && n - trg == BLACKBOX_POST);
+            check("enregistreur : historique complet (224 periodes avant le defaut) et crete visible (> 25 A)",
+                  trg == BLACKBOX_N - BLACKBOX_POST && imax > 25.0);
+        }
         ctrl_release(); RUN_CTRL(0.05);
         foc_clear_fault(); RUN_CTRL(0.6);
     }
