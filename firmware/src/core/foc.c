@@ -256,6 +256,8 @@ RAMFUNC static void trip_at(uint32_t code, uint32_t line)
     set_state(FOC_ST_FAULT);
 }
 
+__attribute__((weak)) void foc_hw_rearm(void) { }
+
 void foc_raise_fault(uint32_t code) { trip_at(code, 0); }
 /* Essais (simulation) : observateur force sur un etat donne, comme un decrochage en roue libre */
 void foc_dbg_obs_reset(float theta, float omega) { obs_reset(&S.obs, &S.oc, theta, omega); }
@@ -1479,6 +1481,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.clear_req = false;
             S.fault = RESC_FAULT_NONE;
             g_foc_telem.fault = RESC_FAULT_NONE;
+            foc_hw_rearm();
             set_state(FOC_ST_IDLE);
         }
         S.theta = S.obs.theta;

@@ -315,5 +315,8 @@ void foc_detect_abort(void);
  * coupure rapide du pont (break logiciel), commutation du filtre de phase */
 void foc_hw_kill(void);
 void foc_hw_phase_filter(bool on);
+/* Autorise de nouveau l'activation du pont (sortie de l'etat de defaut). Definition faible vide dans
+ * foc.c (simulation, tests) ; bsp/ la remplace. */
+void foc_hw_rearm(void);
 
 #endif /* FOC_H */

@@ -202,6 +202,11 @@ static void tim1_init(float f)
     for (int k = 0; k < 6; k++) gpio_cfg(pins[k], GPIO_MODE_AF, false, 3, GPIO_PUPD_NONE, 1);
 }
 
+/* Coupure collante : une fois le pont coupe par une protection (defaut logiciel, break, driver, watchdog
+ * analogique), seule la sortie de l'etat de defaut du coeur (foc_hw_rearm) autorise a remettre MOE a 1.
+ * Sans cela, une ISR FOC preemptee par la protection finirait son tour et rallumerait le pont. */
+static volatile bool s_killed;
+
 RAMFUNC static void pwm_write(const float d[3], bool en)
 {
     uint32_t a = H.arr;
@@ -211,7 +216,7 @@ RAMFUNC static void pwm_write(const float d[3], bool en)
     TIM1->CCR3 = (uint32_t)(d[2] * (float)a);
     TIM1->CR1 &= ~TIM_CR1_UDIS;
     if (en) {
-        if (!(TIM1->BDTR & TIM_BDTR_MOE) && !(TIM1->SR & TIM_SR_BIF)) TIM1->BDTR |= TIM_BDTR_MOE;
+        if (!s_killed && !(TIM1->BDTR & TIM_BDTR_MOE) && !(TIM1->SR & TIM_SR_BIF)) TIM1->BDTR |= TIM_BDTR_MOE;
     } else {
         TIM1->BDTR &= ~TIM_BDTR_MOE;
     }
@@ -229,11 +234,19 @@ RAMFUNC void TIM1_UP_TIM10_IRQHandler(void)
 
 RAMFUNC void foc_hw_kill(void)
 {
+    s_killed = true;
     TIM1->BDTR &= ~TIM_BDTR_MOE;
+}
+
+/* Appele par le coeur quand il quitte l'etat de defaut (pont coupe, aucune cause active) */
+RAMFUNC void foc_hw_rearm(void)
+{
+    s_killed = false;
 }
 
 void TIM1_BRK_TIM9_IRQHandler(void)
 {
+    s_killed = true;                              /* avant d'effacer BIF : pwm_write ne peut plus rallumer */
     TIM1->BDTR &= ~TIM_BDTR_MOE;
     if (TIM1->SR & TIM_SR_BIF) {
         TIM1->SR = ~TIM_SR_BIF;
@@ -378,6 +391,7 @@ RAMFUNC void ADC_IRQHandler(void)
 
     /* Watchdog analogique : coupure immediate, avant tout calcul */
     if ((sr1 | sr2 | sr3) & ADC_SR_AWD) {
+        s_killed = true;
         TIM1->BDTR &= ~TIM_BDTR_MOE;
         ADC1->SR = ~ADC_SR_AWD;
         ADC2->SR = ~ADC_SR_AWD;
@@ -452,6 +466,7 @@ static void exti_fault(void)
 {
     if (EXTI->PR & (1u << FAULT_LINE)) {
         EXTI->PR = 1u << FAULT_LINE;
+        s_killed = true;
         TIM1->BDTR &= ~TIM_BDTR_MOE;
         foc_raise_fault(RESC_FAULT_DRV);
     }
