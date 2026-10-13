@@ -164,6 +164,7 @@ typedef struct {
 
     uint32_t fault;
     volatile bool clear_req;
+    volatile uint32_t fault_req; /* defaut signale hors ISR (pris en compte au debut de la periode suivante) */
 } foc_t;
 
 static CCMBSS foc_t S;
@@ -232,6 +233,7 @@ static bool motor_params_ok(void)
 
 
 
+/* Uniquement depuis l'ISR FOC (les autres contextes passent par foc_raise_fault) */
 RAMFUNC static void trip_at(uint32_t code, uint32_t line)
 {
     foc_hw_kill();
@@ -258,7 +260,15 @@ RAMFUNC static void trip_at(uint32_t code, uint32_t line)
 
 __attribute__((weak)) void foc_hw_rearm(void) { }
 
-void foc_raise_fault(uint32_t code) { trip_at(code, 0); }
+/* Defaut detecte hors ISR (SysTick, break, EXTI, watchdog analogique) : le pont est coupe tout de suite,
+ * l'etat du coeur n'est modifie que par l'ISR (pas d'ecriture concurrente de S.st / S.br). */
+void foc_raise_fault(uint32_t code)
+{
+    foc_hw_kill();
+    uint32_t none = RESC_FAULT_NONE;              /* premier defaut conserve ; LDREX/STREX sur cible */
+    if (code != RESC_FAULT_NONE)
+        __atomic_compare_exchange_n(&S.fault_req, &none, code, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
 /* Essais (simulation) : observateur force sur un etat donne, comme un decrochage en roue libre */
 void foc_dbg_obs_reset(float theta, float omega) { obs_reset(&S.obs, &S.oc, theta, omega); }
 #define trip(code) trip_at((code), __LINE__)
@@ -1253,6 +1263,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     const float dt = S.dt;
     g_foc_telem.ticks++;
     S.st_time += dt;
+    {
+        /* lecture et effacement atomiques : une protection de priorite superieure peut s'intercaler */
+        uint32_t code = __atomic_exchange_n(&S.fault_req, RESC_FAULT_NONE, __ATOMIC_SEQ_CST);
+        if (code != RESC_FAULT_NONE) trip_at(code, 0);
+    }
 
     /* ---- 1. Conversion des mesures */
     S.hall_now = adc->hall;
