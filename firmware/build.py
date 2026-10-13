@@ -44,7 +44,7 @@ CFLAGS = [
     "-std=gnu11", "-O2", "-g3",
     "-ffunction-sections", "-fdata-sections", "-fno-common",
     "-fno-math-errno", "-fsingle-precision-constant",
-    "-Wall", "-Wextra", "-Wdouble-promotion", "-Wno-unused-parameter",
+    "-Wall", "-Wextra", "-Wshadow", "-Wdouble-promotion", "-Wno-unused-parameter",
     "-DSTM32F405xx",
 ]
 LDFLAGS = [
@@ -170,7 +170,7 @@ def sim():
     os.makedirs(out, exist_ok=True)
     exe = os.path.join(out, "sim.exe")
     srcs = ["sim/sim_main.c", "sim/sim_motor.c", "src/core/foc.c", "src/core/blackbox.c", "src/core/observer.c", "src/core/angle_sensors.c", "src/core/ctrl.c"]
-    run([gcc, "-std=gnu11", "-O2", "-Wall", "-Wextra", "-DRESC_HOST", "-Isrc", "-Isrc/core", "-Isim"] + srcs + ["-lm", "-o", exe])
+    run([gcc, "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Wshadow", "-DRESC_HOST", "-Isrc", "-Isrc/core", "-Isim"] + srcs + ["-lm", "-o", exe])
     r = subprocess.run([exe], cwd=HERE)
     sys.exit(r.returncode)
 

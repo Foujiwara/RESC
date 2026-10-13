@@ -22,7 +22,9 @@ Pour l'interopérabilité avec VESC Tool, les écrans et les contrôleurs exista
 | Applications : PPM, ADC (+ boutons, marche arrière intelligente et commande hybride courant / rapport cyclique de RESC), VESC Remote, PAS, multi-contrôleurs CAN avec antipatinage, arrêt d'urgence | `firmware/src/app/apps.c`, `bsp/inputs.c` | tests PC OK |
 | Configuration : générée depuis les XML, stockage par nom avec migration, description envoyée à RESC Tool (commande 250) | `firmware/conf/`, `tools/resc_conf/`, `src/vesc/`, `src/comm/conf_desc.c` | tests PC OK |
 | Fonctions de VESC 7.00 : échantillonnage V0/V7, surmodulation, frein tenu jusqu'à l'arrêt avec court-circuit par les low-sides, frein à main, échantillonnage pour l'outil, statistiques, odomètre, codeurs absolus (tous les modes du port capteur de VESC sauf Custom : AS5047, MT6816, AS5x47U, TLE5012, AMT22, MA782, BiSS-C, TS5700N8501, AD2S1205, sin/cos, PWM, PWM + ABI), IMU (BMI160), BMS VESC par CAN, assistant (détection automatique, CAN compris), mise à jour du firmware sur le bus CAN | `core/`, `bsp/abs_enc.c`, `app/imu.c`, `app/bms.c`, `app/detect_all.c`, `comm/sampler.c` | simulation et tests PC OK |
-| Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break, survitesse | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partiellement simulé |
+| Protections : surintensité logicielle + watchdog ADC, surtension, sous-tension, températures, défaut driver, break, survitesse ; depuis la 1.7 (doc 15) : coupure collante, reprise au vol validée par la FEM mesurée, perte de synchronisation par le résidu de prédiction du courant, échéance de l'ISR (défaut 34), verrou des surintensités répétées, jamais de pont sans calibration | `foc.c`, `ctrl.c`, `bsp/motor_hw.c` | partiellement simulé |
+| Enregistreur pré-défaut : 256 périodes autour du premier défaut, conservé à travers un redémarrage logiciel, terminal `fault_dump` (CSV) | `core/blackbox.c` | simulation OK |
+| **Limite connue (1.7)** : reprise au vol à très haute vitesse (40 000 ERPM, moteur 14 µH / 8 mΩ) avec des diviseurs de phase réels : ~47 A de crête pour 2 A demandés. Déjà présent en 1.6 (sans coupure) ; la 1.7 coupe au premier pic. Voir doc 15 §15.7 | `foc.c` | **à corriger** |
 | STM32F405 : TIM1, ADC triple, TIM4 (servo), UART, CAN, USB CDC, flash, IWDG | `firmware/src/bsp/` | **à valider sur carte** |
 
 ## Configuration
@@ -50,9 +52,9 @@ python firmware/build.py --tests
 ```
 
 Images prêtes à flasher dans `firmware/release/` :
-- `resc_ubox_single_85_200.bin` / `.hex` : le firmware. Il fonctionne avec **RESC Tool** (la version qui lit la description envoyée par le firmware), pas avec le VESC Tool officiel, dont la liste de paramètres intégrée est différente.
+- `resc_ubox_single_85_200.bin` / `.hex` : le firmware (encore la 1.6 : la 1.7 n'est pas publiée tant que la limite connue ci-dessus n'est pas traitée ; `python firmware/build.py` la compile). Il fonctionne avec **RESC Tool** (la version qui lit la description envoyée par le firmware), pas avec le VESC Tool officiel, dont la liste de paramètres intégrée est différente.
 
-Console : `python tools/resc_cli.py`. Le terminal (`help`) liste toutes les commandes, dont les détections (`detect_rl`, `detect_acim`...) et `get` / `set` / `list` pour tous les paramètres.
+Console : `python tools/resc_cli.py`. Le terminal (`help`) liste toutes les commandes, dont les détections (`detect_rl`, `detect_acim`...), `get` / `set` / `list` pour tous les paramètres, `faults` (défauts, reprises refusées, marge de la détection de perte de synchro) et `fault_dump` (enregistreur pré-défaut).
 
 ## Convention de fiabilité (utilisée dans tous les documents)
 
@@ -80,6 +82,7 @@ Console : `python tools/resc_cli.py`. Le terminal (`help`) liste toutes les comm
 | 12 | [Premier essai au banc](docs/12_essai_banc.md) | Sauvegarde, flashage, vérifications, détections, premiers tours |
 | 13 | [Audit du code et indépendance du FOC](docs/13_audit_code_et_independance_foc.md) | Ce qui vient de VESC, ce qui est propre à RESC |
 | 14 | [Fonctions RESC 1.0](docs/14_fonctions_v1.md) | Observateurs, capteurs, sensorless, filtres de phase, applications, induction, configuration |
+| 15 | [Audit du firmware 1.6 et corrections 1.7](docs/15_audit_1.6.md) | Défauts de sécurité, courses critiques, enregistreur pré-défaut, reprise à haute vitesse |
 | — | [RESC 0.1 vs VESC 7.00 (PDF, anglais)](docs/RESC_vs_VESC_FOC_observer.pdf) | Comparatif du cœur FOC et de l'observateur, **version 0.1** (dépassé : pas de HFI, un seul observateur à l'époque) |
 
 ## Configuration matérielle

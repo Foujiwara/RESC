@@ -773,7 +773,7 @@ RAMFUNC static void enter_hfi_start(void)
 
 /* ---------------------------------------------- demarrage I/f et relais */
 /* Courant de demarrage : la consigne, bornee par st_i (boost) et st_i_max */
-RAMFUNC static inline float st_cur(float cmd)
+RAMFUNC static float st_cur(float cmd)
 {
     return fm_min(fm_max(S.p.st_i, fm_abs(cmd)), S.p.st_i_max);
 }
@@ -1797,10 +1797,10 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.hfi_t += dt;
         S.theta = S.hfi_theta;
         S.omega = S.hfi_omega;
-        float sn, cs;
-        fm_sincos(S.theta, &sn, &cs);
-        S.id = cs * S.i_a + sn * S.i_b;
-        S.iq = -sn * S.i_a + cs * S.i_b;
+        float sn, cth;
+        fm_sincos(S.theta, &sn, &cth);
+        S.id = cth * S.i_a + sn * S.i_b;
+        S.iq = -sn * S.i_a + cth * S.i_b;
         float ia = fm_max(S.p.hfi.amb_current, 0.5f);
         float tp = fm_max(S.p.hfi.amb_time, 0.004f);
         bool dbl = S.p.hfi.amb_mode != 1;
@@ -1893,10 +1893,10 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 S.st_time = 0.0f;
             }
         }
-        float sn, cs;
-        fm_sincos(S.theta, &sn, &cs);
-        S.id = cs * S.i_a + sn * S.i_b;
-        S.iq = -sn * S.i_a + cs * S.i_b;
+        float sn, cth;
+        fm_sincos(S.theta, &sn, &cth);
+        S.id = cth * S.i_a + sn * S.i_b;
+        S.iq = -sn * S.i_a + cth * S.i_b;
         if (S.st == FOC_ST_START && S.sub == ST_MAG) {
             current_loop(S.p.kp, S.p.ki, 0.0f, 0.0f, vmax);
             modulate_out();

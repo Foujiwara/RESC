@@ -308,7 +308,7 @@ void terminal_process(char *line)
     }
     else if (!strcmp(c, "fault_dump")) {
         if (argc >= 2 && !strcmp(argv[1], "reset")) { blackbox_release(); P("Enregistreur pre-defaut relance"); return; }
-        uint32_t line = 0, ticks = 0, code = blackbox_fault(&line, &ticks);
+        uint32_t f_line = 0, ticks = 0, code = blackbox_fault(&f_line, &ticks);
         if (!blackbox_frozen()) {
             P("Enregistreur pre-defaut : aucun defaut enregistre (%d periodes en memoire)", blackbox_count());
             return;
@@ -317,7 +317,7 @@ void terminal_process(char *line)
         float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;
         int n = blackbox_count(), trg = blackbox_trigger_index();
         P("Defaut %s (%u), ligne %u, a %.3f s%s ; %d periodes de %.1f us, defaut a la ligne %d",
-          fault_name(code), (unsigned)code, (unsigned)line, (double)((float)ticks / f_loop),
+          fault_name(code), (unsigned)code, (unsigned)f_line, (double)((float)ticks / f_loop),
           blackbox_from_previous_boot() ? " (avant le dernier redemarrage)" : "", n, (double)(1e6f / f_loop), trg);
         P("k,ia,ib,ic,id,iq,vd,vq,theta,omega,vbus,etat,duty");
         for (int k = 0; k < n; k++) {

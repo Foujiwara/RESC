@@ -228,7 +228,7 @@
     p = p0;
     foc_set_params(&p);
     {
-        double wss[2] = { 0, 0 }, rip[2] = { 0, 0 };
+        double wss[2] = { 0, 0 }, w_rip[2] = { 0, 0 };
         static const double thr[2] = { 0.5, 1.0 };
         for (int k = 0; k < 2; k++) {
             STOP_AT(0.5);
@@ -247,16 +247,16 @@
                 }
             }
             wss[k] = 0.5 * (wmin + wmax);
-            rip[k] = wmax - wmin;
+            w_rip[k] = wmax - wmin;
             char t[40];
             snprintf(t, sizeof t, "hybride gaz %.0f %%", thr[k] * 100);
             report(t);
             ctrl_release(); RUN_CTRL(0.05);
         }
         printf("  vitesse a vide : %.0f ERPM a mi-gaz, %.0f ERPM plein gaz (rapport %.2f), ondulation %.0f / %.0f ERPM\n",
-               wss[0], wss[1], wss[0] / wss[1], rip[0], rip[1]);
+               wss[0], wss[1], wss[0] / wss[1], w_rip[0], w_rip[1]);
         check("hybride : mi-gaz = environ mi-vitesse (rapport 0.4 a 0.6)", wss[0] / wss[1] > 0.4 && wss[0] / wss[1] < 0.6);
-        check("hybride : vitesse stable (ondulation < 3 %)", rip[0] < 0.03 * wss[0] && rip[1] < 0.03 * wss[1]);
+        check("hybride : vitesse stable (ondulation < 3 %)", w_rip[0] < 0.03 * wss[0] && w_rip[1] < 0.03 * wss[1]);
     }
 
     /* ------------------------------------------------------------------ */

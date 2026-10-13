@@ -240,3 +240,72 @@ Donne un tableau : étape, fichiers touchés, essai ajouté, résultat --tests /
 que tu n'as pas pu terminer avec la raison exacte. Ne compile pas le binaire cible si
 arm-none-eabi-gcc n'est pas installé : dis-le.
 ```
+
+---
+
+## 15.7 Mise en œuvre (1.7) et constats faits en cours de route
+
+Un commit par étape sur la branche `main-tat8hn` (`E1` à `E17`). Chaque étape a été vérifiée par les tests PC,
+la simulation et la **compilation cible** (chaîne `arm-none-eabi-gcc` 13.2, qui n'avait encore jamais servi à
+vérifier `motor_hw.c` et `main.c` : aucun test PC ne les compile).
+
+| Étape | Résultat | Essai qui le prouve |
+|---|---|---|
+| E1 coupure collante | fait | — (code cible, vérifié à la compilation) |
+| E2 défaut hors ISR = requête | fait, échange atomique (LDREX/STREX) | toute la simulation |
+| E3 commande atomique | fait : compteur de séquence vers l'ISR, `BASEPRI` pour boucle principale ↔ SysTick | sortie de simulation identique à l'octet |
+| E4 publication des paramètres | fait | — |
+| E5 calibration obligatoire | fait ; **bug réel** : un défaut au démarrage (watchdog) laissait les offsets de courant à 2048 | essai 1 (échoue sans la correction) |
+| E6 tension bus | 4 échantillons bruts consécutifs (0,27 ms) plutôt que `vbus_f` + 4 (retard inutile en surtension) | — |
+| E7 sortie immédiate | fait | — |
+| E8 échéance ISR | défaut 34 ; gère la remise à zéro du compteur par `prof` | — |
+| E9 reprise validée | fait ; la garde repose sur la FEM **mesurée** (« le moteur tourne »), pas sur `obs_fast` | 27d : observateur décalé de 90° → crête **80,6 A → 10,2 A** |
+| E10 perte de synchro | fait ; seuil 5 % de la coupure, biais lent retiré, prédiction à l'ordre 2 | 27e : observateur retourné à 20 A → défaut en 3 périodes, crête **72 A → 30 A** |
+| E11 verrou surintensité | fait (voir correction S6 ci-dessous) | 12b |
+| E12 seuils Ubox | 350 A max / 300 A par défaut, courant moteur ≤ 80 % de la coupure | test_conf |
+| E13 fenêtre de mesure | 2 t_win ; m_max 0,95 → 0,947 à 15 kHz | 31, 32 inchangés |
+| E14 enregistreur | fait (`fault_dump`) | 27e |
+| E15 cas de l'utilisateur | fait ; **3 échecs connus**, voir ci-dessous | 27c |
+| E16 découpage de `foc_isr` | **non fait** : conditionné par l'audit à E1–E15 tous verts, et ce n'est pas le moment de remanier le cœur | — |
+| E17 nettoyage | `-Wshadow` (cible et PC), aucun avertissement, version 1.7, README | — |
+
+**Corrections de l'audit.**
+- **S6 était faux** : la 1.6 verrouillait déjà après 3 surintensités (la fenêtre de 10 s n'était réévaluée qu'à une
+  nouvelle surintensité, impossible tant que le défaut est tenu). E11 rend le verrou explicite et le fait lever
+  proprement par `clear`.
+- **Piste « compensation du temps mort » écartée** : sans temps mort, la reprise à 40 000 ERPM est pire (53 A).
+
+**Constats nouveaux.**
+1. **Code en flash appelé depuis l'ISR** : `foc_raise_fault` (chemin du watchdog analogique), `apply_params`
+   (copie de structure → `memcpy`), `motor_params_ok`, `obs_reset`. Pendant un effacement flash, l'ISR restait
+   bloquée. Corrigé, et `build.py` signale maintenant tout appel RAM → flash hors liste blanche (identification,
+   codeur sin/cos, échantillonneur, laissés en flash car hors chemin critique).
+2. **Essais qui passaient à vide** : l'essai 27c ne vérifiait pas que la reprise avait lieu (moteur en défaut =
+   0 A = « pas d'à-coup ») ; le résumé de `build.py --tests` n'affichait que le dernier binaire (un échec dans un
+   autre passait inaperçu).
+3. **Bruit de simulation partagé** : ajouter un essai changeait le bruit des suivants. Le générateur est
+   maintenant réinitialisé par groupe d'essais. Restent fragiles selon `SIM_SEED`, **déjà en 1.6** : démarrage
+   HFI (départ 0,3 à 5,0 rad) et observateurs à compensation de flux (MXLEMMING_LAMBDA_COMP,
+   MXV_LAMBDA_COMP_LIN) ; environ 3 graines sur 8 donnent un échec dans ces familles.
+4. **Reprise au vol à très haute vitesse (problème ouvert, le plus important).** Moteur de l'utilisateur
+   (14/26 µH, 8 mΩ, 8,9 mWb, 72 V), 40 000 ERPM, diviseurs de phase réalistes (gains ±2 %, partie mode commun
+   calibrée au démarrage, dérive 0,1 V) :
+
+   | | crêtes pour 2 A demandés | comportement |
+   |---|---|---|
+   | 1.6 | 46 / 20 / 33 / 48 A, iq −12 … +20 A | pics répétés, jamais de défaut |
+   | 1.7 | 47 A à la 1ʳᵉ reprise | E10 coupe ; défaut tenu (réarmement après 0,5 s relâché) |
+   | 1.6 et 1.7, mesure idéale | 14 à 25 A | identiques |
+
+   C'est la mesure relevée sur le contrôleur le 12/10 (−10 / +18 A). L'ancien essai ne pouvait pas le voir : il
+   tournait à 29 600 ERPM. Mécanisme : à la remise du pont, une erreur de tension ΔV excite le mode naturel du
+   moteur (courant continu dans le repère fixe, constante L/R ≈ 1,75 ms), vu en d/q comme une oscillation à la
+   fréquence électrique d'amplitude ≈ ΔV/(ωL) : **1 V ≈ 12 A** à 40 000 ERPM sur ce moteur. La boucle de courant
+   (≈ 1 400 rad/s) est trop lente pour l'amortir à 4 100 rad/s, et le pont travaille à 2 V de la limite de tension
+   (FEM 37,4 V pour 39,4 V disponibles). Pistes, à évaluer en simulation **avant** tout essai sur carte :
+   amortissement actif du mode du repère fixe (résistance virtuelle), régulateur de courant en vecteur complexe
+   (découplage discret exact), consigne d'id négative à la reprise pour regagner de la marge de tension.
+
+**Avant de rouler avec la 1.7** : `faults` après un essai donne la marge réelle de la détection de perte de synchro
+(« max vu », coupure à 1,00) ; au-dessus de 0,5 en roulage normal, le seuil est trop serré pour la carte. Après tout
+défaut, `fault_dump` donne les 17 ms qui l'entourent : c'est la donnée qui a manqué pour comprendre la casse.
