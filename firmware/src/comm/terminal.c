@@ -37,8 +37,14 @@ static const char *fault_name(uint32_t f)
     case 5: return "TEMP FET";
     case 6: return "TEMP MOTEUR";
     case 15: case 16: case 17: return "OFFSET COURANT";
+    case 10: return "WATCHDOG (redemarrage)";
     case 19: return "BREAK MATERIEL";
+    case 27: return "FILTRE DE PHASE";
+    case 30: return "GLISSEMENT CODEUR";
+    case 31: return "SURVITESSE";
     case 32: return "DEMARRAGE / SYNCHRO";
+    case 33: return "SURVITESSE ABSOLUE";
+    case 34: return "ECHEANCE ISR FOC";
     default: return "autre";
     }
 }

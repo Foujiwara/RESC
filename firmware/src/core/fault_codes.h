@@ -25,5 +25,6 @@
 #define RESC_FAULT_OVERSPEED            31
 #define RESC_FAULT_UNDERSPEED           32   /* RESC : echec du demarrage / perte de synchro */
 #define RESC_FAULT_ABS_OVERSPEED        33
+#define RESC_FAULT_ISR_OVERRUN          34   /* RESC : boucle FOC plus longue que la periode PWM (repete) */
 
 #endif /* FAULT_CODES_H */

@@ -250,6 +250,15 @@ void app_tick_1khz(void)
     bool dim = (now % 3u) == 0u;
     board_led(!fault && (run || dim), fault && ((now >> 8) & 1u));
 
+    /* Echeance de la boucle FOC : plus de 10 depassements en 1 s -> defaut (une ISR trop longue degrade
+     * la regulation sans rien signaler) */
+    {
+        static uint32_t ov_ref, ov_ms;
+        uint32_t ov = motor_hw_overruns();
+        if (now - ov_ms >= 1000u || ov < ov_ref) { ov_ms = now; ov_ref = ov; }      /* ov < ref : compteur remis a 0 */
+        else if (ov - ov_ref > 10u) { foc_raise_fault(RESC_FAULT_ISR_OVERRUN); ov_ref = ov; }
+    }
+
     /* Watchdog : rafraichi seulement si la boucle FOC et la boucle principale avancent */
     if (s_main_alive != s_last_alive) { s_last_alive = s_main_alive; s_alive_ms = now; }
     bool foc_ok = g_foc_telem.ticks != s_last_foc_ticks;
