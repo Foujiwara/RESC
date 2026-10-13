@@ -1528,7 +1528,16 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.fault = RESC_FAULT_NONE;
             g_foc_telem.fault = RESC_FAULT_NONE;
             foc_hw_rearm();
-            set_state(FOC_ST_IDLE);
+            if (S.calibrated) {
+                set_state(FOC_ST_IDLE);
+            } else {
+                /* defaut pendant la calibration (offsets, watchdog au demarrage...) : on la refait,
+                 * jamais de pont actif avec des offsets de courant non mesures */
+                S.cal_n = 0;
+                for (int x = 0; x < 3; x++) S.cal_acc[x] = 0.0f;
+                set_state(FOC_ST_CALIB);
+                goto output;
+            }
         }
         S.theta = S.obs.theta;
         S.omega = S.obs.omega;
@@ -1538,6 +1547,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         bridge_off();
         S.theta = S.obs.theta;
         S.omega = S.obs.omega;
+        if (!S.calibrated) goto output;           /* jamais de pont sans offsets mesures */
         if (S.det.busy) {
             set_state(FOC_ST_DETECT);
             S.ds = DS_IDLE;

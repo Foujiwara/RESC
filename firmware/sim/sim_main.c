@@ -11,6 +11,7 @@
 #include "foc.h"
 #include "sim_motor.h"
 #include "ctrl.h"
+#include "fault_codes.h"
 
 static sim_motor_t M;
 static foc_adc_t ADC;
@@ -113,6 +114,16 @@ int main(void)
     foc_init(&p);
 
     printf("== 1. Calibration des offsets\n");
+    /* defaut au demarrage (watchdog), avant la fin de la calibration : apres effacement, la calibration
+     * est refaite et aucune commande (meme en boucle ouverte) n'active le pont avant */
+    foc_raise_fault(RESC_FAULT_WATCHDOG_RESET);
+    run(0.01);
+    check("defaut au demarrage : etat FAULT", foc_state() == FOC_ST_FAULT);
+    foc_clear_fault();
+    g_foc_cmd.iq_ref = 5; g_foc_cmd.dir = 1; g_foc_cmd.openloop = 1; g_foc_cmd.run = 1;
+    run(0.02);
+    check("defaut efface sans calibration : retour en CALIB, pont coupe", foc_state() == FOC_ST_CALIB && !OUT.enable);
+    g_foc_cmd.run = 0; g_foc_cmd.openloop = 0;
     run(0.4);
     check("calibration terminee, etat IDLE", foc_state() == FOC_ST_IDLE);
     printf("  offsets %.1f %.1f %.1f (vrais %.0f %.0f %.0f)\n", g_foc_telem.off_cs[0], g_foc_telem.off_cs[1],
