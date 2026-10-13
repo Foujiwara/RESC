@@ -50,6 +50,14 @@ typedef struct {
     float off_vph[3];            /* offsets de tension pont coupe utilises (demarrage ou configuration) */
     uint32_t meas_n;             /* echantillons pont coupe depuis le dernier pilotage */
     float va_prev, vb_prev;      /* pont coupe : tension mesuree a l'echantillon precedent */
+    /* validation de la reprise au vol : la FEM mesuree (pont coupe) doit etre en avance de 90 deg sur le flux
+     * observe ; l'observateur integre cette meme tension, un ecart signale qu'il ne la suit pas (derive) */
+    float rv_s, rv_c;            /* ecart FEM mesuree / FEM attendue (sin, cos filtres) */
+    float rv_mag;                /* V : module de la tension mesuree, filtre */
+    float rv_e;                  /* rad : ecart instantane (le filtre seul laisserait passer un saut brusque) */
+    float rv_th_prev, rv_w;      /* angle de la tension mesuree, vitesse qui s'en deduit (rad/s el.) */
+    float rv_flux;               /* angle du flux deduit de la tension mesuree (recalage) */
+    float resume_wait_t;         /* s : reprise demandee, refusee faute d'observateur coherent */
     bool calibrated;
 
     /* mesures */
@@ -1473,6 +1481,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
         S.oc.iq = driven ? S.iq : 0.0f;
         S.oc.adapt_on = S.st == FOC_ST_RUN && S.use_obs;   /* RESC _LAMBDA : seulement en marche observee */
         float va, vb;
+        bool v_avg = false;                       /* tension moyennee : elle date du milieu de l'intervalle */
         applied_voltage(vph, &va, &vb);
         if (!driven) {
             /* pont coupe : la mesure est la tension a l'instant de l'echantillon ; l'observateur integre la
@@ -1482,7 +1491,8 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             S.va_prev = va;
             S.vb_prev = vb;
             /* utile en vitesse seulement (retard negligeable a basse vitesse : demarrages inchanges) */
-            if (fm_abs(S.obs.omega) * dt > 0.05f) {
+            v_avg = fm_abs(S.obs.omega) * dt > 0.05f;
+            if (v_avg) {
                 va = 0.5f * (va + pa);
                 vb = 0.5f * (vb + pb);
             }
@@ -1498,6 +1508,29 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                              : fm_sqrt(va * va + vb * vb) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
         obs_update(&S.obs, &S.oc, va, vb, driven ? S.i_a : 0.0f, driven ? S.i_b : 0.0f, m_obs, dt);
         if (!driven) {
+            /* FEM mesuree : angle de la tension (milieu de l'intervalle si moyennee) ; attendue : flux observe
+             * + 90 deg dans le sens de rotation, ramene au meme instant */
+            float th_v = fm_atan2(vb, va);
+            float sg = S.obs.omega >= 0.0f ? 1.0f : -1.0f;
+            float th_e = S.obs.theta - (v_avg ? 0.5f * S.obs.omega * dt : 0.0f) + sg * FM_PI_2;
+            float se, ce;
+            fm_sincos(th_v - th_e, &se, &ce);
+            S.rv_e = fm_wrap_pi(th_v - th_e);
+            float vm = fm_sqrt(va * va + vb * vb);
+            if (S.meas_n == 0u) {
+                S.rv_s = se; S.rv_c = ce; S.rv_mag = vm;
+                S.rv_th_prev = th_v;
+                S.rv_w = S.obs.omega;
+            } else {
+                FM_LPF(S.rv_s, se, 0.0625f);
+                FM_LPF(S.rv_c, ce, 0.0625f);
+                FM_LPF(S.rv_mag, vm, 0.0625f);
+                FM_LPF(S.rv_w, fm_wrap_pi(th_v - S.rv_th_prev) / dt, 0.1f);
+                S.rv_th_prev = th_v;
+            }
+            float sw = S.rv_w >= 0.0f ? 1.0f : -1.0f;
+            S.rv_flux = fm_wrap_pi(th_v - sw * FM_PI_2 + (v_avg ? 0.5f * S.rv_w * dt : 0.0f));
+            g_foc_telem.resume_err = fm_atan2(S.rv_s, S.rv_c);
             if (S.meas_n < 0xFFFFFFFFu) S.meas_n++;
         } else {
             S.meas_n = 0u;
@@ -1583,7 +1616,36 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 obs_fast = false;
                 g_foc_telem.obs_resync++;
             }
-            if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
+            /* Moteur lance (plus de 2 V de FEM mesuree pont coupe) : sans capteur, la seule facon de reprendre est
+             * la reprise au vol, et seulement si l'observateur suit la tension mesuree (ecart < 15 deg filtre,
+             * < 30 deg instantane, 32 periodes pont coupe au moins) ; elle est alors permise meme sous le seuil
+             * de vitesse habituel. Sinon : pas de pont (ni demarrage I/f depuis l'arret, ni frein en
+             * court-circuit, sur un moteur qui tourne) ; avec un capteur valide, demarrage sur le capteur.
+             * Apres 0.5 s de refus, l'observateur est recale sur la tension mesuree. */
+            bool hold = false;
+            bool spinning = !acim() && S.meas_n > 0u && S.rv_mag > 2.0f;
+            if (spinning) {
+                bool coherent = S.meas_n >= 32u && fm_abs(fm_atan2(S.rv_s, S.rv_c)) < 0.26f && fm_abs(S.rv_e) < 0.52f;
+                if (coherent && obs_ok0) {
+                    obs_fast = true;                  /* observateur verifie : reprise, meme sous le seuil de vitesse */
+                    S.resume_wait_t = 0.0f;
+                } else {
+                    obs_fast = false;
+                    hold = !sensor_ok;                /* capteur valide (Hall, codeur) : demarrage sur le capteur */
+                    S.resume_wait_t += dt;
+                    g_foc_telem.resume_refused++;
+                    if (S.resume_wait_t > 0.5f && S.meas_n >= 32u) {
+                        obs_reset(&S.obs, &S.oc, S.rv_flux, S.rv_w);
+                        S.resume_wait_t = 0.0f;
+                        g_foc_telem.obs_resync++;
+                    }
+                }
+            } else {
+                S.resume_wait_t = 0.0f;
+            }
+            if (hold) {
+                /* attente : l'observateur se recale (pont coupe) */
+            } else if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
                 pi_preload(S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega, true);

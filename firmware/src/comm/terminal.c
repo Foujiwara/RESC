@@ -327,7 +327,9 @@ void terminal_process(char *line)
           fault_name(g_foc_telem.fault), (unsigned)g_foc_telem.fault,
           fault_name(g_foc_telem.last_fault), (unsigned)g_foc_telem.last_fault,
           (unsigned)g_foc_telem.fault_count, (double)g_foc_telem.i_phase_max);
-        P("Reprises en roue libre avec l'observateur recale sur les Hall : %u", (unsigned)g_foc_telem.obs_resync);
+        P("Observateur recale en roue libre (Hall ou tension mesuree) : %u ; reprise au vol refusee : %u periodes ; "
+          "ecart FEM mesuree / observateur : %.1f deg", (unsigned)g_foc_telem.obs_resync,
+          (unsigned)g_foc_telem.resume_refused, (double)(g_foc_telem.resume_err * 57.29578f));
         /* historique : origine = ligne de foc.c (0 = materiel / externe), instant depuis le demarrage */
         const foc_params_t *fp = foc_params();
         float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;

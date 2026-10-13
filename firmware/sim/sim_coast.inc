@@ -103,6 +103,35 @@
         check("sensorless : reprise sans couple inverse ni pic", iq_min > -2.0 && iq_max < 20.0);
         ctrl_release(); RUN_CTRL(0.05);
     }
+
+    printf("== 27d. Sensorless : reprise des gaz avec l'observateur decale de 90 deg (reprise validee)\n");
+    {
+        M.b = 2e-4; M.t_load = 0.05; M.omega_m = 0;
+        RUN_CTRL(0.3);
+        for (int k = 0; k < 8000 && sim_omega_e(&M) * 60 / (2 * M_PI) < 12000; k++) { ctrl_set_current_rel(0.6f); RUN_CTRL(0.001); }
+        ctrl_set_current_rel(0.0f);
+        for (int k = 0; k < 300; k++) { ctrl_alive(); RUN_CTRL(0.001); }
+        double erpm0 = sim_omega_e(&M) * 60 / (2 * M_PI);
+        /* decrochage simule juste avant la reprise : angle faux de 90 deg, vitesse juste */
+        foc_dbg_obs_reset((float)(sim_theta_e(&M) + M_PI / 2), (float)sim_omega_e(&M));
+        g_trip_peak = 0;
+        int t_run = -1;
+        double err_run = 0;
+        for (int k = 0; k < 300; k++) {
+            ctrl_set_current_rel(0.1f);                   /* 4 A */
+            ctrl_update(ms++, 0.001f);
+            for (int j = 0; j < 15; j++) {
+                run(1.0 / M.f_pwm);
+                if (t_run < 0 && foc_state() == FOC_ST_RUN) { t_run = k; err_run = ang_err() * 180 / M_PI; }
+            }
+        }
+        printf("  reprise a %.0f ERPM, observateur decale de 90 deg : RUN apres %d ms (erreur d'angle %.1f deg), "
+               "crete phase %.1f A, recalages %u\n", erpm0, t_run, err_run, g_trip_peak, (unsigned)g_foc_telem.obs_resync);
+        check("reprise validee : marche en moins de 100 ms", t_run >= 0 && t_run < 100);
+        check("reprise validee : angle juste a la reprise (< 15 deg)", t_run >= 0 && fabs(err_run) < 15);
+        check("reprise validee : crete de phase < 15 A (demande 4 A)", g_trip_peak < 15.0);
+        ctrl_release(); RUN_CTRL(0.05);
+    }
     p = p_saved;
     foc_set_params(&p);
     L = L_saved;
