@@ -165,7 +165,8 @@ typedef struct {
     foc_cmd_t cmd;               /* copie de g_foc_cmd prise au debut de chaque periode */
     uint32_t fault;
     volatile bool clear_req;
-    volatile uint32_t fault_req; /* defaut signale hors ISR (pris en compte au debut de la periode suivante) */
+    volatile uint32_t fault_req;
+    uint8_t ov_n, uv_n;          /* echantillons consecutifs hors plage de tension bus */ /* defaut signale hors ISR (pris en compte au debut de la periode suivante) */
 } foc_t;
 
 static CCMBSS foc_t S;
@@ -1417,8 +1418,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             break;
         }
     }
-    if (S.vbus > S.p.vbus_trip_max) trip(RESC_FAULT_OVER_VOLTAGE);
-    if (S.br && S.vbus < S.p.vbus_trip_min) trip(RESC_FAULT_UNDER_VOLTAGE);
+    /* tension bus : 4 echantillons consecutifs (0.27 ms a 15 kHz), un pic de bruit isole ne coupe pas */
+    S.ov_n = S.vbus > S.p.vbus_trip_max ? (uint8_t)(S.ov_n < 255 ? S.ov_n + 1 : 255) : 0;
+    S.uv_n = (S.br && S.vbus < S.p.vbus_trip_min) ? (uint8_t)(S.uv_n < 255 ? S.uv_n + 1 : 255) : 0;
+    if (S.ov_n >= 4) trip(RESC_FAULT_OVER_VOLTAGE);
+    if (S.uv_n >= 4) trip(RESC_FAULT_UNDER_VOLTAGE);
 
     reconstruct_currents(valid);
     {
