@@ -49,6 +49,14 @@ static double ang_err(void)
     return e;
 }
 
+/* Bruit de mesure : generateur reinitialise au debut de chaque groupe d'essais (graine = SIM_SEED x 100 +
+ * groupe), pour qu'un essai ajoute dans un groupe ne change pas le bruit vu par les suivants */
+static void sim_reseed(int group)
+{
+    unsigned base = getenv("SIM_SEED") ? (unsigned)atoi(getenv("SIM_SEED")) : 1u;
+    srand(base * 100u + (unsigned)group);
+}
+
 static void check(const char *what, bool ok)
 {
     printf("  [%s] %s\n", ok ? " OK " : "ECHEC", what);
@@ -71,7 +79,7 @@ static void report(const char *tag)
 int main(void)
 {
     /* --- Moteur type moyeu (valeurs representatives) */
-    if (getenv("SIM_SEED")) srand((unsigned)atoi(getenv("SIM_SEED")));
+    sim_reseed(0);
     memset(&M, 0, sizeof(M));
     M.r = 0.06; M.ld = 90e-6; M.lq = 110e-6; M.lambda = 0.018; M.pp = 7;
     M.j = 0.004; M.b = 2e-4; M.t_load = 0.05;   /* a vide pour l'identification */
@@ -461,10 +469,15 @@ int main(void)
     RUN_CTRL(0.05);
     check("stop : pont coupe", foc_state() == FOC_ST_IDLE);
 
+sim_reseed(1);
 #include "sim_coast.inc"
+sim_reseed(2);
 #include "sim_user.inc"
+sim_reseed(3);
 #include "sim_features.inc"
+sim_reseed(4);
 #include "sim_vesc1.inc"
+sim_reseed(5);
 #include "sim_acim.inc"
 
     printf("\nCharge : %s  (%d echec(s))\n", g_fail ? "ECHEC" : "TOUS LES ESSAIS PASSENT", g_fail);
