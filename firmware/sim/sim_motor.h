@@ -25,6 +25,7 @@ typedef struct {
     double pf_tau;            /* s */
     double vph_f[3];          /* tensions de phase filtrees */
     double vph_off[3];        /* V : erreur d'offset de la mesure de tension de phase (diviseurs reels) */
+    double vph_gain[3];       /* erreur de gain des diviseurs de phase (0 = gain exact, 0.02 = +2 %) */
     /* moteur asynchrone (acim = true) : r = Rs, ld = lq = sigma Ls (inductance transitoire) */
     bool   acim;
     double lm, lr, rr;        /* inductance magnetisante, rotorique, resistance rotorique ramenee */

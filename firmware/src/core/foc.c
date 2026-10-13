@@ -66,6 +66,8 @@ typedef struct {
     bool pr_meas, pr_meas_prev;  /* courant mesure (et non predit) a cette periode, a la precedente */
     float sync_r;                /* residu filtre (1 = seuil) */
     uint8_t sync_bad;
+    float pr_bd, pr_bq;          /* A : biais lent du residu (temps mort, erreurs de R, de flux...) */
+    uint16_t pr_eval;            /* periodes evaluees depuis l'entree en marche */
     bool calibrated;
 
     /* mesures */
@@ -2170,16 +2172,38 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
      * avec v = moyenne des deux dernieres commandes (appliquees a cheval sur l'intervalle). Un angle faux
      * met la FEM reelle hors de l'axe attendu : l'ecart grandit avec la vitesse (175 A par periode a 90 deg
      * et 40000 ERPM sur 14 uH ; ecart normal : bruit et erreurs de modele, < 1 A sur le moteur simule, ~5 A
-     * pour 1 V d'erreur sur 14 uH). Seuil : 5 % de la coupure (au moins 3 A), 4 periodes de suite apres
-     * filtrage. Hors injection HFI, court-circuit de frein, surmodulation, et sur des courants mesures. */
+     * pour 1 V d'erreur sur 14 uH, dont le temps mort non compense : 0.7 V sur l'Ubox a 72 V). Les erreurs de
+     * modele lentes sont retirees : biais suivi en 50 ms, gele pendant un ecart (un decrochage est brutal et
+     * n'est pas absorbe). Seuil : 5 % de la coupure (au moins 3 A), 4 periodes de suite apres filtrage. Hors
+     * injection HFI, court-circuit de frein, surmodulation, et sur des courants mesures. */
     if (S.st == FOC_ST_RUN && S.br_p1 && S.br_p2 && S.pr_n >= 20u && S.pr_meas && S.pr_meas_prev && !S.hfi_on &&
         !S.brk_short && S.duty_abs < 0.98f && S.oc.ld > 1e-8f && S.oc.lq > 1e-8f) {
         float w = S.omega;
         float vd = 0.5f * (S.pr_vd1 + S.pr_vd2), vq = 0.5f * (S.pr_vq1 + S.pr_vq2);
-        float pd = S.pr_id + dt / S.oc.ld * (vd - S.oc.r * S.pr_id + w * S.oc.lq * S.pr_iq);
-        float pq = S.pr_iq + dt / S.oc.lq * (vq - S.oc.r * S.pr_iq - w * S.oc.ld * S.pr_id - w * S.lam_eff);
+        /* x' = A x + b (repere rotor), developpement a l'ordre 2 : x + dt f + dt^2/2 A f, f = A x + b. Les termes
+         * croises tournent de w dt par periode (0.27 rad a 40000 ERPM) : l'ordre 1 laisserait ~4 % d'erreur */
+        float ild = 1.0f / S.oc.ld, ilq = 1.0f / S.oc.lq;
+        float fd = (vd - S.oc.r * S.pr_id + w * S.oc.lq * S.pr_iq) * ild;
+        float fq = (vq - S.oc.r * S.pr_iq - w * S.oc.ld * S.pr_id - w * S.lam_eff) * ilq;
+        float afd = (-S.oc.r * fd + w * S.oc.lq * fq) * ild;
+        float afq = (-S.oc.r * fq - w * S.oc.ld * fd) * ilq;
+        float pd = S.pr_id + dt * fd + 0.5f * dt * dt * afd;
+        float pq = S.pr_iq + dt * fq + 0.5f * dt * dt * afq;
         float ed = S.id - pd, eq = S.iq - pq;
-        float r = fm_sqrt(ed * ed + eq * eq) / fm_max(0.05f * S.p.i_abs_trip, 3.0f);
+        float thr = fm_max(0.05f * S.p.i_abs_trip, 3.0f);
+        if (S.pr_eval == 0u) {
+            /* premier ecart : biais de depart, limite a la moitie du seuil */
+            S.pr_bd = fm_sat_sym(ed, 0.5f * thr);
+            S.pr_bq = fm_sat_sym(eq, 0.5f * thr);
+        }
+        if (S.pr_eval < 0xFFFFu) S.pr_eval++;
+        float rd = ed - S.pr_bd, rq = eq - S.pr_bq;
+        float r = fm_sqrt(rd * rd + rq * rq) / thr;
+        if (r < 1.0f) {
+            float kb = fm_min(dt / 0.05f, 1.0f);
+            S.pr_bd += kb * (ed - S.pr_bd);
+            S.pr_bq += kb * (eq - S.pr_bq);
+        }
         FM_LPF(S.sync_r, r, 0.25f);
         if (S.sync_r > g_foc_telem.sync_resid_max) g_foc_telem.sync_resid_max = S.sync_r;
         S.sync_bad = S.sync_r > 1.0f ? (uint8_t)(S.sync_bad < 255 ? S.sync_bad + 1 : 255) : 0;
@@ -2187,6 +2211,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
     } else {
         S.sync_r *= 0.9f;
         S.sync_bad = 0;
+        if (S.pr_n < 20u) S.pr_eval = 0u;         /* nouvelle marche : biais repris */
     }
     if (S.st == FOC_ST_RUN && S.brk_short) {
         S.vd = S.vq = 0.0f;

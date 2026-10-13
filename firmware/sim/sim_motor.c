@@ -156,7 +156,7 @@ void sim_step(sim_motor_t *m, const foc_pwm_t *out, foc_adc_t *adc)
         double e = -we * m->lambda * sin(th - x * 2 * M_PI / 3);
         if (m->acim) e = x == 0 ? m->ea_s : -0.5 * m->ea_s + (x == 1 ? 1 : -1) * sqrt(3) / 2 * m->eb_s;
         double v = m->en_cur ? (m->pf_on ? m->vph_f[x] : 0.0) : e + m->vbus / 2;
-        adc->vph[x] = to_adc((v + m->vph_off[x]) / m->vph_lsb + m->noise_lsb * gauss());
+        adc->vph[x] = to_adc((v * (1.0 + m->vph_gain[x]) + m->vph_off[x]) / m->vph_lsb + m->noise_lsb * gauss());
     }
     double h = th - m->hall_off;
     adc->hall = (uint8_t)((sin(h) > 0 ? 1 : 0) | (sin(h - 2 * M_PI / 3) > 0 ? 2 : 0) | (sin(h + 2 * M_PI / 3) > 0 ? 4 : 0));
