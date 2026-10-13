@@ -7,6 +7,7 @@
 #include "foc.h"
 #include "fmath.h"
 #include "fault_codes.h"
+#include "platform.h"
 
 #define RAD_TO_ERPM  (60.0f / FM_2PI)
 
@@ -110,26 +111,32 @@ void ctrl_init(const ctrl_limits_t *l)
     C.st.tfet = C.st.tmot = 25.0f;
 }
 
-void ctrl_set_limits(const ctrl_limits_t *l) { C.l = *l; }
+void ctrl_set_limits(const ctrl_limits_t *l) { uint32_t k = plat_ctrl_lock(); C.l = *l; plat_ctrl_unlock(k); }
 const ctrl_limits_t *ctrl_limits(void) { return &C.l; }
 ctrl_mode_t ctrl_mode(void) { return C.mode; }
 float ctrl_pos_set_deg(void) { return C.mode == CTRL_MODE_POS ? C.value + C.l.p_offset : C.pos_acc; }
 const ctrl_stats_t *ctrl_stats(void) { return &C.st; }
 
+/* Les commandes viennent de la boucle principale (paquets) et de SysTick (applications) ; ctrl_update()
+ * tourne dans SysTick. Mode, valeur et parametres associes sont ecrits sous plat_ctrl_lock() : SysTick
+ * ne voit jamais un mode neuf avec une valeur ancienne. */
 static void command(ctrl_mode_t m, float v)
 {
+    uint32_t k = plat_ctrl_lock();
     if (m != C.mode) ctrl_log(CLOG_MODE, (float)m);
     C.mode = m;
     C.value = v;
     C.last_cmd_ms = C.now_ms;
     C.cmd_flag = true;
     C.st.timeout = false;
+    plat_ctrl_unlock(k);
 }
 
 void ctrl_set_current(float a)      { command(CTRL_MODE_CURRENT, a); }
 void ctrl_set_current_rel(float r)
 {
     r = fm_sat_sym(r, 1.0f);
+    uint32_t k = plat_ctrl_lock();
     if (C.l.x.brk_enable || C.l.x.tr_enable) {
         /* Control Settings : la consigne est gardee et traitee a chaque pas de 1 kHz */
         if (C.mode != CTRL_MODE_CURRENT_REL) {
@@ -142,26 +149,41 @@ void ctrl_set_current_rel(float r)
             C.x_tr_active = false;
         }
         command(CTRL_MODE_CURRENT_REL, r);
-        return;
+    } else {
+        command(CTRL_MODE_CURRENT, r >= 0.0f ? r * C.l.i_max : -r * C.l.i_min);
     }
-    command(CTRL_MODE_CURRENT, r >= 0.0f ? r * C.l.i_max : -r * C.l.i_min);
+    plat_ctrl_unlock(k);
 }
 void ctrl_set_brake(float a)        { command(CTRL_MODE_BRAKE, fm_abs(a)); }
 void ctrl_set_brake_rel(float r)    { command(CTRL_MODE_BRAKE, fm_abs(fm_sat_sym(r, 1.0f)) * fm_abs(C.l.i_min)); }
 void ctrl_set_handbrake(float a)    { command(CTRL_MODE_HANDBRAKE, fm_abs(a)); }
 void ctrl_set_current_hybrid(float a, float lim, float band)
 {
+    uint32_t k = plat_ctrl_lock();
     if (a > 0.0f && C.x_armed) { C.x_armed = C.x_arm_press = false; ctrl_log(CLOG_REV_DISARMED, 2.0f); }
     C.hyb_lim = fm_sat(lim, 0.0f, C.l.duty_max);
     C.hyb_band = fm_max(fm_sat(band, 0.0f, 1.0f) * C.hyb_lim, 0.002f);
     command(CTRL_MODE_CURRENT_HYB, a);
+    plat_ctrl_unlock(k);
 }
 void ctrl_set_duty(float d)         { command(CTRL_MODE_DUTY, fm_sat_sym(d, C.l.duty_max)); }
 void ctrl_set_rpm(float erpm)       { command(CTRL_MODE_RPM, erpm); }
 void ctrl_set_pos(float deg)        { command(CTRL_MODE_POS, deg); }
 void ctrl_release(void)             { command(CTRL_MODE_NONE, 0.0f); }
-void ctrl_set_openloop(float a, float erpm)      { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP, fm_abs(a)); }
-void ctrl_set_openloop_duty(float d, float erpm) { C.ol_erpm = erpm; command(CTRL_MODE_OPENLOOP_DUTY, fm_abs(fm_sat_sym(d, C.l.duty_max))); }
+void ctrl_set_openloop(float a, float erpm)
+{
+    uint32_t k = plat_ctrl_lock();
+    C.ol_erpm = erpm;
+    command(CTRL_MODE_OPENLOOP, fm_abs(a));
+    plat_ctrl_unlock(k);
+}
+void ctrl_set_openloop_duty(float d, float erpm)
+{
+    uint32_t k = plat_ctrl_lock();
+    C.ol_erpm = erpm;
+    command(CTRL_MODE_OPENLOOP_DUTY, fm_abs(fm_sat_sym(d, C.l.duty_max)));
+    plat_ctrl_unlock(k);
+}
 void ctrl_alive(void)               { C.last_cmd_ms = C.now_ms; C.st.timeout = false; }
 /* Maintien par une app au neutre : seulement si la commande en cours est une consigne nulle (celle de
  * l'app). Une commande d'une autre source (outil, CAN) n'est jamais prolongee : son timeout s'applique. */
@@ -175,7 +197,7 @@ void ctrl_alive_if_idle(void)
 void ctrl_set_off_delay(float s)    { C.off_delay = fm_sat(s, 0.0f, 10.0f); }
 void ctrl_estop(void)               { C.estop = true; command(CTRL_MODE_NONE, 0.0f); }
 void ctrl_set_power_allowed(bool a) { C.power_ok = a; }
-void ctrl_set_bms_limits(float lo, float hi) { C.bms_lo = lo; C.bms_hi = hi; }
+void ctrl_set_bms_limits(float lo, float hi) { uint32_t k = plat_ctrl_lock(); C.bms_lo = lo; C.bms_hi = hi; plat_ctrl_unlock(k); }
 
 void ctrl_set_temps(float t1, float t2, float t3, float tm)
 {
@@ -816,17 +838,20 @@ void ctrl_update(uint32_t now_ms, float dt)
     }
 
     C.iq_out = iq;
-    g_foc_cmd.id_ref = 0.0f;
-    g_foc_cmd.iq_ref = iq;
-    g_foc_cmd.dir = dir;
-    g_foc_cmd.allow_start = allow_start ? 1 : 0;
-    g_foc_cmd.ol_omega = C.ol_erpm * (FM_2PI / 60.0f);
-    g_foc_cmd.ol_duty = C.ol_erpm >= 0.0f ? v : -v;
-    g_foc_cmd.duty = duty_cmd;
-    g_foc_cmd.i_hi = hi;
-    g_foc_cmd.i_lo = lo;
-    g_foc_cmd.duty_mode = (run && duty_mode) ? 1 : 0;
-    g_foc_cmd.brake = (run && brake) ? 1 : 0;
-    g_foc_cmd.openloop = openloop;
-    g_foc_cmd.run = run ? 1 : 0;
+    foc_cmd_t c;
+    memset(&c, 0, sizeof(c));
+    c.id_ref = 0.0f;
+    c.iq_ref = iq;
+    c.dir = dir;
+    c.allow_start = allow_start ? 1 : 0;
+    c.ol_omega = C.ol_erpm * (FM_2PI / 60.0f);
+    c.ol_duty = C.ol_erpm >= 0.0f ? v : -v;
+    c.duty = duty_cmd;
+    c.i_hi = hi;
+    c.i_lo = lo;
+    c.duty_mode = (run && duty_mode) ? 1 : 0;
+    c.brake = (run && brake) ? 1 : 0;
+    c.openloop = openloop;
+    c.run = run ? 1 : 0;
+    foc_cmd_publish(&c);
 }

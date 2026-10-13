@@ -33,4 +33,24 @@
 
 #define ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
+/* Priorite NVIC de la couche de controle (SysTick, 1 kHz). Les applications qui la commandent
+ * tournent dans ce contexte ; les paquets (outil, CAN) dans la boucle principale. */
+#define PLAT_CTRL_PRIO      4
+
+/* Section critique vis-a-vis de la couche de controle : masque SysTick et les interruptions moins
+ * prioritaires (BASEPRI), jamais l'ISR FOC ni les protections. Imbricable (rend l'ancien masque). */
+#if defined(RESC_HOST)
+static inline uint32_t plat_ctrl_lock(void) { return 0; }
+static inline void plat_ctrl_unlock(uint32_t s) { (void)s; }
+#else
+static inline uint32_t plat_ctrl_lock(void)
+{
+    uint32_t old, v = (uint32_t)PLAT_CTRL_PRIO << 4;
+    __asm volatile("mrs %0, basepri" : "=r"(old) :: "memory");
+    if (old == 0 || old > v) __asm volatile("msr basepri, %0" :: "r"(v) : "memory");
+    return old;
+}
+static inline void plat_ctrl_unlock(uint32_t s) { __asm volatile("msr basepri, %0" :: "r"(s) : "memory"); }
+#endif
+
 #endif /* PLATFORM_H */

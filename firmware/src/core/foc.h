@@ -159,21 +159,25 @@ typedef struct {
 } foc_params_t;
 
 /* ------------------------------------------------------------ Commande */
-/* Ecrit par la couche de controle (1 kHz), lu par l'ISR. */
+/* Ecrit par la couche de controle (1 kHz), lu par l'ISR. Publication par foc_cmd_publish() : compteur
+ * de sequence impair pendant l'ecriture ; l'ISR (plus prioritaire) garde alors la commande precedente,
+ * elle ne voit jamais un melange de deux commandes. Les essais sur PC peuvent ecrire les champs
+ * directement (contexte unique, compteur pair). */
 typedef struct {
-    volatile float   id_ref;
-    volatile float   iq_ref;
-    volatile uint8_t run;          /* pont souhaite actif */
-    volatile uint8_t allow_start;  /* autorise le demarrage I/f depuis l'arret */
-    volatile int8_t  dir;          /* sens du demarrage I/f : +1 / -1 */
-    volatile uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty,
+    uint32_t seq;                  /* pair : stable, impair : ecriture en cours */
+    float   id_ref;
+    float   iq_ref;
+    uint8_t run;          /* pont souhaite actif */
+    uint8_t allow_start;  /* autorise le demarrage I/f depuis l'arret */
+    int8_t  dir;          /* sens du demarrage I/f : +1 / -1 */
+    uint8_t openloop;     /* boucle ouverte commandee : 0 non, 1 courant (iq_ref), 2 duty,
                                       3 frein a main (courant iq_ref sur l'axe d, angle fige) */
-    volatile float   ol_omega;     /* rad/s el. (signe = sens) */
-    volatile float   ol_duty;      /* -1..1, mode 2 */
-    volatile uint8_t duty_mode;    /* marche a rapport cyclique impose (tension q), courant borne */
-    volatile float   duty;         /* -1..1 */
-    volatile float   i_hi, i_lo;   /* A : bornes de iq en mode duty (i_lo <= 0 : frein) */
-    volatile uint8_t brake;        /* frein : |iq_ref| oppose a la vitesse ; phases en court-circuit si ce
+    float   ol_omega;     /* rad/s el. (signe = sens) */
+    float   ol_duty;      /* -1..1, mode 2 */
+    uint8_t duty_mode;    /* marche a rapport cyclique impose (tension q), courant borne */
+    float   duty;         /* -1..1 */
+    float   i_hi, i_lo;   /* A : bornes de iq en mode duty (i_lo <= 0 : frein) */
+    uint8_t brake;        /* frein : |iq_ref| oppose a la vitesse ; phases en court-circuit si ce
                                       courant n'est pas atteignable (basse vitesse), y compris a l'arret */
 } foc_cmd_t;
 
@@ -293,7 +297,9 @@ typedef struct {
 } foc_sample_t;
 void foc_last_sample(foc_sample_t *s);
 
-extern foc_cmd_t   g_foc_cmd;
+extern volatile foc_cmd_t g_foc_cmd;
+/* Publie une commande complete (couche de controle) */
+void foc_cmd_publish(const foc_cmd_t *c);
 extern foc_telem_t g_foc_telem;
 
 foc_state_t foc_state(void);
