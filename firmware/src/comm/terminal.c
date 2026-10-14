@@ -8,6 +8,7 @@
 #include "detect_app.h"
 #include "foc.h"
 #include "blackbox.h"
+#include "fmath.h"
 #include "ctrl.h"
 #include "resc_conf.h"
 #include "hw_config.h"
@@ -218,7 +219,10 @@ static void cmd_help(void)
     P("  faults                         : defaut actif, 8 derniers defauts avec leur origine, crete de courant vue");
     P("  reset                          : cause du dernier demarrage, redemarrages, plantage, config relue au demarrage");
     P("  ctrl_log                       : journal de la commande (modes, timeouts, ADC, etats du moteur, recul arme)");
-    P("  fault_dump [reset]             : enregistreur pre-defaut (256 periodes autour du 1er defaut, CSV) | relance");
+    P("  fault_dump [reset|arm]         : enregistreur pre-defaut (256 periodes autour du 1er defaut, CSV) | relance | "
+      "figer a la prochaine remise en marche");
+    P("  resume_mode [0|1]              : reprise au vol sur la tension du modele (0) ou mesuree (1, comme VESC)");
+    P("  vph_check                      : diviseurs de phase et flux, moteur lance pont coupe (2 appels)");
     P("  prof [reset]                   : chronometrage des taches (blocages de la boucle principale et 1 kHz)");
     P("  sensor                         : mode capteur, etat Hall, source d'angle active");
     P("  acim                           : moteur a induction : parametres, flux, glissement, ce qui manque");
@@ -308,6 +312,11 @@ void terminal_process(char *line)
     }
     else if (!strcmp(c, "fault_dump")) {
         if (argc >= 2 && !strcmp(argv[1], "reset")) { blackbox_release(); P("Enregistreur pre-defaut relance"); return; }
+        if (argc >= 2 && !strcmp(argv[1], "arm")) {
+            blackbox_arm_start();
+            P("Enregistreur arme : fige a la prochaine remise en marche du pont (32 periodes avant, 224 apres)");
+            return;
+        }
         uint32_t f_line = 0, ticks = 0, code = blackbox_fault(&f_line, &ticks);
         if (!blackbox_frozen()) {
             P("Enregistreur pre-defaut : aucun defaut enregistre (%d periodes en memoire)", blackbox_count());
@@ -316,8 +325,8 @@ void terminal_process(char *line)
         const foc_params_t *fp = foc_params();
         float f_loop = fp->ctl_mode == 1 ? 2.0f * fp->f_pwm : fp->f_pwm;
         int n = blackbox_count(), trg = blackbox_trigger_index();
-        P("Defaut %s (%u), ligne %u, a %.3f s%s ; %d periodes de %.1f us, defaut a la ligne %d",
-          fault_name(code), (unsigned)code, (unsigned)f_line, (double)((float)ticks / f_loop),
+        P("Evenement %s (%u), ligne %u, a %.3f s%s ; %d periodes de %.1f us, evenement a la ligne %d",
+          code == BLACKBOX_CODE_START ? "REMISE EN MARCHE" : fault_name(code), (unsigned)code, (unsigned)f_line, (double)((float)ticks / f_loop),
           blackbox_from_previous_boot() ? " (avant le dernier redemarrage)" : "", n, (double)(1e6f / f_loop), trg);
         P("k,ia,ib,ic,id,iq,vd,vq,theta,omega,vbus,etat,duty");
         for (int k = 0; k < n; k++) {
@@ -327,6 +336,32 @@ void terminal_process(char *line)
               (double)(r.i[1] * 0.1f), (double)(r.i[2] * 0.1f), (double)(r.id * 0.1f), (double)(r.iq * 0.1f),
               (double)(r.vd * 0.1f), (double)(r.vq * 0.1f), (double)(r.theta * 1e-4f), (int)r.omega,
               (double)(r.vbus * 0.01f), (unsigned)r.state, (double)(r.duty * 0.005f));
+        }
+    }
+    else if (!strcmp(c, "resume_mode")) {
+        if (argc >= 2) foc_set_resume_mode((uint8_t)atoi(argv[1]));
+        P("Reprise au vol : %s (resume_mode 0 | 1, non enregistre)",
+          foc_resume_mode() ? "1, tension mesuree pendant la roue libre (comme VESC)" : "0, tension du modele (vitesse x flux)");
+    }
+    else if (!strcmp(c, "vph_check")) {
+        /* moteur lance, pont coupe : 1re commande = mesure (0.5 s), 2e = resultat */
+        foc_vph_check_t r;
+        if (foc_vph_check_result(&r)) {
+            float acm = (r.ac[0] + r.ac[1] + r.ac[2]) / 3.0f, dcm = (r.dc[0] + r.dc[1] + r.dc[2]) / 3.0f;
+            P("Diviseurs de phase, %u periodes en roue libre a %.0f ERPM :", (unsigned)r.n, (double)(r.omega * 9.5493f));
+            for (int x = 0; x < 3; x++)
+                P("  phase %c : derive d'offset %+.3f V, amplitude %.2f V eff (%+.2f %%)", 'A' + x, (double)(r.dc[x] - dcm),
+                  (double)r.ac[x], (double)(acm > 0.01f ? 100.0f * (r.ac[x] / acm - 1.0f) : 0.0f));
+            float lam = r.omega > 1.0f ? r.emf / r.omega : 0.0f;
+            P("  flux mesure %.5f Wb (configure %.5f, %+.1f %%) ; tension sur l'axe d de l'observateur %.3f V, q %.3f V "
+              "(angle %+.1f deg)", (double)lam, (double)r.lambda_cfg,
+              (double)(r.lambda_cfg > 1e-6f ? 100.0f * (lam / r.lambda_cfg - 1.0f) : 0.0f), (double)r.vd, (double)r.vq,
+              (double)(fm_atan2(-r.vd, fm_abs(r.vq)) * 57.29578f));
+            foc_vph_check_start(0);
+        } else {
+            uint32_t n = (uint32_t)(0.5f * foc_params()->f_pwm);
+            foc_vph_check_start(n);
+            P("Mesure en cours (0.5 s, moteur lance pont coupe) : relancer vph_check pour le resultat");
         }
     }
     else if (!strcmp(c, "ctrl_log")) {

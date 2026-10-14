@@ -316,6 +316,23 @@ void foc_set_motor_temp(float t);
 /* Rearmement (uniquement si aucune condition de defaut active) */
 bool foc_clear_fault(void);
 
+/* Reprise au vol : 0 tension du modele, 1 tension mesuree pendant la roue libre (comme VESC). Non enregistre. */
+void foc_set_resume_mode(uint8_t m);
+uint8_t foc_resume_mode(void);
+
+/* Banc : mesure des diviseurs de tension de phase en roue libre (pont coupe, moteur lance) */
+typedef struct {
+    uint32_t n;              /* periodes accumulees */
+    float dc[3];             /* V : moyenne de chaque phase, offsets du demarrage retires (derive) */
+    float ac[3];             /* V : valeur efficace alternative de chaque phase (gain du diviseur) */
+    float emf;               /* V : module moyen de la FEM (alpha, beta) */
+    float omega;             /* rad/s el. : vitesse de l'observateur */
+    float vd, vq;            /* V : tension mesuree sur les axes de l'observateur (vd ~ 0 si l'angle est juste) */
+    float lambda_cfg;        /* Wb : flux configure */
+} foc_vph_check_t;
+void foc_vph_check_start(uint32_t n);
+bool foc_vph_check_result(foc_vph_check_t *r);
+
 /* Identification moteur (lancee hors ISR, executee dans l'ISR) */
 bool foc_detect_start(const foc_det_t *req);
 const foc_det_t *foc_detect_status(void);

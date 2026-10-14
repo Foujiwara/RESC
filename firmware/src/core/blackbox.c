@@ -15,6 +15,8 @@ typedef struct {
     uint32_t frozen;
     uint32_t code, line, ticks;  /* defaut */
     uint32_t prev_boot;
+    uint32_t arm_start;          /* figer a la prochaine remise en marche */
+    uint32_t post_len;           /* periodes gardees apres l'evenement */
     uint32_t check;              /* somme de controle de l'en-tete */
     blackbox_rec_t rec[BLACKBOX_N];
 } bb_t;
@@ -39,6 +41,8 @@ void blackbox_release(void)
     B.head = 0;
     B.code = B.line = B.ticks = 0;
     B.prev_boot = 0;
+    B.arm_start = 0;
+    B.post_len = BLACKBOX_POST;
     B.magic = BB_MAGIC;
     B.check = hdr_sum();
 }
@@ -66,15 +70,34 @@ RAMFUNC void blackbox_push(const blackbox_rec_t *r)
     }
 }
 
-RAMFUNC void blackbox_freeze(uint32_t code, uint32_t line, uint32_t ticks)
+RAMFUNC static void freeze_post(uint32_t code, uint32_t line, uint32_t ticks, uint32_t post)
 {
-    if (B.frozen) return;        /* le premier defaut est garde */
+    if (B.frozen) return;        /* le premier evenement est garde */
     B.frozen = 1;
-    B.post = BLACKBOX_POST;
+    B.post = post;
+    B.post_len = post;
     B.code = code;
     B.line = line;
     B.ticks = ticks;
     B.check = hdr_sum();
+}
+
+RAMFUNC void blackbox_freeze(uint32_t code, uint32_t line, uint32_t ticks)
+{
+    freeze_post(code, line, ticks, BLACKBOX_POST);
+}
+
+RAMFUNC void blackbox_start_event(uint32_t ticks)
+{
+    if (!B.arm_start || B.frozen) return;
+    B.arm_start = 0;
+    freeze_post(BLACKBOX_CODE_START, 0, ticks, BLACKBOX_N - 32u);
+}
+
+void blackbox_arm_start(void)
+{
+    if (B.frozen || B.magic != BB_MAGIC) blackbox_release();   /* l'historique en cours est garde (32 periodes avant) */
+    B.arm_start = 1;
 }
 
 bool blackbox_frozen(void) { return B.frozen != 0 && B.post == 0; }
@@ -101,6 +124,6 @@ bool blackbox_get(int k, blackbox_rec_t *r)
 int blackbox_trigger_index(void)
 {
     if (!B.frozen) return -1;
-    uint32_t after = BLACKBOX_POST - B.post;
+    uint32_t after = B.post_len - B.post;
     return B.n >= after ? (int)(B.n - after) : 0;
 }

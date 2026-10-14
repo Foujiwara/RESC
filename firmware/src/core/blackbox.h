@@ -28,13 +28,17 @@ typedef struct {
     uint8_t duty;        /* modulation x 200 */
 } blackbox_rec_t;
 
+#define BLACKBOX_CODE_START  1000u   /* declenchement manuel : pont remis en marche (reprise, demarrage) */
+
 /* ISR FOC */
 void blackbox_push(const blackbox_rec_t *r);
 void blackbox_freeze(uint32_t code, uint32_t line, uint32_t ticks);
+void blackbox_start_event(uint32_t ticks);   /* pont remis en marche : declenche si arme */
 
 /* Hors ISR */
 void blackbox_init(void);        /* au demarrage : garde un enregistrement valide d'avant le redemarrage */
 void blackbox_release(void);     /* efface et relance l'enregistrement */
+void blackbox_arm_start(void);   /* relance, puis fige a la prochaine remise en marche du pont (32 avant, 224 apres) */
 bool blackbox_frozen(void);
 bool blackbox_from_previous_boot(void);
 uint32_t blackbox_fault(uint32_t *line, uint32_t *ticks);

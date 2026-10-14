@@ -59,6 +59,13 @@ typedef struct {
     float rv_th_prev, rv_w;      /* angle de la tension mesuree, vitesse qui s'en deduit (rad/s el.) */
     float rv_flux;               /* angle du flux deduit de la tension mesuree (recalage) */
     float resume_wait_t;         /* s : reprise demandee, refusee faute d'observateur coherent */
+    float vdm_f, vqm_f;          /* pont coupe : tension mesuree sur les axes de l'observateur, filtree */
+    volatile uint8_t resume_mode;
+    foc_state_t bb_prev_st;      /* etat a la periode precedente (enregistreur : remise en marche) */
+    /* mesure des diviseurs de phase en roue libre (terminal vph_check) */
+    volatile uint32_t vc_left;   /* periodes restantes a accumuler */
+    uint32_t vc_n;
+    float vc_sum[3], vc_sq[3], vc_mag, vc_w, vc_vd, vc_vq;/* reprise au vol : 0 tension du modele (w lambda), 1 tension mesuree (VESC) */
     /* perte de synchronisation : courant mesure compare a la prediction du modele d/q sur une periode */
     float pr_id, pr_iq;          /* courant d/q de la periode precedente */
     float pr_vd1, pr_vq1, pr_vd2, pr_vq2;   /* tensions commandees aux deux periodes precedentes */
@@ -343,6 +350,57 @@ RAMFUNC static void ff_terms(float w, float id, float iq, float *vd, float *vq)
 
 /* Integrateurs prepositionnes sur la tension du modele en regime etabli pour les
  * references actuelles (reprise sans a-coup), anticipation deduite si utilisee */
+RAMFUNC static void pi_preload(float w, bool with_ff);
+
+/* Reprise au vol comme VESC (« Set the current controller integrator to the BEMF voltage to avoid a current
+ * spike when the motor is driven again ») : integrateurs sur la tension MESUREE aux bornes pendant la roue
+ * libre, exprimee sur l'angle de la commande, au lieu de la tension calculee w x lambda (une erreur de flux, de
+ * temps mort ou d'angle de 1 V donne ~12 A d'oscillation a 40000 ERPM sur un moteur de 14 uH). Repli sur le
+ * modele si la mesure est trop recente. resume_mode 0 : toujours le modele. */
+RAMFUNC static void pi_preload_resume(float w, float theta)
+{
+    if (S.resume_mode == 0u || S.meas_n < 20u) { pi_preload(w, true); return; }
+    float sn, cth;
+    fm_sincos(fm_wrap_pi(theta - S.obs.theta), &sn, &cth);
+    float vd = cth * S.vdm_f + sn * S.vqm_f;
+    float vq = -sn * S.vdm_f + cth * S.vqm_f;
+    float fd = 0.0f, fq = 0.0f;
+    ff_terms(w, 0.0f, 0.0f, &fd, &fq);
+    S.int_d = vd - fd;
+    S.int_q = vq - fq;
+}
+
+void foc_set_resume_mode(uint8_t m) { S.resume_mode = m ? 1u : 0u; }
+
+/* Mesure des diviseurs de phase en roue libre : n periodes pont coupe (moteur lance) */
+void foc_vph_check_start(uint32_t n)
+{
+    S.vc_left = 0;
+    S.vc_n = 0;
+    for (int x = 0; x < 3; x++) { S.vc_sum[x] = 0.0f; S.vc_sq[x] = 0.0f; }
+    S.vc_mag = S.vc_w = S.vc_vd = S.vc_vq = 0.0f;
+    S.vc_left = n;
+}
+
+bool foc_vph_check_result(foc_vph_check_t *r)
+{
+    if (S.vc_left || S.vc_n == 0u) return false;
+    float n = (float)S.vc_n;
+    r->n = S.vc_n;
+    for (int x = 0; x < 3; x++) {
+        float m = S.vc_sum[x] / n;
+        r->dc[x] = m;
+        r->ac[x] = fm_sqrt(fm_max(S.vc_sq[x] / n - m * m, 0.0f));
+    }
+    r->emf = S.vc_mag / n;
+    r->omega = S.vc_w / n;
+    r->vd = S.vc_vd / n;
+    r->vq = S.vc_vq / n;
+    r->lambda_cfg = S.p.lambda;
+    return true;
+}
+uint8_t foc_resume_mode(void) { return S.resume_mode; }
+
 RAMFUNC static void pi_preload(float w, bool with_ff)
 {
     float vd = S.oc.r * S.id_ref - w * S.oc.lq * S.iq_ref;
@@ -1558,6 +1616,27 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             float sw = S.rv_w >= 0.0f ? 1.0f : -1.0f;
             S.rv_flux = fm_wrap_pi(th_v - sw * FM_PI_2 + (v_avg ? 0.5f * S.rv_w * dt : 0.0f));
             g_foc_telem.resume_err = fm_atan2(S.rv_s, S.rv_c);
+            if (S.vc_left && S.meas_n >= 32u) {
+                /* tensions de phase (offsets du demarrage retires) : moyenne et carre de chaque phase, module de
+                 * la FEM, vitesse, composantes sur les axes de l'observateur */
+                for (int x = 0; x < 3; x++) { S.vc_sum[x] += vph[x]; S.vc_sq[x] += vph[x] * vph[x]; }
+                S.vc_mag += vm;
+                S.vc_w += fm_abs(S.obs.omega);
+                S.vc_vd += S.vdm_f;
+                S.vc_vq += S.vqm_f;
+                S.vc_n++;
+                S.vc_left--;
+            }
+            {
+                /* tension aux bornes sur les axes de l'observateur (instant de la mesure), filtree */
+                float th_m = S.obs.theta - (v_avg ? 0.5f * S.obs.omega * dt : 0.0f);
+                float sm, cm;
+                fm_sincos(th_m, &sm, &cm);
+                float vdm = cm * va + sm * vb, vqm = cm * vb - sm * va;
+                if (S.meas_n == 0u) { S.vdm_f = vdm; S.vqm_f = vqm; }
+                FM_LPF(S.vdm_f, vdm, 0.2f);
+                FM_LPF(S.vqm_f, vqm, 0.2f);
+            }
             if (S.meas_n < 0xFFFFFFFFu) S.meas_n++;
         } else {
             S.meas_n = 0u;
@@ -1641,6 +1720,7 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
                 (!obs_ok0 || fm_abs(S.obs.omega - S.hall.omega) > 0.2f * fm_abs(S.hall.omega))) {
                 obs_reset(&S.obs, &S.oc, S.hall.theta, S.hall.omega);
                 obs_fast = false;
+                S.meas_n = 0u;                    /* tension mesuree exprimee dans l'ancien repere : inutilisable */
                 g_foc_telem.obs_resync++;
             }
             /* Moteur lance (plus de 2 V de FEM mesuree pont coupe) : sans capteur, la seule facon de reprendre est
@@ -1675,10 +1755,11 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             } else if (sensor_ok && !(S.p.sensor_mode == FOC_SENSOR_HALL && obs_fast && fm_abs(S.obs.omega) > S.p.sl_omega)) {
                 /* Capteur : marche directe depuis l'arret, sans boucle ouverte */
                 S.id_ref = S.iq_ref = 0.0f;
-                pi_preload(S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega, true);
                 {
                     float w0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.omega : S.enc.omega;
-                    S.duty_sf = w0 * S.lam_eff / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                    float th0 = S.p.sensor_mode == FOC_SENSOR_HALL ? S.hall.theta : S.enc.theta;
+                    pi_preload_resume(w0, th0);
+                    S.duty_sf = (S.int_q + ((S.p.decoupling & 2) ? w0 * S.lam_eff : 0.0f)) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                     S.brk_w_prev = w0;
                     S.brk_vq_prev = S.duty_sf;
                     S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);   /* mode duty : part de la FEM, pas de 0 */
@@ -1693,9 +1774,9 @@ RAMFUNC void foc_isr(const foc_adc_t *adc, foc_pwm_t *out)
             } else if (obs_fast) {
                 /* Reprise au vol : integrateurs sur la FEM observee (selon l'anticipation) */
                 S.id_ref = S.iq_ref = 0.0f;
-                pi_preload(S.obs.omega, true);
+                pi_preload_resume(S.obs.omega, S.obs.theta);
                 /* frein au vol : modulation et signes courants (pas de court-circuit a pleine vitesse) */
-                S.duty_sf = (S.oc.r * S.iq_ref + S.obs.omega * S.lam_eff) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
+                S.duty_sf = (S.int_q + ((S.p.decoupling & 2) ? S.obs.omega * S.lam_eff : 0.0f)) / fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);
                 S.brk_w_prev = S.obs.omega;
                 S.brk_vq_prev = S.duty_sf;
                 S.vq = S.duty_sf * fm_max(S.vbus_f * FM_1_SQRT3, 1.0f);       /* mode duty : part de la FEM, pas de 0 */
@@ -2262,6 +2343,8 @@ output:
         S.pr_n = 0;
     }
     g_foc_telem.sync_resid = S.sync_r;
+    if (S.bb_prev_st == FOC_ST_IDLE && (S.st == FOC_ST_RUN || S.st == FOC_ST_START)) blackbox_start_event(g_foc_telem.ticks);
+    S.bb_prev_st = S.st;
     S.br_p2 = S.br_p1;
     S.br_p1 = S.br;
 

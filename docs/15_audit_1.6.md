@@ -309,3 +309,54 @@ vérifier `motor_hw.c` et `main.c` : aucun test PC ne les compile).
 **Avant de rouler avec la 1.7** : `faults` après un essai donne la marge réelle de la détection de perte de synchro
 (« max vu », coupure à 1,00) ; au-dessus de 0,5 en roulage normal, le seuil est trop serré pour la carte. Après tout
 défaut, `fault_dump` donne les 17 ms qui l'entourent : c'est la donnée qui a manqué pour comprendre la casse.
+
+---
+
+## 15.8 Reprise au vol : banc d'expériences et essai au banc (1.8)
+
+**Banc d'expériences en simulation** (`SIM_LAB=1 firmware/build/sim/sim.exe`, variables dans `sim/sim_lab.inc`) :
+chaque reprise est isolée (moteur de l'utilisateur, roue libre 150 ms, 2 A pendant 100 ms, défaut réarmé entre deux
+reprises), courants vrais du modèle. Crête de phase, 72 V :
+
+| Cas | 10 000 ERPM | 40 000 ERPM |
+|---|---|---|
+| mesure idéale (obs. 0) | 4 A | 28 A |
+| gains des diviseurs ±2 % seuls | 4 A | 33 A |
+| + dérive d'offset 0,1 V (obs. 0, ORTEGA_ORIGINAL) | **18 A** | **58 A** |
+| idem, obs. 3 (MXLEMMING_LAMBDA_COMP, défaut VESC) | 5 A | 30 A |
+| idem, **obs. 8 (RESC_RADIAL)** | **2,2 A** | **5,5 A** |
+| obs. 8, dérive 0,3 V | 5 A | 6 A |
+
+Constats :
+- La **dérive d'offset des tensions de phase** depuis la calibration du démarrage est la cause principale : en roue libre,
+  l'observateur intègre ces tensions ; 0,1 V suffit à fausser l'angle de 6° et la vitesse de 7 % (obs. 0). La partie
+  « gain × Vbus/2 » est corrigée par la calibration ; seule la dérive compte.
+- Le **choix de l'observateur** est le levier principal : le rappel radial (obs. 8) rejette cette dérive.
+- La reprise sur **tension mesurée** (comme VESC, `resume_mode 1`) ne fait pas mieux que la tension du modèle.
+- Dans l'essai 27c, la limite de vitesse de la couche de contrôle (30 000 ERPM) ramenait la consigne à 0 A : les pics
+  observés à 40 000 ERPM viennent donc de la seule remise du pont.
+- À 48 V, au-delà de ~29 700 ERPM, la FEM entre phases dépasse le bus : les diodes conduisent même pont coupé (freinage).
+
+**Outils de banc ajoutés au firmware (1.8)** :
+- `vph_check` (moteur lancé, pont coupé, deux appels) : dérive d'offset et gain relatif de chaque diviseur, flux réel,
+  tension sur l'axe d de l'observateur. Vérifié en simulation : défauts injectés retrouvés à ±0,015 V et ±0,1 %.
+- `fault_dump arm` : l'enregistreur se fige à la prochaine remise en marche du pont (32 périodes avant, 224 après).
+- `resume_mode 0|1` : reprise sur la tension du modèle ou mesurée (non enregistré).
+
+**Essai au banc** : `python tools/bench_reprise.py [port]`. Contraintes appliquées par le script : aucun courant de
+freinage (courant min 0, régénération 0, jamais `brake` ni `duty`), refus au-dessus de 48 V, coupure à 50 V, arrêt à
+49 V, plafond 22 000 ERPM, rien d'enregistré en flash (valeurs remises à la fin). Il compare les observateurs 3 et 8 à
+5 000, 10 000, 15 000 et 20 000 ERPM, avec `vph_check` et l'enregistrement de chaque reprise, et écrit
+`bench_reprise_<date>.txt`.
+
+Prédiction de la simulation pour le banc (48 V, crête max pour 2 A) :
+
+| | 5 000 | 10 000 | 15 000 | 20 000 ERPM |
+|---|---|---|---|---|
+| obs. 3, diviseurs idéaux | 2,9 | 3,0 | 2,9 | 2,9 A |
+| obs. 3, dérive 0,1 V | 15 | 9 | 11 | 13 A |
+| obs. 8, diviseurs idéaux | 2,2 | 2,2 | 2,4 | 2,5 A |
+| obs. 8, dérive 0,1 V | 2,2 | 2,6 | 3,9 | 5,5 A |
+
+Si le banc confirme (dérive mesurée par `vph_check`, obs. 8 nettement meilleur), le changement à faire est de passer
+le moteur de l'utilisateur sur l'observateur 8, puis de valider la reprise à haute tension avant tout roulage.

@@ -122,6 +122,7 @@ int main(void)
     p.i_slew = 2000;
     if (getenv("SIM_CS")) p.cs_mode = (uint8_t)atoi(getenv("SIM_CS"));
     foc_init(&p);
+    if (getenv("SIM_RESUME")) foc_set_resume_mode((uint8_t)atoi(getenv("SIM_RESUME")));
 
     printf("== 1. Calibration des offsets\n");
     /* defaut au demarrage (watchdog), avant la fin de la calibration : apres effacement, la calibration
@@ -139,6 +140,7 @@ int main(void)
     printf("  offsets %.1f %.1f %.1f (vrais %.0f %.0f %.0f)\n", g_foc_telem.off_cs[0], g_foc_telem.off_cs[1],
            g_foc_telem.off_cs[2], M.off[0], M.off[1], M.off[2]);
     check("offsets a +/-2 LSB", fabs(g_foc_telem.off_cs[0] - M.off[0]) < 2 && fabs(g_foc_telem.off_cs[1] - M.off[1]) < 2);
+#include "sim_lab.inc"
 
     printf("== 2. Identification R / Ld / Lq (temps mort partiel sous 4 A, comme de gros MOSFET)\n");
     M.i_soft = 4.0;
